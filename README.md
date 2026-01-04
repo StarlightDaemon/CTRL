@@ -13,9 +13,26 @@ A browser extension for managing BitTorrent clients. Built with WXT, React, and 
 
 ## ✨ Features
 
-- **Universal Client Support** - Manages 9 popular clients including qBittorrent, Transmission, and Deluge.
-- **Secure Vault** - Encrypted credential storage with AES-GCM (Zero telemetry).
-- **Modern UI** - Feature-rich interface with context menus, theming, and multi-server support.
+- **Universal Client Support** - Unified interface for all major BitTorrent clients (see list below).
+- **Secure Vault** - Industry-standard AES-GCM encryption for your credentials.
+- **Privacy First** - Zero telemetry, zero analytics, strictly local data storage.
+- **Modern UI** - Beautiful dark mode, context menus, and responsive design.
+- **Multilingual** - Professionally translated into 7 languages.
+- **Open Source** - MIT licensed and completely auditable code.
+
+### 📦 Supported Clients
+
+| Client | Status | Key Features |
+|--------|--------|--------------|
+| qBittorrent | ✅ Full | Categories, Tags, Sequential Download |
+| Transmission | ✅ Full | Labels, Directories |
+| Deluge | ✅ Full | Labels, Auth |
+| Flood | ✅ Full | Tags, JWT |
+| ruTorrent | ✅ Full | Labels, Fast Resume |
+| uTorrent | ✅ Full | Token Auth |
+| BiglyBT | ✅ Full | Basic Control |
+| Vuze | ✅ Full | Basic Control |
+| Aria2 | ✅ Basic | RPC Multicall |
 
 ---
 
@@ -36,22 +53,6 @@ This project is currently in **Beta**. We recommend most users wait for the offi
 2. **Install**:
    - **Chrome**: Load unpacked in Developer Mode.
    - **Firefox**: Load as Temporary Add-on.
-
----
-
-## 📦 Supported Clients
-
-| Client | Status | Key Features |
-|--------|--------|--------------|
-| qBittorrent | ✅ Full | Categories, Tags, Sequential Download |
-| Transmission | ✅ Full | Labels, Directories |
-| Deluge | ✅ Full | Labels, Auth |
-| Flood | ✅ Full | Tags, JWT |
-| ruTorrent | ✅ Full | Labels, Fast Resume |
-| uTorrent | ✅ Full | Token Auth |
-| BiglyBT | ✅ Full | Basic Control |
-| Vuze | ✅ Full | Basic Control |
-| Aria2 | ✅ Basic | RPC Multicall |
 
 ---
 
