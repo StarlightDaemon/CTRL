@@ -24,29 +24,55 @@ A modern, cross-browser extension for controlling torrent clients. Built with WX
 
 ## 🚀 Quick Start
 
-### Install from Store
+### Download Beta Release
 
-- [Chrome Web Store](https://chrome.google.com/webstore) *(coming soon)*
-- [Firefox Add-ons](https://addons.mozilla.org/firefox) *(coming soon)*
+**Recommended**: Download pre-built packages from [GitHub Releases](https://github.com/StarlightDaemon/CTRL/releases)
 
-> **Beta Release Available**: Download from [GitHub Releases](https://github.com/StarlightDaemon/CTRL/releases)
+**Chrome/Edge**:
+1. Download `ctrl-chrome-v0.2.0-beta.1.zip`
+2. Extract the ZIP file
+3. Go to `chrome://extensions/`
+4. Enable "Developer mode"
+5. Click "Load unpacked" and select the extracted folder
 
-### Build from Source
+**Firefox**:
+1. Download `ctrl-firefox-v0.2.0-beta.1.zip`
+2. Extract the ZIP file
+3. Go to `about:debugging#/runtime/this-firefox`
+4. Click "Load Temporary Add-on"
+5. Select `manifest.json` from the extracted folder
+
+### Install from Store *(Coming Soon)*
+
+- [Chrome Web Store](https://chrome.google.com/webstore) - In review
+- [Firefox Add-ons](https://addons.mozilla.org/firefox) - In review
+
+<details>
+<summary><b>Advanced: Build from Source</b></summary>
+
+For developers who want to build the extension themselves:
 
 ```bash
-# Clone the repo
-git clone https://github.com/YOUR_USERNAME/CTRL.git
+# Clone the repository
+git clone https://github.com/StarlightDaemon/CTRL.git
 cd CTRL/extension
 
 # Install dependencies
 npm install
 
-# Development (Chrome)
-npm run dev
+# Build for Chrome
+npm run build:chrome
 
-# Build for production
-npm run build
+# Build for Firefox
+npm run build:firefox
+
+# Run tests
+npm test
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full development setup.
+
+</details>
 
 ---
 
