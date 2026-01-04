@@ -14,7 +14,6 @@ A browser extension for managing BitTorrent clients. Built with WXT, React, and 
 ## ✨ Features
 
 - **Universal Client Support** - Manages 9 popular clients including qBittorrent, Transmission, and Deluge.
-- **Seamless Integrations** - Adds "Add to Client" buttons to 7 top torrent sites.
 - **Secure Vault** - Encrypted credential storage with AES-GCM (Zero telemetry).
 - **Modern UI** - Feature-rich interface with context menus, theming, and multi-server support.
 
@@ -70,12 +69,6 @@ This project is currently in **Beta**. We recommend most users wait for the offi
 ## 🛠️ Development
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
-
-```bash
-npm run dev          # Start dev server
-npm run build        # Production build
-npm run test         # Unit tests
-```
 
 ---
 
