@@ -105,4 +105,4 @@ MIT © CTRL Contributors
 
 ## 🙏 Acknowledgments
 
-Originally forked from [Torrent Control](https://github.com/AthanasiusBrainworx/torrent-control).
+Inspired by [Torrent Control](https://github.com/AthanasiusBrainworx/torrent-control). CTRL is a complete rewrite built from the ground up with modern technologies.
