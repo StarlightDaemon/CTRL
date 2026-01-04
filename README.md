@@ -4,9 +4,9 @@
 
 A modern, cross-browser extension for controlling torrent clients. Built with WXT, React, and TypeScript.
 
-[![Chrome](https://img.shields.io/badge/Chrome-Extension-green?logo=googlechrome)](https://chrome.google.com/webstore)
-[![Firefox](https://img.shields.io/badge/Firefox-Add--on-orange?logo=firefox)](https://addons.mozilla.org/addon/torrent-control/)
-[![Tests](https://img.shields.io/badge/Tests-106%20passing-brightgreen)](extension/tests)
+[![Chrome](https://img.shields.io/badge/Chrome-Coming_Soon-lightgrey?logo=googlechrome)](https://github.com/StarlightDaemon/CTRL/releases)
+[![Firefox](https://img.shields.io/badge/Firefox-Coming_Soon-lightgrey?logo=firefox)](https://github.com/StarlightDaemon/CTRL/releases)
+[![Tests](https://img.shields.io/badge/Tests-153%20passing-brightgreen)](extension/tests)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
@@ -27,7 +27,9 @@ A modern, cross-browser extension for controlling torrent clients. Built with WX
 ### Install from Store
 
 - [Chrome Web Store](https://chrome.google.com/webstore) *(coming soon)*
-- [Firefox Add-ons](https://addons.mozilla.org/addon/torrent-control/)
+- [Firefox Add-ons](https://addons.mozilla.org/firefox) *(coming soon)*
+
+> **Beta Release Available**: Download from [GitHub Releases](https://github.com/StarlightDaemon/CTRL/releases)
 
 ### Build from Source
 
