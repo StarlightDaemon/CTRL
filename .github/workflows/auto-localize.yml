@@ -1,0 +1,44 @@
+name: Zero-Touch Localization
+
+on:
+  push:
+    paths:
+      - 'extension/public/_locales/en/messages.json' # Only trigger when source changes
+    branches:
+      - main
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # Required to push translations back to repo
+      pull-requests: write  # Optional: if you prefer PRs over direct commit
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # Essential: We need the previous commit to perform a diff
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Translator Dependencies
+        run: |
+          cd extension/scripts/translator
+          npm ci
+
+      - name: Run AI Translator Agent
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          # This script executes the diffing, API calls, and file writing
+          node extension/scripts/translator/index.js
+
+      - name: Commit and Push Changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(i18n): Auto-generate translations [skip ci]"
+          file_pattern: 'extension/public/_locales/**/messages.json'

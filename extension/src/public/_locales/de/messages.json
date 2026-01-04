@@ -1,0 +1,130 @@
+{
+    "addonConfigurationTitle": {
+        "message": "Add-on Konfiguration",
+        "description": "Addon configuration"
+    },
+    "contextMenuOption": {
+        "message": "Kontextmenü",
+        "description": "Context menu"
+    },
+    "contextMenuDefaultOption": {
+        "message": "Standard",
+        "description": "Context menu default"
+    },
+    "contextMenuSimpleOption": {
+        "message": "Einfach",
+        "description": "Context menu simple"
+    },
+    "contextMenuHiddenOption": {
+        "message": "Versteckt",
+        "description": "Context menu hidden"
+    },
+    "catchUrlsOption": {
+        "message": "Torrent-URLs abfangen",
+        "description": "Catch torrent URLs"
+    },
+    "addAdvancedOption": {
+        "message": "Über erweiterten Dialog hinzufügen",
+        "description": "Add torrents via advanced dialog"
+    },
+    "enableNotificationsOption": {
+        "message": "Benachrichtigungen anzeigen",
+        "description": "Enable notifications option"
+    },
+    "addPausedOption": {
+        "message": "Torrents pausiert hinzufügen",
+        "description": "Add as paused by default"
+    },
+    "torrentLabelsOption": {
+        "message": "Labels",
+        "description": "Label list option"
+    },
+    "addTorrentAction": {
+        "message": "Torrent hinzufügen",
+        "description": "Context menu action"
+    },
+    "addTorrentPausedAction": {
+        "message": "Torrent hinzufügen (Pausiert)",
+        "description": "Context menu action"
+    },
+    "saveAction": {
+        "message": "Speichern",
+        "description": "Save action"
+    },
+    "removeAction": {
+        "message": "Server entfernen",
+        "description": "Remove action"
+    },
+    "addServerAction": {
+        "message": "Neuen Server hinzufügen",
+        "description": "Add server action"
+    },
+    "serverConfigurationTitle": {
+        "message": "Server-Konfiguration",
+        "description": "Server configuration title"
+    },
+    "bittorrentClientOption": {
+        "message": "BitTorrent-Client",
+        "description": "Bittorrent client option"
+    },
+    "serverSelect": {
+        "message": "Aktueller Server",
+        "description": "Server select"
+    },
+    "serverNameOption": {
+        "message": "Servername",
+        "description": "Server name option"
+    },
+    "serverAddressOption": {
+        "message": "Serveradresse",
+        "description": "Server address option"
+    },
+    "usernameOption": {
+        "message": "Benutzername",
+        "description": "Username option"
+    },
+    "passwordOption": {
+        "message": "Passwort",
+        "description": "Password option"
+    },
+    "torrentAddedNotification": {
+        "message": "Torrent hinzugefügt",
+        "description": "Torrent added notification."
+    },
+    "loginError": {
+        "message": "Anmeldung fehlgeschlagen",
+        "description": "Login error."
+    },
+    "torrentAddError": {
+        "message": "Torrent konnte nicht hinzugefügt werden. $1",
+        "description": "Add error."
+    },
+    "addTorrentTitle": {
+        "message": "Torrent hinzufügen",
+        "description": "Add torrent"
+    },
+    "labelSelect": {
+        "message": "Label",
+        "description": "Label select"
+    },
+    "downloadDirectorySelect": {
+        "message": "Download-Verzeichnis",
+        "description": "Download directory select"
+    },
+    "defaultOption": {
+        "message": "Standard",
+        "description": "Default option"
+    },
+    "noneOption": {
+        "message": "Keine",
+        "description": "None option"
+    },
+    "sidebarServers": {
+        "message": "Server",
+        "description": "Sidebar servers label"
+    },
+    "sidebarGeneral": {
+        "message": "Allgemein",
+        "description": "Sidebar general label"
+    }
+}
