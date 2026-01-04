@@ -1,0 +1,130 @@
+{
+    "addonConfigurationTitle": {
+        "message": "扩展配置",
+        "description": "Addon configuration"
+    },
+    "contextMenuOption": {
+        "message": "右键菜单",
+        "description": "Context menu"
+    },
+    "contextMenuDefaultOption": {
+        "message": "默认",
+        "description": "Context menu default"
+    },
+    "contextMenuSimpleOption": {
+        "message": "简单",
+        "description": "Context menu simple"
+    },
+    "contextMenuHiddenOption": {
+        "message": "隐藏",
+        "description": "Context menu hidden"
+    },
+    "catchUrlsOption": {
+        "message": "捕获种子链接",
+        "description": "Catch torrent URLs"
+    },
+    "addAdvancedOption": {
+        "message": "通过高级对话框添加",
+        "description": "Add torrents via advanced dialog"
+    },
+    "enableNotificationsOption": {
+        "message": "显示通知",
+        "description": "Enable notifications option"
+    },
+    "addPausedOption": {
+        "message": "添加时暂停种子",
+        "description": "Add as paused by default"
+    },
+    "torrentLabelsOption": {
+        "message": "标签",
+        "description": "Label list option"
+    },
+    "addTorrentAction": {
+        "message": "添加种子",
+        "description": "Context menu action"
+    },
+    "addTorrentPausedAction": {
+        "message": "添加种子（暂停）",
+        "description": "Context menu action"
+    },
+    "saveAction": {
+        "message": "保存",
+        "description": "Save action"
+    },
+    "removeAction": {
+        "message": "移除服务器",
+        "description": "Remove action"
+    },
+    "addServerAction": {
+        "message": "添加新服务器",
+        "description": "Add server action"
+    },
+    "serverConfigurationTitle": {
+        "message": "服务器配置",
+        "description": "Server configuration title"
+    },
+    "bittorrentClientOption": {
+        "message": "BitTorrent 客户端",
+        "description": "Bittorrent client option"
+    },
+    "serverSelect": {
+        "message": "当前服务器",
+        "description": "Server select"
+    },
+    "serverNameOption": {
+        "message": "服务器名称",
+        "description": "Server name option"
+    },
+    "serverAddressOption": {
+        "message": "服务器地址",
+        "description": "Server address option"
+    },
+    "usernameOption": {
+        "message": "用户名",
+        "description": "Username option"
+    },
+    "passwordOption": {
+        "message": "密码",
+        "description": "Password option"
+    },
+    "torrentAddedNotification": {
+        "message": "已添加种子",
+        "description": "Torrent added notification."
+    },
+    "loginError": {
+        "message": "登录失败",
+        "description": "Login error."
+    },
+    "torrentAddError": {
+        "message": "添加种子失败。$1",
+        "description": "Add error."
+    },
+    "addTorrentTitle": {
+        "message": "添加种子",
+        "description": "Add torrent"
+    },
+    "labelSelect": {
+        "message": "标签",
+        "description": "Label select"
+    },
+    "downloadDirectorySelect": {
+        "message": "下载目录",
+        "description": "Download directory select"
+    },
+    "defaultOption": {
+        "message": "默认",
+        "description": "Default option"
+    },
+    "noneOption": {
+        "message": "无",
+        "description": "None option"
+    },
+    "sidebarServers": {
+        "message": "服务器",
+        "description": "Sidebar servers label"
+    },
+    "sidebarGeneral": {
+        "message": "通用",
+        "description": "Sidebar general label"
+    }
+}
