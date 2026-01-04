@@ -13,12 +13,10 @@ A browser extension for managing BitTorrent clients. Built with WXT, React, and 
 
 ## ✨ Features
 
-- **9 Torrent Clients** - qBittorrent, Transmission, Deluge, Flood, ruTorrent, uTorrent, BiglyBT, Vuze, Aria2
-- **7 Site Integrations** - 1337x, Nyaa, TPB, FitGirl, RARBG, TorrentGalaxy, AudioBook Bay
-- **Secure Vault** - Encrypted credential storage with AES-GCM
-- **Context Menu** - Right-click to add torrents
-- **Multi-Server** - Manage multiple torrent clients
-- **Theming** - Dark mode and multiple theme options
+- **Universal Client Support** - Manages 9 popular clients including qBittorrent, Transmission, and Deluge.
+- **Seamless Integrations** - Adds "Add to Client" buttons to 7 top torrent sites.
+- **Secure Vault** - Encrypted credential storage with AES-GCM (Zero telemetry).
+- **Modern UI** - Feature-rich interface with context menus, theming, and multi-server support.
 
 ---
 
@@ -27,67 +25,34 @@ A browser extension for managing BitTorrent clients. Built with WXT, React, and 
 **Current Status**: Beta / Active Development  
 **Target**: v1.0 Store Release (Coming 2026)
 
-This project is currently in **Beta**. We recommend most users wait for the official release on the Chrome Web Store and Firefox Add-ons site for the best experience (automatic updates, signing, etc.).
+This project is currently in **Beta**. We recommend most users wait for the official release on the Chrome Web Store and Firefox Add-ons site.
 
 ---
 
 ## 📥 Installation
 
-### Option 1: Store Release (Recommended)
+> **Beta Release Available**: Download from [GitHub Releases](https://github.com/StarlightDaemon/CTRL/releases) - See [Beta Guide](docs/BETA_TESTING.md) for instructions.
 
-*Coming soon. Watch this repo for updates.*
-
-- ⚪ **Chrome Web Store** - In Review
-- ⚪ **Firefox Add-ons** - In Review
-
-### Option 2: Beta Testing (Advanced)
-
-If you want to test the latest features and help report bugs, you can install the unsigned beta.
-
-> **⚠️ Note**: As these are unsigned beta builds, Chrome will require "Developer Mode" and Firefox will treat them as "Temporary Extensions" (removed on restart).
-
-1. **Download**:> **Beta Release Available**: Download from [GitHub Releases](https://github.com/StarlightDaemon/CTRL/releases) - See [Beta Guide](docs/BETA_TESTING.md)
-2. **Chrome/Edge**:
-   - Go to `chrome://extensions` -> Toggle "Developer Mode"
-   - Drag and drop the `ctrl-chrome-*.zip` file (or extract and "Load Unpacked")
-3. **Firefox**:
-   - Go to `about:debugging` -> "This Firefox"
-   - Click "Load Temporary Add-on" -> Select the `manifest.json` inside the ZIP
-
----
-
-## 🛠️ Development
-
-Interested in contributing? See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions and architecture documentation.
+1. **Download**: Get the latest `.zip` release.
+2. **Install**:
+   - **Chrome**: Load unpacked in Developer Mode.
+   - **Firefox**: Load as Temporary Add-on.
 
 ---
 
 ## 📦 Supported Clients
 
-| Client | Status | Features |
-|--------|--------|----------|
-| qBittorrent | ✅ Full | Categories, Tags, Sequential |
+| Client | Status | Key Features |
+|--------|--------|--------------|
+| qBittorrent | ✅ Full | Categories, Tags, Sequential Download |
 | Transmission | ✅ Full | Labels, Directories |
-| Deluge | ✅ Full | Labels |
-| Flood | ✅ Full | Tags |
+| Deluge | ✅ Full | Labels, Auth |
+| Flood | ✅ Full | Tags, JWT |
 | ruTorrent | ✅ Full | Labels, Fast Resume |
-| uTorrent | ✅ Full | - |
-| BiglyBT | ✅ Full | - |
-| Vuze | ✅ Full | - |
-| Aria2 | ✅ Basic | - |
-
----
-
-## 🔧 Development
-
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for setup instructions.
-
-```bash
-npm run dev          # Start dev server
-npm run build        # Production build
-npm run compile      # Type check
-npm run test         # Unit tests
-```
+| uTorrent | ✅ Full | Token Auth |
+| BiglyBT | ✅ Full | Basic Control |
+| Vuze | ✅ Full | Basic Control |
+| Aria2 | ✅ Basic | RPC Multicall |
 
 ---
 
@@ -95,17 +60,22 @@ npm run test         # Unit tests
 
 | Document | Description |
 |----------|-------------|
-| [ROADMAP.md](ROADMAP.md) | Feature roadmap |
-| [docs/API.md](docs/API.md) | Client adapter API |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Dev setup |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
+| [Beta Guide](docs/BETA_TESTING.md) | **Start Here** - Installation & Testing |
+| [ROADMAP.md](ROADMAP.md) | Future features & strategy |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Setup build environment |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 
 ---
 
-## 🤝 Contributing
+## 🛠️ Development
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
+
+```bash
+npm run dev          # Start dev server
+npm run build        # Production build
+npm run test         # Unit tests
+```
 
 ---
 
@@ -114,7 +84,7 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 MIT © CTRL Contributors
 
 ---
-| [Example Beta Guide](docs/BETA_TESTING.md) | Beta installation & testing |
+
 ## 🙏 Acknowledgments
 
 Inspired by [Torrent Control](https://github.com/AthanasiusBrainworx/torrent-control). CTRL is a complete rewrite built from the ground up with modern technologies.
