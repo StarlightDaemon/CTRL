@@ -16,8 +16,8 @@ A browser extension for managing BitTorrent clients. Built with WXT, React, and 
 - **Universal Client Support** - Unified interface for all major BitTorrent clients (see list below).
 - **Secure Vault** - Industry-standard AES-GCM encryption for your credentials.
 - **Privacy First** - Zero telemetry, zero analytics, strictly local data storage.
-- **Modern UI** - Beautiful dark mode, context menus, and responsive design.
-- **Multilingual** - Professionally translated into 7 languages.
+- **Modern UI** - Native dark mode, context menus, and responsive design.
+- **Multilingual** - Translated into 7 languages.
 - **Open Source** - MIT licensed and completely auditable code.
 
 ### 📦 Supported Clients
