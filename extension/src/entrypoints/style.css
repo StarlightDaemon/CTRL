@@ -1,0 +1,185 @@
+@import '../app/styles/global.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f1f5f9;
+  --bg-card: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --border: #e2e8f0;
+  --input-bg: #ffffff;
+}
+
+[data-theme='gray'] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #e2e8f0;
+  --bg-card: #ffffff;
+  --text-primary: #334155;
+  --text-secondary: #64748b;
+  --accent: #475569;
+  --accent-hover: #334155;
+  --border: #cbd5e1;
+  --input-bg: #f1f5f9;
+}
+
+[data-theme='dark'] {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-card: #1e293b;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --border: #334155;
+  --input-bg: #0f172a;
+}
+
+[data-theme='oled'] {
+  --bg-primary: #000000;
+  --bg-secondary: #000000;
+  --bg-card: #121212;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --border: #27272a;
+  --input-bg: #000000;
+}
+
+/* Colored Themes (CE) */
+[data-theme='midnight'] {
+  --bg-primary: #2e2c54;
+  --bg-secondary: #1a1833;
+  --bg-card: #3f3c6e;
+  --text-primary: #e0e7ff;
+  --text-secondary: #a5b4fc;
+  --accent: #8b5cf6;
+  --accent-hover: #7c3aed;
+  --border: #4f46e5;
+  --input-bg: #2e2c54;
+}
+
+[data-theme='forest'] {
+  --bg-primary: #143322;
+  --bg-secondary: #0a1f14;
+  --bg-card: #1f4a33;
+  --text-primary: #dcfce7;
+  --text-secondary: #86efac;
+  --accent: #22c55e;
+  --accent-hover: #16a34a;
+  --border: #15803d;
+  --input-bg: #143322;
+}
+
+[data-theme='ocean'] {
+  --bg-primary: #163a52;
+  --bg-secondary: #0b2333;
+  --bg-card: #20506e;
+  --text-primary: #e0f2fe;
+  --text-secondary: #7dd3fc;
+  --accent: #0ea5e9;
+  --accent-hover: #0284c7;
+  --border: #0369a1;
+  --input-bg: #163a52;
+}
+
+[data-theme='sky_blue'] {
+  --bg-primary: #bae6fd;
+  --bg-secondary: #e0f2fe;
+  --bg-card: #ffffff;
+  --text-primary: #0c4a6e;
+  --text-secondary: #0369a1;
+  --accent: #0284c7;
+  --accent-hover: #0369a1;
+  --border: #7dd3fc;
+  --input-bg: #ffffff;
+}
+
+/* Performance Mode Overrides */
+[data-performance='fancy'] {
+  --shadow-glow: 0 0 15px rgba(59, 130, 246, 0.5);
+}
+
+[data-performance='fancy'] button,
+[data-performance='fancy'] .bg-card,
+[data-performance='fancy'] input,
+[data-performance='fancy'] select {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-performance='fancy'] button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-glow);
+}
+
+[data-performance='fancy'] .bg-card {
+  backdrop-filter: blur(12px);
+  background-color: color-mix(in srgb, var(--bg-card), transparent 10%);
+  border: 1px solid color-mix(in srgb, var(--border), transparent 80%);
+  border-radius: 0.5rem;
+}
+
+[data-performance='low'] .bg-card,
+[data-performance='low'] .bg-primary,
+[data-performance='low'] .bg-secondary,
+[data-performance='low'] button,
+[data-performance='low'] input,
+[data-performance='low'] select {
+  background-image: none !important;
+}
+
+
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+/* Low Performance / Accessible Toggle */
+[data-performance='low'] .ctrl-toggle-track {
+  background-color: transparent !important;
+  border: 2px solid var(--text-secondary);
+  border-radius: 4px !important;
+  width: 48px !important;
+  height: 24px !important;
+  position: relative;
+}
+
+[data-performance='low'] .ctrl-toggle-track::after {
+  display: none !important;
+}
+
+[data-performance='low'] .ctrl-toggle-track::before {
+  content: "OFF";
+  display: block;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: monospace;
+  font-weight: bold;
+  text-align: center;
+  line-height: 20px;
+  width: 100%;
+}
+
+[data-performance='low'] input:checked+.ctrl-toggle-track {
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
+[data-performance='low'] input:checked+.ctrl-toggle-track::before {
+  content: "ON";
+  color: #ffffff;
+  /* Always white for contrast on accent */
+}

@@ -1,0 +1,34 @@
+node_modules/
+web-ext-ar# Build outputs
+builds/
+*.zip
+*.crx
+*.xpi
+
+# Dependencies
+node_modules/
+
+# Testing artifacts
+test-results/
+playwright-report/
+coverage/
+
+# Build cache
+.wxt/
+.output/
+
+# Logs
+*.log
+build.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups (extension-level)
+backups/
+ea/

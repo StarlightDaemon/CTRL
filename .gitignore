@@ -1,0 +1,75 @@
+# CTRL Extension - Git Repository Contents
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.pnpm-debug.log*
+
+# Build outputs (NEVER commit these)
+builds/
+.output/
+dist/
+*.zip
+*.crx
+*.xpi
+
+# WXT cache
+.wxt/
+.wxt-cache/
+
+# Testing
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Extension-specific
+web-ext-artifacts/
+*.pem
+
+# Research & Documentation to EXCLUDE
+docs/reports/
+docs/archive/
+docs/specs/
+
+# Artifacts directory (our planning docs - not for public)
+.gemini/
+brain/
+
+# Workspace backups (NOT part of CTRL project)
+backups/
+
+# Extension build artifacts (handled by extension/.gitignore but listed here too)
+extension/builds/
+extension/*.zip
+extension/node_modules/
+extension/.wxt/
+extension/test-results/
+extension/playwright-report/
