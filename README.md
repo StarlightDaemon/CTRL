@@ -1,8 +1,8 @@
 # CTRL
 
-> **Manage your torrents from the browser**
+> **Control torrent clients from your browser**
 
-A modern, cross-browser extension for controlling torrent clients. Built with WXT, React, and TypeScript.
+A browser extension for managing BitTorrent clients. Built with WXT, React, and TypeScript.
 
 [![Chrome](https://img.shields.io/badge/Chrome-Coming_Soon-lightgrey?logo=googlechrome)](https://github.com/StarlightDaemon/CTRL/releases)
 [![Firefox](https://img.shields.io/badge/Firefox-Coming_Soon-lightgrey?logo=firefox)](https://github.com/StarlightDaemon/CTRL/releases)
@@ -18,7 +18,7 @@ A modern, cross-browser extension for controlling torrent clients. Built with WX
 - **Secure Vault** - Encrypted credential storage with AES-GCM
 - **Context Menu** - Right-click to add torrents
 - **Multi-Server** - Manage multiple torrent clients
-- **Dark Mode** - Beautiful dark theme by default
+- **Theming** - Dark mode and multiple theme options
 
 ---
 
