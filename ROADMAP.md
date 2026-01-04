@@ -13,32 +13,17 @@ Transform CTRL from a working port into a **Best-in-Class** torrent management s
 
 ---
 
-## Current Status: v0.1.x (Beta)
+## Current Status: v0.2.0-beta.1 (Jan 2026)
 
 ### ✅ Completed
+- **Phase 1: Beta Release** (Jan 2026)
+  - Public GitHub Release
+  - 153 Unit Tests passing
+  - CI/CD Pipeline active
+  - Privacy Policy published
 
-| Feature | Status |
-|---------|--------|
-| WXT + React + TypeScript foundation | ✅ |
-| Manifest V3 migration | ✅ |
-| Feature-Sliced Design architecture | ✅ |
-| 8 Torrent client adapters | ✅ |
-| VaultService encrypted storage | ✅ |
-| 7 Site integrations | ✅ |
-| Context menu support | ✅ |
-| Chrome + Firefox builds | ✅ |
-
----
-
-## Short-Term Goals (v0.2.x)
-
-### 🔴 P0 - Critical
-
-| Goal | Description | Status |
-|------|-------------|--------|
-| **Test Coverage** | Unit tests for adapters, E2E for critical paths | ✅ Complete (106 tests) |
-| **CI/CD Pipeline** | GitHub Actions: lint, test, build on PR | ✅ Complete |
-| **Documentation** | Complete README, API docs, user guide | ✅ Complete |
+### 🚀 Upcoming: Phase 2 (Technical Excellence)
+- **Focus**: Stability, 1337x migration, YTS integration, E2E testing
 
 ### 🟡 P1 - Important
 

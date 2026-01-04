@@ -46,7 +46,7 @@ If you want to test the latest features and help report bugs, you can install th
 
 > **⚠️ Note**: As these are unsigned beta builds, Chrome will require "Developer Mode" and Firefox will treat them as "Temporary Extensions" (removed on restart).
 
-1. **Download**: Get the latest `.zip` from [GitHub Releases](https://github.com/StarlightDaemon/CTRL/releases)
+1. **Download**:> **Beta Release Available**: Download from [GitHub Releases](https://github.com/StarlightDaemon/CTRL/releases) - See [Beta Guide](docs/BETA_TESTING.md)
 2. **Chrome/Edge**:
    - Go to `chrome://extensions` -> Toggle "Developer Mode"
    - Drag and drop the `ctrl-chrome-*.zip` file (or extract and "Load Unpacked")
@@ -114,7 +114,7 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 MIT © CTRL Contributors
 
 ---
-
+| [Example Beta Guide](docs/BETA_TESTING.md) | Beta installation & testing |
 ## 🙏 Acknowledgments
 
 Inspired by [Torrent Control](https://github.com/AthanasiusBrainworx/torrent-control). CTRL is a complete rewrite built from the ground up with modern technologies.
