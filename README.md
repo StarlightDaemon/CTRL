@@ -22,57 +22,43 @@ A browser extension for managing BitTorrent clients. Built with WXT, React, and 
 
 ---
 
-## 🚀 Quick Start
+## 🚧 Project Status
 
-### Download Beta Release
+**Current Status**: Beta / Active Development  
+**Target**: v1.0 Store Release (Coming 2026)
 
-**Recommended**: Download pre-built packages from [GitHub Releases](https://github.com/StarlightDaemon/CTRL/releases)
+This project is currently in **Beta**. We recommend most users wait for the official release on the Chrome Web Store and Firefox Add-ons site for the best experience (automatic updates, signing, etc.).
 
-**Chrome/Edge**:
-1. Download `ctrl-chrome-v0.2.0-beta.1.zip`
-2. Extract the ZIP file
-3. Go to `chrome://extensions/`
-4. Enable "Developer mode"
-5. Click "Load unpacked" and select the extracted folder
+---
 
-**Firefox**:
-1. Download `ctrl-firefox-v0.2.0-beta.1.zip`
-2. Extract the ZIP file
-3. Go to `about:debugging#/runtime/this-firefox`
-4. Click "Load Temporary Add-on"
-5. Select `manifest.json` from the extracted folder
+## 📥 Installation
 
-### Install from Store *(Coming Soon)*
+### Option 1: Store Release (Recommended)
 
-- [Chrome Web Store](https://chrome.google.com/webstore) - In review
-- [Firefox Add-ons](https://addons.mozilla.org/firefox) - In review
+*Coming soon. Watch this repo for updates.*
 
-<details>
-<summary><b>Advanced: Build from Source</b></summary>
+- ⚪ **Chrome Web Store** - In Review
+- ⚪ **Firefox Add-ons** - In Review
 
-For developers who want to build the extension themselves:
+### Option 2: Beta Testing (Advanced)
 
-```bash
-# Clone the repository
-git clone https://github.com/StarlightDaemon/CTRL.git
-cd CTRL/extension
+If you want to test the latest features and help report bugs, you can install the unsigned beta.
 
-# Install dependencies
-npm install
+> **⚠️ Note**: As these are unsigned beta builds, Chrome will require "Developer Mode" and Firefox will treat them as "Temporary Extensions" (removed on restart).
 
-# Build for Chrome
-npm run build:chrome
+1. **Download**: Get the latest `.zip` from [GitHub Releases](https://github.com/StarlightDaemon/CTRL/releases)
+2. **Chrome/Edge**:
+   - Go to `chrome://extensions` -> Toggle "Developer Mode"
+   - Drag and drop the `ctrl-chrome-*.zip` file (or extract and "Load Unpacked")
+3. **Firefox**:
+   - Go to `about:debugging` -> "This Firefox"
+   - Click "Load Temporary Add-on" -> Select the `manifest.json` inside the ZIP
 
-# Build for Firefox
-npm run build:firefox
+---
 
-# Run tests
-npm test
-```
+## 🛠️ Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for full development setup.
-
-</details>
+Interested in contributing? See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions and architecture documentation.
 
 ---
 
