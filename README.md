@@ -6,6 +6,7 @@ A browser extension for managing BitTorrent clients. Built with WXT, React, and 
 
 [![Chrome](https://img.shields.io/badge/Chrome-Coming_Soon-lightgrey?logo=googlechrome)](https://github.com/StarlightDaemon/CTRL/releases)
 [![Firefox](https://img.shields.io/badge/Firefox-Coming_Soon-lightgrey?logo=firefox)](https://github.com/StarlightDaemon/CTRL/releases)
+[![CI](https://github.com/StarlightDaemon/CTRL/actions/workflows/ci.yml/badge.svg)](https://github.com/StarlightDaemon/CTRL/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/Tests-153%20passing-brightgreen)](extension/tests)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
