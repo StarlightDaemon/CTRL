@@ -27,11 +27,12 @@ export const test = base.extend<{
 
         // Launch Persistent Context
         const context = await chromium.launchPersistentContext(userDataDir, {
-            headless: false, // Explicitly false for extensions
+            headless: true, // Use headless mode
             args: [
-                process.env.CI ? '--headless=new' : '', // Use new headless in CI
                 `--disable-extensions-except=${pathToExtension}`,
                 `--load-extension=${pathToExtension}`,
+                '--no-sandbox',
+                '--disable-gpu',
             ].filter(Boolean),
         });
 

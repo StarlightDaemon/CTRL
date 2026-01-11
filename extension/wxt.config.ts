@@ -59,10 +59,6 @@ export default defineConfig({
           resources: ['popup.html', 'options.html'],
           matches: ['<all_urls>'],
         },
-        {
-          resources: ['/style.css'], // Our compiled CSS for shadow DOM
-          matches: ['*://torrentgalaxy.to/*', '*://proxygalaxy.me/*'], // Add proxies as needed
-        }
       ],
     };
   },
