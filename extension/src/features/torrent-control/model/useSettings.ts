@@ -21,10 +21,7 @@ export function useSettings() {
             ...val,
             globals: { ...DEFAULT_OPTIONS.globals, ...val?.globals },
             appearance: { ...DEFAULT_OPTIONS.appearance, ...val?.appearance },
-            layout: { ...DEFAULT_OPTIONS.layout, ...val?.layout },
-            '1337x': { ...DEFAULT_OPTIONS['1337x'], ...val?.['1337x'] },
-            nyaa: { ...DEFAULT_OPTIONS.nyaa, ...val?.nyaa },
-            fitgirl: { ...DEFAULT_OPTIONS.fitgirl, ...val?.fitgirl }
+            layout: { ...DEFAULT_OPTIONS.layout, ...val?.layout }
         } as AppOptions;
 
         // Try to load servers from Vault
@@ -115,16 +112,10 @@ export function useSettings() {
                 }));
             }
         } else {
-            // Settings Only (Global + Appearance + Sites)
+            // Settings Only (Global + Appearance)
             exportData.data = {
                 globals: settings.globals,
-                appearance: settings.appearance,
-                '1337x': settings['1337x'],
-                nyaa: settings.nyaa,
-                fitgirl: settings.fitgirl,
-                audiobook_bay: settings.audiobook_bay,
-                torrent_galaxy: settings.torrent_galaxy,
-                the_pirate_bay: settings.the_pirate_bay
+                appearance: settings.appearance
             };
         }
 

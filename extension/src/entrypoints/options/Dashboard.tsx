@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { OptionsLayout } from './OptionsLayout';
-import { SitesDashboard } from './SitesDashboard';
-import { Dashboard as ABBDashboard } from '../../features/audiobook-bay/ui/Dashboard';
 import { ServerConfigPanel } from '../../features/torrent-control/ui/ServerConfigPanel';
 import { FunctionSettings } from '../../features/torrent-control/ui/FunctionSettings';
 import { AppearanceSettings } from '../../features/torrent-control/ui/AppearanceSettings';
@@ -10,18 +8,14 @@ import { DataManagement } from '../../features/torrent-control/ui/DataManagement
 import { AboutTab } from '../../features/torrent-control/ui/AboutTab';
 import { SystemSettings } from '@/shared/ui/SystemSettings';
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
-import { PrismThemeProvider } from '@/app/providers/ThemeProvider';
 import { TorrentDashboard } from '../../features/torrent-control/ui/TorrentDashboard';
 import { CommandPalette } from '@/shared/ui/ui/CommandPalette';
-import { Download, BookHeadphones, Palette, Info, Settings, Hash, CircleDashed, Ghost, Activity, Wrench, Dumbbell, Cat, Magnet, Gamepad2, X, Lock, Layers, Globe } from 'lucide-react';
+import { Download, Palette, Info, CircleDashed, Wrench, Magnet, Lock } from 'lucide-react';
 import { ContextMenuSettings } from '../../features/torrent-control/ui/settings/ContextMenuSettings';
 import { NotificationSettings } from '../../features/torrent-control/ui/settings/NotificationSettings';
-import { PlaceholderPage } from '@/shared/ui/PlaceholderPage';
-// import { VirtualizedTorrentList } from '../../features/torrent-control/ui/VirtualizedTorrentList'; // Replaced by TorrentDashboard
 import { useTorrentPoller } from '../../features/torrent-control/model/useTorrentPoller';
 import { Utilities } from '../../features/torrent-control/ui/Utilities';
 import { AppSettings } from '@/shared/lib/types';
-import { useABBSettings } from '../../features/audiobook-bay/model/useABBSettings';
 import { PageHeader } from '@/shared/ui/PageHeader';
 
 interface DashboardProps {
@@ -48,7 +42,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     // Start polling for torrents
     useTorrentPoller();
-    const { settings: abbSettings, updateSettings: updateABBSettings } = useABBSettings();
 
     const defaultCustomOptions = { addToClient: true, pauseResume: true, openWebUI: true };
     const [previewContextMenu, setPreviewContextMenu] = useState(1);
@@ -103,12 +96,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         });
     };
 
-
-
     const getIcon = (id: string) => {
         switch (id) {
             case 'torrents': return Download;
-            case 'sites': return Globe;
             case 'utilities': return Magnet;
             default: return CircleDashed;
         }
@@ -117,14 +107,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const getLabel = (id: string) => {
         switch (id) {
             case 'torrents': return 'Torrent Control';
-            case 'sites': return 'Site Integrations';
             case 'utilities': return 'Utilities';
             default: return 'Coming Soon';
         }
     };
 
-    // Dynamic Navigation Structure
-    const defaultOrder = ['torrents', 'audiobooks', 'sites', 'utilities'];
+    // Dynamic Navigation Structure (simplified - no site integrations)
+    const defaultOrder = ['torrents', 'utilities'];
 
     // Merge stored settings with new defaults (handling upgrades for existing users)
     const effectiveSidebar = React.useMemo(() => {
@@ -132,14 +121,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         let items = [...settings.layout.sidebar];
 
-        // Check for missing items (e.g. if 'audiobooks' was added in an update)
+        // Filter out removed items (audiobooks, sites)
+        items = items.filter(item => defaultOrder.includes(item.id));
+
+        // Check for missing items
         const existingIds = new Set(items.map(i => i.id));
-        let added = false;
 
         defaultOrder.forEach((id, index) => {
             if (!existingIds.has(id)) {
-                items.push({ id, visible: true, order: index }); // Default to end or index?
-                added = true;
+                items.push({ id, visible: true, order: index });
             }
         });
 
@@ -152,14 +142,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const navItems = effectiveSidebar
         .filter(item => item.visible)
         .map(item => {
-            const icon = getIcon(item.id) === CircleDashed && item.id === 'audiobooks'
-                ? BookHeadphones
-                : getIcon(item.id);
-
             return {
                 id: item.id,
-                icon: icon,
-                label: item.id === 'audiobooks' ? 'AudioBooks' : getLabel(item.id)
+                icon: getIcon(item.id),
+                label: getLabel(item.id)
             };
         });
 
@@ -169,23 +155,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         { id: 'about', icon: Info, label: 'About' },
         { id: 'lock', icon: Lock, label: 'Lock Vault' },
     ];
-
-    const renderSubTabs = (tabs: { id: string; label: string }[], active: string, onChange: (id: string) => void) => (
-        <div className="flex space-x-1 mb-6 border-b border-border">
-            {tabs.map((tab) => (
-                <button
-                    key={tab.id}
-                    onClick={() => onChange(tab.id)}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${active === tab.id
-                        ? 'border-accent text-accent'
-                        : 'border-transparent text-text-secondary hover:text-text-primary hover:border-border'
-                        }`}
-                >
-                    {tab.label}
-                </button>
-            ))}
-        </div>
-    );
 
     const renderContent = () => {
         if (loading || !settings) {
@@ -262,17 +231,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 {activeSubTab === 'diagnostics' && (
                                     <DiagnosticsSettings settings={settings!} />
                                 )}
-                                {activeSubTab === 'diagnostics' && (
-                                    <DiagnosticsSettings settings={settings!} />
-                                )}
                             </div>
                         </div>
                     </div>
                 );
-            case 'audiobooks':
-                return <ABBDashboard />;
-            case 'sites':
-                return <SitesDashboard />;
             case 'utilities':
                 return (
                     <div className="h-full flex flex-col bg-primary/30">
@@ -304,8 +266,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 <SystemSettings
                                     settings={settings!}
                                     updateSettings={updateSettings}
-                                    abbSettings={abbSettings}
-                                    updateABBSettings={updateABBSettings}
                                     exportSystemBackup={exportSystemBackup}
                                     importBackup={importBackup}
                                 />
@@ -322,8 +282,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 <AboutTab
                                     settings={settings!}
                                     updateSettings={updateSettings}
-                                    abbSettings={abbSettings}
-                                    updateABBSettings={updateABBSettings}
                                 />
                             </div>
                         </div>

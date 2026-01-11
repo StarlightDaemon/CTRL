@@ -29,14 +29,9 @@ CTRL (Torrent Control) is a browser extension that provides a **unified interfac
 - ✅ **Vuze** - Basic operations
 - ✅ **Aria2** - JSON-RPC multicall support
 
-#### Site Integrations (7 Active)
-- ✅ **TorrentGalaxy** - Modern Shadow DOM integration (reference implementation)
-- ✅ **1337x** - Legacy integration (⚠️ Shadow DOM migration planned)
-- ✅ **Nyaa** - Anime-focused site (⚠️ Shadow DOM migration planned)
-- ✅ **RARBG** - Archive site
-- ✅ **The Pirate Bay** - Classic tracker
-- ✅ **AudioBookBay** - Audiobook specialist
-- ✅ **FitGirl Repacks** - Game repacks
+#### Site Integrations
+- ⛔ **Discontinued** - Use Context Menu (Right-Click) integration instead.
+
 
 #### Core Features
 - ✅ **Multi-Server Support** - Manage multiple clients, switch instantly
@@ -54,9 +49,8 @@ CTRL (Torrent Control) is a browser extension that provides a **unified interfac
 ## ⚠️ Known Limitations
 
 ### Technical Debt
-- **1337x Integration**: Uses legacy content script pattern (Shadow DOM migration **in progress**)
-- **Nyaa Integration**: Uses legacy content script pattern (Shadow DOM migration **planned**)
-- **YTS.mx**: Not yet integrated (**high priority** for next release)
+- **YTS.mx**: Planned integration via API/Context Menu.
+
 
 ### Not Implemented Yet
 - **E2E Testing**: Playwright test infrastructure designed but not yet implemented
@@ -135,10 +129,11 @@ npm run build:firefox
 ### Step 2: Add a Torrent (Example with Ubuntu ISO)
 
 **Option A: From a Torrent Site**
-1. Visit TorrentGalaxy, 1337x, or any supported site
-2. Find a torrent (e.g., "Ubuntu 22.04 LTS Desktop ISO")
-3. Click the **"Add to [Client]"** button next to the magnet link
-4. ✅ Torrent starts downloading in your client!
+1. Visit any torrent site
+2. Find a magnet link
+3. Right-click the link -> "Add to [Client]"
+4. ✅ Torrent starts downloading!
+
 
 **Option B: Right-Click Context Menu**
 1. Right-click any magnet link on any webpage
@@ -174,9 +169,6 @@ npm run build:firefox
 **Cause**: No active server configured  
 **Fix**: Add and test a server in Options
 
-### Issue: Site Integration Not Working
-**Cause**: May be on a Firefox quarantined domain  
-**Fix**: Use context menu (right-click on magnet link) as fallback
 
 ---
 
@@ -266,18 +258,15 @@ npm run build:firefox
 - 🎉 First public beta release
 - ✅ Multi-server management
 - ✅ 9 torrent client adapters
-- ✅ 7 site integrations
 - ✅ Encrypted credential vault
 - ✅ 7 language translations
+- ⛔ **Site Integrations**: Removed for stability and store compliance.
 
 ### Testing
 - ✅ 153 unit tests passing
 - ✅ All adapter tests passing
 - ⚠️ E2E tests pending
 
-### Known Issues
-- ⚠️ 1337x and Nyaa use legacy integration patterns
-- ⚠️ YTS.mx not yet supported
 
 ---
 

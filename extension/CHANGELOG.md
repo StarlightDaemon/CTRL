@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-beta.1] - 2026-01-11
+
+### 💎 Core Refinement (Major)
+- **Site Integration Separation**: Successfully completely decoupled all site-specific integrations (1337x, Nyaa, etc.) from the core extension. The project is now a pure, store-compliant torrent management tool.
+- **Codebase Cleanup**: Removed 7+ integration modules, significantly reducing bundle size and complexity.
+- **Architecture**: Relocated shared UI components (`Card`, `Button`) to the core shared library.
+
+### ✅ Testing & Quality
+- **Unit Tests**: Achieved **153 passing unit tests**. Verified stability of all 9 client adapters and vault security.
+- **CI/CD**: Fixed critical CI pipeline issues by adding missing `test:e2e` script.
+- **Linux Compatibility**: Verified build and test processes on Linux environments (Ubuntu 24.04).
+
+### 📖 Documentation
+- Added `docs/E2E_TROUBLESHOOTING.md` guide for diagnosing environment-specific testing issues.
+- Updated Project Status Report to reflect the new "Core Only" state.
+
 ## [0.1.33] - 2025-12-19
 
 ### 🔧 Bug Fixes

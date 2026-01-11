@@ -1,24 +1,21 @@
 import React, { useState } from 'react';
-import { Card } from '@/features/audiobook-bay/ui/ui/Card';
+import { Card } from '@/shared/ui/components/Card';
 import { BackupCards } from '@/features/torrent-control/ui/DataManagement';
 import { SettingsCard } from './settings/SettingsCard';
-import { Button } from '@/features/audiobook-bay/ui/ui/Button';
+import { Button } from '@/shared/ui/components/Button';
 
-import { Download, BookHeadphones } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { AppOptions } from '@/shared/lib/types';
-import { ABBSettings } from '@/features/audiobook-bay/lib/types';
 
 interface Props {
     settings: AppOptions;
     updateSettings: (newSettings: AppOptions) => void;
-    abbSettings: ABBSettings | null;
-    updateABBSettings: (newSettings: ABBSettings) => void;
     // Backup Props
     exportSystemBackup: (type?: 'full' | 'settings', sanitize?: boolean) => void;
     importBackup: (file: File) => Promise<{ success: boolean; message: string }>;
 }
 
-export const SystemSettings: React.FC<Props> = ({ settings, updateSettings, abbSettings, updateABBSettings, exportSystemBackup, importBackup }) => {
+export const SystemSettings: React.FC<Props> = ({ settings, updateSettings, exportSystemBackup, importBackup }) => {
     const [globalPing, setGlobalPing] = useState<{ loading: boolean; result: string | null; error: boolean }>({ loading: false, result: null, error: false });
     const [selfTest, setSelfTest] = useState<{ loading: boolean; result: any | null; error: boolean }>({ loading: false, result: null, error: false });
     const [pingTarget, setPingTarget] = useState<string>('google');
@@ -26,42 +23,11 @@ export const SystemSettings: React.FC<Props> = ({ settings, updateSettings, abbS
 
     // Diagnostics State Logic
     const isTCEnabled = settings.globals.showDiagnostics;
-    const isABBEnabled = abbSettings?.showDiagnostics || false;
-    const is1337xEnabled = settings['1337x']?.showDiagnostics || false;
-    const allEnabled = isTCEnabled && isABBEnabled && is1337xEnabled;
-
-    const toggleAll = () => {
-        const newState = !allEnabled;
-        const newSettings = {
-            ...settings,
-            globals: { ...settings.globals, showDiagnostics: newState },
-        };
-        if (newSettings['1337x']) {
-            newSettings['1337x'] = { ...newSettings['1337x'], showDiagnostics: newState };
-        }
-        updateSettings(newSettings);
-        if (abbSettings) {
-            updateABBSettings({ ...abbSettings, showDiagnostics: newState });
-        }
-    };
 
     const toggleTC = () => {
         updateSettings({
             ...settings,
             globals: { ...settings.globals, showDiagnostics: !isTCEnabled },
-        });
-    };
-
-    const toggleABB = () => {
-        if (!abbSettings) return;
-        updateABBSettings({ ...abbSettings, showDiagnostics: !isABBEnabled });
-    };
-
-    const toggle1337x = () => {
-        if (!settings['1337x']) return;
-        updateSettings({
-            ...settings,
-            '1337x': { ...settings['1337x'], showDiagnostics: !is1337xEnabled },
         });
     };
 
@@ -107,20 +73,20 @@ export const SystemSettings: React.FC<Props> = ({ settings, updateSettings, abbS
         <div className="space-y-6 max-w-4xl mx-auto">
             <h1 className="text-2xl font-bold mb-4">System Diagnostics</h1>
 
-            {/* Diagnostics Control Board (Moved from AboutTab) */}
+            {/* Diagnostics Control Board */}
             <SettingsCard
                 className="border-accent/20"
                 headerActions={
                     <div className="flex items-center gap-3">
                         <span className="text-sm font-medium text-text-secondary">
-                            {allEnabled ? 'Enabled' : 'Disabled'}
+                            {isTCEnabled ? 'Enabled' : 'Disabled'}
                         </span>
                         <label className="relative inline-flex items-center cursor-pointer">
                             <input
                                 type="checkbox"
                                 className="sr-only peer"
-                                checked={allEnabled}
-                                onChange={toggleAll}
+                                checked={isTCEnabled}
+                                onChange={toggleTC}
                             />
                             <div className="w-11 h-6 bg-surface peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
                         </label>
@@ -148,29 +114,6 @@ export const SystemSettings: React.FC<Props> = ({ settings, updateSettings, abbS
                             <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
                         </label>
                     </div>
-
-                    {/* AudioBook Bay */}
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-surface/50 border border-border">
-                        <div className="flex items-center space-x-3">
-                            <BookHeadphones className="w-5 h-5 text-green-500" />
-                            <div>
-                                <span className="font-medium text-text-primary">AudioBook Bay</span>
-                                <p className="text-xs text-text-secondary">Mirror latency, parsing errors, and storage state.</p>
-                            </div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                                type="checkbox"
-                                className="sr-only peer"
-                                checked={isABBEnabled}
-                                onChange={toggleABB}
-                                disabled={!abbSettings}
-                            />
-                            <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                        </label>
-                    </div>
-
-
                 </div>
             </SettingsCard>
 
