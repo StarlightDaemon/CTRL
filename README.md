@@ -61,6 +61,7 @@ This project is currently in **Beta**. We recommend most users wait for the offi
 | Document | Description |
 |----------|-------------|
 | [Beta Guide](docs/BETA_TESTING.md) | **Start Here** - Installation & Testing |
+| [E2E Troubleshooting](docs/E2E_TROUBLESHOOTING.md) | Diagnose Playwright/Environment issues |
 | [ROADMAP.md](ROADMAP.md) | Future features & strategy |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Setup build environment |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |

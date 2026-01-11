@@ -1,15 +1,12 @@
 import React from 'react';
 import { AppOptions } from '@/shared/lib/types';
-import { Github, Bug, Lightbulb, ExternalLink, Shield, Zap, Globe, TestTube, Download, BookHeadphones, Info } from 'lucide-react';
+import { Github, Bug, Lightbulb, ExternalLink, Shield, Zap, Globe, TestTube, Info } from 'lucide-react';
 import { SettingsPageLayout } from '@/shared/ui/settings/SettingsPageLayout';
 import { SettingsCard } from '@/shared/ui/settings/SettingsCard';
-import { ABBSettings } from '../../../features/audiobook-bay/lib/types';
 
 interface Props {
     settings: AppOptions;
     updateSettings: (newSettings: AppOptions) => void;
-    abbSettings: ABBSettings | null;
-    updateABBSettings: (newSettings: ABBSettings) => void;
 }
 
 const AboutInfoCard: React.FC = () => {

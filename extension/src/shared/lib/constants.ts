@@ -131,43 +131,7 @@ export const DEFAULT_OPTIONS: AppOptions = {
     layout: {
         sidebar: [
             { id: 'torrents', visible: true, order: 0 },
-            { id: 'audiobooks', visible: true, order: 1 },
-            { id: 'sites', visible: true, order: 2 },
-            { id: 'utilities', visible: true, order: 3 }
+            { id: 'utilities', visible: true, order: 1 }
         ]
-    },
-    '1337x': {
-        enabled: true,
-        showDiagnostics: false,
-        listView: {
-            addMagnetLinks: false,
-            batchActions: false,
-            cleanTitles: false,
-            showImages: false,
-            filterPanel: true
-        },
-        detailPage: {
-            showImdb: false,
-            hideAds: false,
-            fullWidth: false
-        }
-    },
-    nyaa: {
-        enabled: true,
-        autoDarkMode: false,
-        infiniteScroll: false,
-        magnetLinks: false,
-        batchActions: false,
-        hoverPreviews: false,
-        highlightDeadTorrents: false,
-        filterPanel: true
-    },
-    fitgirl: {
-        enabled: true,
-        autoDarkMode: false,
-        infiniteScroll: false,
-        redirectFakeSites: false,
-        showTrailers: false,
-        magnetLinks: false
     }
 };
