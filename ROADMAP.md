@@ -23,7 +23,7 @@ Transform CTRL from a working port into a **Best-in-Class** torrent management s
   - Privacy Policy published
 
 ### 🚀 Upcoming: Phase 2 (Technical Excellence)
-- **Focus**: Stability, 1337x migration, YTS integration, E2E testing
+- **Focus**: Stability, Performance Tuning, E2E testing
 
 ### 🟡 P1 - Important
 
@@ -39,15 +39,15 @@ Transform CTRL from a working port into a **Best-in-Class** torrent management s
 
 ### Performance Engine
 
-- [ ] **Diffing Engine** - RFC 6902 JSON-Patch for incremental updates
+- [x] **Diffing Engine** - RFC 6902 JSON-Patch for incremental updates ✅
 - [ ] **Virtualized State** - Window-based fetching (visible rows only)
 - [ ] **WebSocket Keepalive** - Chrome 116+ persistent connections
 
 ### Internationalization
 
-- [ ] **5 Core Languages** - ES, FR, DE, RU, ZH
+- [x] **7 Core Languages** - de, en, es, fi, fr, ru, zh_CN ✅
 - [ ] **Build Pipeline** - Nested JSON → Chrome flat format
-- [ ] **Type-safe i18n** - Generated TypeScript keys
+- [x] **Type-safe i18n** - Generated TypeScript keys (`MessageKeys.ts`) ✅
 
 ---
 
@@ -57,7 +57,7 @@ Transform CTRL from a working port into a **Best-in-Class** torrent management s
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
-| VPN Integration Check | Medium | IP monitoring, WebRTC leak detection |
+| VPN Integration Check | Medium | ⏳ Deferred to v0.4.x+ |
 | Cloud Sync | Low | Encrypted settings sync |
 | Torrent Detail View | Low | Files, Peers, Trackers tabs |
 | RSS Auto-Downloader | Low | Regex filtering |
@@ -93,4 +93,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get involved.
 
 ---
 
-*Last Updated: December 2025*
+*Last Updated: January 2026*
+
