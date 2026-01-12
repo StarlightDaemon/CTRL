@@ -90,6 +90,8 @@ export class HeaderRewriter {
             await chrome.declarativeNetRequest.updateDynamicRules({
                 removeRuleIds: ids
             });
-        } catch (e) { }
+        } catch (_e) {
+            // Intentionally suppressing errors during cleanup
+        }
     }
 }

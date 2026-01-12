@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { WebSocketKeepalive, ServiceWorkerKeepalive } from '@/shared/lib/websocket/WebSocketKeepalive';
+import { WebSocketKeepalive } from '@/shared/lib/websocket/WebSocketKeepalive';
 import { OffscreenManager } from '@/features/torrent-control/model/services/OffscreenManager';
 
 /**
@@ -18,13 +18,11 @@ export const LifecycleAdapter = {
      */
     initKeepAlive: async () => {
         // Feature detection for Firefox-like extensive environments vs Chrome-like restricted environments.
-        // 'browser.runtime.getBrowserInfo' is typically Firefox-only.
-        // @ts-ignore - WXT types might not fully cover Firefox specifics yet, or we use runtime detection.
-        const isFirefox = typeof browser.runtime.getBrowserInfo !== 'undefined';
+        // 'browser.runtime.getBrowserInfo' is typically Firefox-only and not in the standard WebExtension types.
+        const isFirefox = typeof (browser.runtime as any).getBrowserInfo !== 'undefined';
 
-        // Check for offscreen API as a proxy for Chrome MV3
-        // @ts-ignore
-        const hasOffscreen = typeof chrome !== 'undefined' && typeof chrome.offscreen !== 'undefined';
+        // Check for offscreen API as a proxy for Chrome MV3 (not available in all environments)
+        const hasOffscreen = typeof chrome !== 'undefined' && typeof (chrome as any).offscreen !== 'undefined';
 
         // Check Chrome version for WebSocket support in SW (Chrome 116+)
         const chromeVersion = LifecycleAdapter.getChromeVersion();

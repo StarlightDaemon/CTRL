@@ -11,7 +11,7 @@ import { ViewportManager } from '../features/torrent-control/services/ViewportMa
 import { Torrent } from '../entities/torrent/model/Torrent';
 import { VaultService } from '@/shared/api/security/VaultService';
 import { SESSION_KEY_KEY } from '@/shared/api/security/VaultService';
-import { OffscreenManager } from '../features/torrent-control/model/services/OffscreenManager';
+
 import { HeaderRewriter } from '@/shared/api/network/HeaderRewriter';
 
 export default defineBackground(() => {
@@ -253,7 +253,7 @@ export default defineBackground(() => {
 
 
     // Reset loop on settings change
-    storage.watch<AppSettings>('local:options', (newValue) => {
+    storage.watch<AppSettings>('local:options', (_newValue) => {
         activeClient = null;
         if (activePorts > 0) startFastPolling();
     });
@@ -337,7 +337,7 @@ export default defineBackground(() => {
                     case 'GET_TORRENTS':
                         return await client.getTorrents();
 
-                    case 'ADD_TORRENT_URL':
+                    case 'ADD_TORRENT_URL': {
                         const currentSettings = await storage.getItem<AppSettings>('local:options');
                         const globalAddPaused = currentSettings?.globals.addPaused ?? false;
                         const options = {
@@ -348,21 +348,25 @@ export default defineBackground(() => {
                         const result = await client.addTorrentUrl(message.url, options);
                         performCheck(); // Force refresh
                         return result;
+                    }
 
-                    case 'PAUSE_TORRENT':
+                    case 'PAUSE_TORRENT': {
                         const pResult = await client.pauseTorrent(message.id);
                         performCheck();
                         return pResult;
+                    }
 
-                    case 'RESUME_TORRENT':
+                    case 'RESUME_TORRENT': {
                         const rResult = await client.resumeTorrent(message.id);
                         performCheck();
                         return rResult;
+                    }
 
-                    case 'REMOVE_TORRENT':
+                    case 'REMOVE_TORRENT': {
                         const dResult = await client.removeTorrent(message.id, message.deleteData);
                         performCheck();
                         return dResult;
+                    }
 
                     case 'FORCE_REFRESH':
                         await performCheck();
