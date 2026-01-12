@@ -23,7 +23,7 @@ export class TransmissionAdapter implements ITorrentClient {
         // We trigger a request to get the session ID.
         try {
             await this.call('session-get');
-        } catch (e) {
+        } catch (_e) {
             // Expected to fail if session ID is missing, but call() handles the retry logic.
             // If it still fails, it's a real error.
         }
@@ -84,19 +84,15 @@ export class TransmissionAdapter implements ITorrentClient {
         try {
             await this.call('session-get');
             return true;
-        } catch (e) {
+        } catch (_e) {
             return false;
         }
     }
 
     async ping(): Promise<number> {
         const start = Date.now();
-        try {
-            await this.call('session-get');
-            return Date.now() - start;
-        } catch (e) {
-            throw e;
-        }
+        await this.call('session-get');
+        return Date.now() - start;
     }
 
     private async call(method: string, args: Record<string, unknown> = {}): Promise<unknown> {
