@@ -5,7 +5,7 @@ import { ServerConfig } from '@/shared/lib/types';
 import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
 import { RTorrentResponseSchema, RTorrentTuple } from './RTorrentSchema';
 import { blobToBase64 } from '@/shared/lib/helpers';
-// @ts-ignore
+// @ts-expect-error - txml has no TypeScript declarations
 import { parse } from 'txml';
 
 /** 
