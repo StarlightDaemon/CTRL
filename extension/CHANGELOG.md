@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 💎 Core Architecture & CI
+- **Mainline Rewrite**: Successfully completed the safe rewrite of the project repository history.
+- **CI Determinism**: Transitioned to a fully deterministic npm workflow using `package-lock.json` validation and `npm ci` caching.
+
+### ✅ Testing & Reliability
+- **Test Baseline Growth**: Expanded the test suite significantly, growing from 153 to **357 passing tests**.
+- **Adapter Hardening**:
+  - Implemented active status validation guards for Deluge to prevent UI-blocking timeouts.
+  - Enhanced qBittorrent handling for 401 Unauthorized responses with active attempt tracking.
+- **Connection Truthfulness**:
+  - Resolved generic "Authentication Failed" UI masking by ensuring the actual adapter error strings propagate to the UI during Test Connection.
+  - Hardened Chrome and Firefox vault session persistence and active runtime background resolution.
+
 ## [0.2.0-beta.1] - 2026-01-11
 
 ### 💎 Core Refinement (Major)
