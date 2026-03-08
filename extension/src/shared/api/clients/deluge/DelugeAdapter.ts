@@ -321,13 +321,8 @@ export class DelugeAdapter implements ITorrentClient {
     }
 
     async testConnection(): Promise<boolean> {
-        try {
-            await this.login();
-            return true;
-        } catch (e) {
-            console.error('[Deluge] Test Failed:', e);
-            return false;
-        }
+        await this.login();
+        return true;
     }
 
     async ping(): Promise<number> {

@@ -178,14 +178,13 @@ describe('FloodAdapter', () => {
             expect(result).toBe(true);
         });
 
-        it('should return false when backend disconnected', async () => {
+        it('should throw when backend disconnected', async () => {
             createMockFetch([
                 { ok: true, status: 200, body: { success: true, token: 'jwt' } },
                 { ok: true, status: 200, body: { username: 'admin', clientConnected: false } }
             ]);
 
-            const result = await adapter.testConnection();
-            expect(result).toBe(false);
+            await expect(adapter.testConnection()).rejects.toThrow('Torrent client backend is not connected');
         });
     });
 
