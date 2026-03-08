@@ -1,57 +1,90 @@
 import React, { useState } from 'react';
 import { AppOptions, ServerConfig } from '@/shared/lib/types';
 import { EXTERNAL_RESOURCES } from '@/shared/lib/resources';
-import { ExternalLink, Info } from 'lucide-react';
+import { ExternalLink, Info, Activity, Globe } from 'lucide-react';
+import { SettingsPageLayout } from '@/shared/ui/settings/SettingsPageLayout';
+import { SettingsCard } from '@/shared/ui/settings/SettingsCard';
+import {
+    Stack,
+    InlineNotification,
+    Button,
+    Tile,
+    Tag,
+    IconButton,
+    Link,
+    Toggletip,
+    ToggletipButton,
+    ToggletipContent
+} from '@carbon/react';
 
 interface Props {
     settings: AppOptions;
 }
 
 export const DiagnosticsSettings: React.FC<Props> = ({ settings }) => {
-
     return (
-        <div className="space-y-6 max-w-4xl mx-auto">
-            <div className="bg-accent/10 border border-accent/20 rounded-lg p-4 flex items-start">
-                <Info className="w-5 h-5 text-accent mr-3 mt-0.5 shrink-0" />
-                <p className="text-sm text-text-primary">
-                    Enabled diagnostic tabs will appear in their respective sections throughout the extension.
-                </p>
-            </div>
-            {/* Server Diagnostics */}
-            <div className="bg-panel rounded-lg p-6 border border-border">
-                <h2 className="text-lg font-medium text-text-primary mb-4">Server Connections</h2>
-                <div className="space-y-4">
-                    {settings.servers.map((server, index) => (
-                        <ServerDiagnosticRow key={index} server={server} index={index} />
-                    ))}
-                    {settings.servers.length === 0 && (
-                        <p className="text-sm text-text-secondary italic">No servers configured.</p>
-                    )}
-                </div>
-            </div>
+        <SettingsPageLayout
+            title="Diagnostics"
+            description="Diagnostic tools to help identify connection issues and verify environment compatibility."
+            icon={Activity}
+        >
+            <Stack gap={7}>
+                <InlineNotification
+                    kind="info"
+                    title="Diagnostic Tabs"
+                    subtitle="Enabled diagnostic tabs will appear in their respective sections throughout the extension."
+                    lowContrast
+                    hideCloseButton
+                />
 
-            {/* External Diagnostics */}
-            <div className="bg-panel rounded-lg p-6 border border-border">
-                <h2 className="text-lg font-medium text-text-primary mb-4">External Diagnostic Tools</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {EXTERNAL_RESOURCES.diagnostics.map((res) => (
-                        <a
-                            key={res.name}
-                            href={res.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-between p-4 rounded-lg bg-background/50 border border-border hover:border-accent group transition-colors"
-                        >
-                            <div className="flex flex-col">
-                                <span className="font-medium text-text-primary">{res.name}</span>
-                                <span className="text-xs text-text-secondary">Check WebRTC & WebTorrent Support</span>
+                {/* Server Diagnostics */}
+                <SettingsCard
+                    title="Server Connections"
+                    description="Test connectivity and authentication for your configured torrent servers."
+                >
+                    <Stack gap={4}>
+                        {settings.servers.map((server, index) => (
+                            <ServerDiagnosticRow key={index} server={server} index={index} />
+                        ))}
+                        {settings.servers.length === 0 && (
+                            <div className="text-center py-6 bg-[var(--cds-layer-01)] rounded border border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] italic">
+                                No servers configured.
                             </div>
-                            <ExternalLink size={16} className="text-text-secondary group-hover:text-accent" />
-                        </a>
-                    ))}
-                </div>
-            </div>
-        </div>
+                        )}
+                    </Stack>
+                </SettingsCard>
+
+                {/* External Diagnostics */}
+                <SettingsCard
+                    title="External Diagnostic Tools"
+                    description="Third-party tools to verify browser capabilities like WebRTC and WebTorrent."
+                >
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {EXTERNAL_RESOURCES.diagnostics.map((res) => (
+                            <Tile
+                                key={res.name}
+                                className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] hover:border-[var(--cds-link-primary)] group transition-colors"
+                            >
+                                <div className="flex justify-between items-center w-full">
+                                    <Stack gap={1}>
+                                        <Link
+                                            href={res.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="font-medium inline-flex items-center gap-2"
+                                        >
+                                            {res.name}
+                                            <ExternalLink size={14} />
+                                        </Link>
+                                        <span className="text-xs text-[var(--cds-text-secondary)]">Check environment support</span>
+                                    </Stack>
+                                </div>
+                            </Tile>
+                        ))}
+                    </div>
+                </SettingsCard>
+            </Stack>
+        </SettingsPageLayout>
     );
 };
 
@@ -69,24 +102,14 @@ const ServerDiagnosticRow: React.FC<{ server: ServerConfig; index: number }> = (
     });
 
     const isPrivateIP = (hostname: string) => {
-        // Remove protocol and port
         let host = hostname.replace(/https?:\/\//, '').split(':')[0];
-
         if (host === 'localhost') return true;
-
-        // IPv4 check
         const parts = host.split('.').map(Number);
         if (parts.length !== 4) return false;
-
-        // 127.0.0.0/8
         if (parts[0] === 127) return true;
-        // 10.0.0.0/8
         if (parts[0] === 10) return true;
-        // 192.168.0.0/16
         if (parts[0] === 192 && parts[1] === 168) return true;
-        // 172.16.0.0/12
         if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-
         return false;
     };
 
@@ -100,17 +123,12 @@ const ServerDiagnosticRow: React.FC<{ server: ServerConfig; index: number }> = (
                 const isLocal = isPrivateIP(server.hostname);
                 setPingStatus({
                     loading: false,
-                    result: isLocal ? 'Local Network Error' : 'Failed',
+                    result: isLocal ? 'Local Error' : 'Failed',
                     error: true
                 });
             }
         } catch (e) {
-            const isLocal = isPrivateIP(server.hostname);
-            setPingStatus({
-                loading: false,
-                result: isLocal ? 'Local Network Error' : 'Error',
-                error: true
-            });
+            setPingStatus({ loading: false, result: 'Error', error: true });
         }
     };
 
@@ -129,38 +147,70 @@ const ServerDiagnosticRow: React.FC<{ server: ServerConfig; index: number }> = (
     };
 
     return (
-        <div className="flex items-center justify-between p-4 bg-surface rounded border border-border">
-            <div>
-                <h3 className="font-medium text-text-primary">{server.name || `Server ${index + 1}`}</h3>
-                <p className="text-xs text-text-secondary">{server.type} • {server.hostname}</p>
-            </div>
+        <div className="flex items-center justify-between p-4 bg-[var(--cds-layer-02)] rounded border border-[var(--cds-border-subtle)]">
+            <Stack gap={1}>
+                <h3 className="font-medium text-[var(--cds-text-primary)]">{server.name || `Server ${index + 1}`}</h3>
+                <p className="text-xs text-[var(--cds-text-secondary)]">{server.application} • {server.hostname}</p>
+            </Stack>
             <div className="flex items-center space-x-4">
                 {/* Ping Control */}
                 <div className="flex items-center space-x-2">
-                    <button
+                    <Button
+                        kind="ghost"
+                        size="sm"
                         onClick={runPing}
                         disabled={pingStatus.loading}
-                        className="px-3 py-1.5 text-xs bg-surface border border-border text-text-primary rounded hover:bg-hover transition-colors min-w-[60px]"
                     >
                         {pingStatus.loading ? '...' : 'Ping'}
-                    </button>
-                    <span className={`text-xs font-mono w-[60px] text-right ${pingStatus.error ? 'text-red-500' : 'text-accent'}`}>
-                        {pingStatus.result || <span className="text-text-secondary opacity-50">-</span>}
-                    </span>
+                    </Button>
+                    <div className="flex items-center gap-2">
+                        <span className={`text-xs font-mono w-[60px] text-right ${pingStatus.error ? 'text-[var(--cds-support-error)]' : 'text-[var(--cds-link-primary)]'}`}>
+                            {pingStatus.result || <span className="text-[var(--cds-text-secondary)] opacity-50">-</span>}
+                        </span>
+                        {pingStatus.error && (
+                            <Toggletip align="top-right">
+                                <ToggletipButton label="Ping Help">
+                                    <Info size={14} className="text-[var(--cds-support-error)]" />
+                                </ToggletipButton>
+                                <ToggletipContent>
+                                    <p className="text-xs">
+                                        {pingStatus.result === 'Local Error'
+                                            ? "Request blocked. Ensure you have granted host permissions for local IPs in settings."
+                                            : "Server timed out or refused connection. Check if the server is running and hostname is correct."}
+                                    </p>
+                                </ToggletipContent>
+                            </Toggletip>
+                        )}
+                    </div>
                 </div>
 
                 {/* Auth Control */}
                 <div className="flex items-center space-x-2">
-                    <button
+                    <Button
+                        kind="ghost"
+                        size="sm"
                         onClick={runAuthTest}
                         disabled={authStatus.loading}
-                        className="px-3 py-1.5 text-xs bg-surface border border-border text-text-primary rounded hover:bg-hover transition-colors min-w-[80px]"
                     >
-                        {authStatus.loading ? '...' : 'Test Auth'}
-                    </button>
-                    <span className={`text-xs font-bold w-[70px] text-right ${authStatus.error ? 'text-red-500' : 'text-green-500'}`}>
-                        {authStatus.result || <span className="text-text-secondary opacity-50 font-normal">-</span>}
-                    </span>
+                        {authStatus.loading ? '...' : 'Auth'}
+                    </Button>
+                    <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold w-[70px] text-right ${authStatus.error ? 'text-[var(--cds-support-error)]' : 'text-[var(--cds-support-success)]'}`}>
+                            {authStatus.result || <span className="text-[var(--cds-text-secondary)] opacity-50 font-normal">-</span>}
+                        </span>
+                        {authStatus.error && (
+                            <Toggletip align="top-right">
+                                <ToggletipButton label="Auth Help">
+                                    <Info size={14} className="text-[var(--cds-support-error)]" />
+                                </ToggletipButton>
+                                <ToggletipContent>
+                                    <p className="text-xs">
+                                        Authentication failed. Verify your username and password are correct for this client.
+                                    </p>
+                                </ToggletipContent>
+                            </Toggletip>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

@@ -11,7 +11,7 @@ export const TransmissionResponseSchema = z.object({
             name: z.string(),
             status: z.number(),
 
-            // Stats
+            // Size & Progress
             totalSize: z.number(),
             percentDone: z.number(),
             rateDownload: z.number(),
@@ -24,9 +24,28 @@ export const TransmissionResponseSchema = z.object({
             error: z.number(),
             errorString: z.string(),
 
-            // Optional
+            // Phase 1.4: Critical metadata extensions
+            // Queue management (Phase 2.1)
+            queuePosition: z.number().optional(),
+            bandwidthPriority: z.number().optional(), // -1 (Low), 0 (Normal), 1 (High)
+
+            // Persistent identifier (better than ephemeral id)
+            hashString: z.string().optional(),
+
+            // Statistics
+            uploadRatio: z.number().optional(),
+            uploadedEver: z.number().optional(),
+            downloadedEver: z.number().optional(),
+
+            // Verification (Phase 2.3)
+            recheckProgress: z.number().optional(), // 0.0-1.0 while status=2 (checking)
+
+            // Optional features
             labels: z.array(z.string()).optional()
-        })).optional()
+        })).optional(),
+
+        // Phase 3.1: recently-active response includes removed torrent IDs
+        removed: z.array(z.number()).optional()
     }).optional()
 });
 

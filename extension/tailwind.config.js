@@ -6,28 +6,45 @@ export default {
     theme: {
         extend: {
             colors: {
-                background: 'hsl(var(--bg-background) / <alpha-value>)',
-                panel: 'hsl(var(--bg-panel) / <alpha-value>)',
-                surface: 'hsl(var(--bg-surface) / <alpha-value>)',
-                hover: 'hsl(var(--bg-hover) / <alpha-value>)',
-                border: 'hsl(var(--bg-border) / <alpha-value>)',
+                // Carbon Layer Tokens
+                background: 'var(--cds-background)',
+                'layer-01': 'var(--cds-layer-01)',
+                'layer-02': 'var(--cds-layer-02)',
+                'layer-03': 'var(--cds-layer-03)',
+                'layer-selected': 'var(--cds-layer-selected)',
+                'layer-selected-hover': 'var(--cds-layer-selected-hover)',
 
-                primary: 'hsl(var(--bg-primary) / <alpha-value>)',
-                secondary: 'hsl(var(--bg-primary) / 0.8)', // Fallback or derived? Let's use text vars for text colors
+                // Carbon Text Tokens
+                'text-primary': 'var(--cds-text-primary)',
+                'text-secondary': 'var(--cds-text-secondary)',
+                'text-helper': 'var(--cds-text-helper)',
+                'text-placeholder': 'var(--cds-text-placeholder)',
+                'text-on-color': 'var(--cds-text-on-color)',
+                'text-disabled': 'var(--cds-text-disabled)',
+                'text-error': 'var(--cds-text-error)',
 
-                'text-primary': 'hsl(var(--text-primary) / <alpha-value>)',
-                'text-secondary': 'hsl(var(--text-secondary) / <alpha-value>)',
-                'text-muted': 'hsl(var(--text-muted) / <alpha-value>)',
+                // Carbon Border Tokens
+                'border-subtle': 'var(--cds-border-subtle)',
+                'border-strong': 'var(--cds-border-strong)',
+                'border-interactive': 'var(--cds-border-interactive)',
 
-                // Retain existing functional colors if needed, or map them
-                'accent-primary': 'hsl(var(--bg-primary) / <alpha-value>)',
-                'status-success': '#22c55e', // Hardcoded for now or add to tokens
-                'status-warning': '#eab308',
-                'status-error': '#ef4444',
+                // Carbon Interactive Tokens
+                'interactive': 'var(--cds-interactive)',
+                'interactive-hover': 'var(--cds-interactive-hover)',
+
+                // Carbon Link Tokens
+                'link-primary': 'var(--cds-link-primary)',
+                'link-primary-hover': 'var(--cds-link-primary-hover)',
+
+                // Semantic/Status Colors (Mapped to Carbon Support Tokens)
+                'status-success': 'var(--cds-support-success)',
+                'status-warning': 'var(--cds-support-warning)',
+                'status-error': 'var(--cds-support-error)',
+                'status-info': 'var(--cds-support-info)',
             },
             fontFamily: {
-                sans: ['var(--font-sans)'],
-                mono: ['var(--font-mono)'],
+                sans: ['var(--cds-font-family-sans)'], // Fixed to use correct Carbon var
+                mono: ['var(--cds-font-family-mono)'], // Carbon uses mono font var too usually, but we keep custom if needed. Let's assume defaults.
             },
             animation: {
                 shimmer: 'shimmer 2s infinite linear',

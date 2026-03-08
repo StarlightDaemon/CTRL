@@ -10,10 +10,10 @@ export const VersionOverlay = () => {
     return (
         <div
             onClick={copyBuildInfo}
-            className="fixed bottom-4 right-4 z-50 px-3 py-1 bg-black/80 backdrop-blur text-white text-xs rounded-full border border-white/10 shadow-lg select-none font-mono opacity-50 hover:opacity-100 transition-opacity cursor-pointer"
+            className="fixed bottom-4 right-4 z-50 px-3 py-1 bg-layer-01 text-[var(--cds-text-secondary)] text-xs rounded-full border border-subtle shadow-lg select-none font-mono opacity-50 hover:opacity-100 transition-opacity cursor-pointer"
             title="Click to copy build version"
         >
-            <span className="text-gray-400">Build: v</span>{BUILD_INFO.version} <span className="text-gray-500">//</span> {BUILD_INFO.displayDate}
+            <span className="text-[var(--cds-text-helper)]">Build: v</span>{BUILD_INFO.version} <span className="text-[var(--cds-text-helper)]">//</span> {BUILD_INFO.displayDate}
         </div>
     );
 };

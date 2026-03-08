@@ -2,11 +2,12 @@
  * UTorrentAdapter Unit Tests
  * 
  * Tests the uTorrent WebUI adapter including token-based authentication,
- * query string API, and status bitmask mapping.
+ * query string API, status bitmask mapping, and delta sync.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { UTorrentAdapter } from '@/shared/api/clients/utorrent/UTorrentAdapter';
 import { ServerConfig } from '@/shared/lib/types';
+import { STATUS_FLAG } from '@/shared/api/clients/utorrent/UTorrentSchema';
 
 // Mock server config
 const mockConfig: ServerConfig = {
@@ -22,7 +23,7 @@ const mockConfig: ServerConfig = {
 
 // Mock DOMParser for token parsing
 class MockDOMParser {
-    parseFromString(str: string, type: string) {
+    parseFromString(str: string, _type: string) {
         const tokenMatch = str.match(/<div id="token"[^>]*>([^<]+)<\/div>/i);
         return {
             getElementById: (id: string) => {
@@ -58,7 +59,7 @@ const createMockFetch = (responses: Array<{ ok: boolean; status: number; body: a
 // Token HTML response
 const tokenHtml = '<html><body><div id="token">ABC123TOKEN</div></body></html>';
 
-// Mock torrent list response
+// Mock torrent list response with full array indices
 const createTorrentListResponse = (torrents: Array<{
     hash: string;
     status: number;
@@ -69,14 +70,16 @@ const createTorrentListResponse = (torrents: Array<{
     upSpeed: number;
     eta: number;
     label: string;
-}>) => ({
-    build: 12345,
+    dateAdded?: number;
+    savePath?: string;
+}>, torrentc?: string) => ({
+    build: 28705,
     torrents: torrents.map(t => [
         t.hash,      // 0: hash
         t.status,    // 1: status
         t.name,      // 2: name
         t.size,      // 3: size
-        t.percent,   // 4: percent (promille)
+        t.percent,   // 4: percent (permils)
         0,           // 5: downloaded
         0,           // 6: uploaded
         0,           // 7: ratio
@@ -84,7 +87,23 @@ const createTorrentListResponse = (torrents: Array<{
         t.downSpeed, // 9: downspeed
         t.eta,       // 10: eta
         t.label,     // 11: label
-    ])
+        0,           // 12: peers_connected
+        0,           // 13: peers_in_swarm
+        0,           // 14: seeds_connected
+        0,           // 15: seeds_in_swarm
+        0,           // 16: availability
+        1,           // 17: queue_order
+        0,           // 18: remaining
+        '',          // 19: download_url
+        '',          // 20: rss_feed_url
+        '',          // 21: status_message
+        '',          // 22: stream_id
+        t.dateAdded || 1704067200, // 23: date_added (default: 2024-01-01)
+        0,           // 24: date_completed
+        '',          // 25: app_update_url
+        t.savePath || '/downloads', // 26: save_path
+    ]),
+    torrentc: torrentc || '12345678',
 });
 
 describe('UTorrentAdapter', () => {
@@ -119,17 +138,19 @@ describe('UTorrentAdapter', () => {
     });
 
     describe('getTorrents', () => {
-        it('should return mapped torrent list', async () => {
+        it('should return mapped torrent list with extended metadata', async () => {
             const mockResponse = createTorrentListResponse([{
                 hash: 'ABC123',
                 status: 201, // Downloading + started
                 name: 'Test Torrent',
                 size: 1000000000,
-                percent: 500, // 50% in promille (500/1000)
+                percent: 500, // 50% in permils (500/1000)
                 downSpeed: 1000000,
                 upSpeed: 500000,
                 eta: 3600,
-                label: 'movies'
+                label: 'movies',
+                dateAdded: 1704067200,
+                savePath: '/data/movies'
             }]);
 
             createMockFetch([
@@ -143,36 +164,117 @@ describe('UTorrentAdapter', () => {
             expect(torrents[0]).toMatchObject({
                 id: 'ABC123',
                 name: 'Test Torrent',
-                category: 'movies'
+                category: 'movies',
+                progress: 50, // 500/10 = 50%
+                addedDate: 1704067200,
+                savePath: '/data/movies'
             });
         });
 
         it('should return empty array when no torrents', async () => {
             createMockFetch([
                 { ok: true, status: 200, body: tokenHtml },
-                { ok: true, status: 200, body: { build: 12345, torrents: [] } }
+                { ok: true, status: 200, body: { build: 12345, torrents: [], torrentc: '123' } }
             ]);
 
             const torrents = await adapter.getTorrents();
             expect(torrents).toEqual([]);
         });
-    });
 
-    describe('addTorrentUrl', () => {
-        it('should add torrent via add-url action', async () => {
+        it('should use delta sync with cache ID on subsequent calls', async () => {
+            const initialResponse = createTorrentListResponse([{
+                hash: 'ABC123', status: 201, name: 'Test', size: 100,
+                percent: 500, downSpeed: 100, upSpeed: 0, eta: 100, label: ''
+            }], 'CACHE_ID_1');
+
             const fetchSpy = createMockFetch([
                 { ok: true, status: 200, body: tokenHtml },
-                { ok: true, status: 200, body: { build: 12345 } }
+                { ok: true, status: 200, body: initialResponse },
+                { ok: true, status: 200, body: { build: 12345, torrentc: 'CACHE_ID_2' } }
             ]);
 
-            await adapter.addTorrentUrl('magnet:?xt=urn:btih:abc123');
+            // First call - gets full list
+            await adapter.getTorrents();
 
-            expect(fetchSpy).toHaveBeenCalledTimes(2);
+            // Second call - should use cid parameter
+            await adapter.getTorrents();
+
+            // Verify the second call included the cache ID
+            const secondCall = fetchSpy.mock.calls[2];
+            expect(secondCall[0]).toContain('cid=CACHE_ID_1');
         });
     });
 
-    describe('pauseTorrent', () => {
-        it('should pause torrent via stop action', async () => {
+    describe('status mapping', () => {
+        const testStatusMapping = async (status: number, percent: number, expectedStatus: string) => {
+            const response = createTorrentListResponse([{
+                hash: 'test', status, name: 'Test', size: 100,
+                percent, downSpeed: 100, upSpeed: 0, eta: 100, label: ''
+            }]);
+            createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: response }
+            ]);
+            const result = await adapter.getTorrents();
+            expect(result[0].status).toBe(expectedStatus);
+        };
+
+        it('should map downloading status (started, not complete)', async () => {
+            // 201 = LOADED(128) + QUEUED(64) + CHECKED(8) + STARTED(1)
+            await testStatusMapping(201, 500, 'downloading');
+        });
+
+        it('should map seeding status (started, 100% complete)', async () => {
+            // Same status bits, but 100% progress
+            await testStatusMapping(201, 1000, 'seeding');
+        });
+
+        it('should map paused status (bit 32)', async () => {
+            await testStatusMapping(STATUS_FLAG.PAUSED | STATUS_FLAG.LOADED, 500, 'paused');
+        });
+
+        it('should map error status (bit 16) with highest priority', async () => {
+            // Error takes priority over started
+            await testStatusMapping(STATUS_FLAG.ERROR | STATUS_FLAG.STARTED, 500, 'error');
+        });
+
+        it('should map checking status (bit 2)', async () => {
+            await testStatusMapping(STATUS_FLAG.CHECKING | STATUS_FLAG.LOADED, 500, 'checking');
+        });
+
+        it('should map forced start (no queue bit)', async () => {
+            // 137 = LOADED(128) + CHECKED(8) + STARTED(1) - no QUEUED bit
+            await testStatusMapping(137, 500, 'downloading');
+        });
+
+        it('should map queued seed (queued + 100%)', async () => {
+            await testStatusMapping(STATUS_FLAG.QUEUED | STATUS_FLAG.LOADED, 1000, 'seeding');
+        });
+    });
+
+    describe('session recovery', () => {
+        it('should retry on 400/401 errors', async () => {
+            const mockResponse = createTorrentListResponse([{
+                hash: 'ABC123', status: 201, name: 'Test', size: 100,
+                percent: 500, downSpeed: 100, upSpeed: 0, eta: 100, label: ''
+            }]);
+
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },        // Initial login
+                { ok: false, status: 400, body: 'Invalid token' }, // First call fails
+                { ok: true, status: 200, body: tokenHtml },        // Re-login
+                { ok: true, status: 200, body: mockResponse }      // Retry succeeds
+            ]);
+
+            const torrents = await adapter.getTorrents();
+
+            expect(fetchSpy).toHaveBeenCalledTimes(4);
+            expect(torrents).toHaveLength(1);
+        });
+    });
+
+    describe('torrent actions', () => {
+        it('should pause torrent via pause action', async () => {
             const fetchSpy = createMockFetch([
                 { ok: true, status: 200, body: tokenHtml },
                 { ok: true, status: 200, body: { build: 12345 } }
@@ -181,10 +283,9 @@ describe('UTorrentAdapter', () => {
             await adapter.pauseTorrent('ABC123');
 
             expect(fetchSpy).toHaveBeenCalledTimes(2);
+            expect(fetchSpy.mock.calls[1][0]).toContain('action=pause');
         });
-    });
 
-    describe('resumeTorrent', () => {
         it('should resume torrent via start action', async () => {
             const fetchSpy = createMockFetch([
                 { ok: true, status: 200, body: tokenHtml },
@@ -194,10 +295,33 @@ describe('UTorrentAdapter', () => {
             await adapter.resumeTorrent('ABC123');
 
             expect(fetchSpy).toHaveBeenCalledTimes(2);
+            expect(fetchSpy.mock.calls[1][0]).toContain('action=start');
         });
-    });
 
-    describe('removeTorrent', () => {
+        it('should force start torrent via forcestart action', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: { build: 12345 } }
+            ]);
+
+            await adapter.forceStartTorrent('ABC123');
+
+            expect(fetchSpy).toHaveBeenCalledTimes(2);
+            expect(fetchSpy.mock.calls[1][0]).toContain('action=forcestart');
+        });
+
+        it('should recheck torrent via recheck action', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: { build: 12345 } }
+            ]);
+
+            await adapter.recheckTorrent('ABC123');
+
+            expect(fetchSpy).toHaveBeenCalledTimes(2);
+            expect(fetchSpy.mock.calls[1][0]).toContain('action=recheck');
+        });
+
         it('should remove torrent without data via remove action', async () => {
             const fetchSpy = createMockFetch([
                 { ok: true, status: 200, body: tokenHtml },
@@ -207,6 +331,7 @@ describe('UTorrentAdapter', () => {
             await adapter.removeTorrent('ABC123', false);
 
             expect(fetchSpy).toHaveBeenCalledTimes(2);
+            expect(fetchSpy.mock.calls[1][0]).toContain('action=remove');
         });
 
         it('should remove torrent with data via removedata action', async () => {
@@ -218,6 +343,39 @@ describe('UTorrentAdapter', () => {
             await adapter.removeTorrent('ABC123', true);
 
             expect(fetchSpy).toHaveBeenCalledTimes(2);
+            expect(fetchSpy.mock.calls[1][0]).toContain('action=removedata');
+        });
+    });
+
+    describe('bandwidth limits', () => {
+        it('should set upload limit via setprops', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: { build: 12345 } }
+            ]);
+
+            await adapter.setUploadLimit('ABC123', 102400);
+
+            expect(fetchSpy).toHaveBeenCalledTimes(2);
+            const url = fetchSpy.mock.calls[1][0] as string;
+            expect(url).toContain('action=setprops');
+            expect(url).toContain('s=ulrate');
+            expect(url).toContain('v=102400');
+        });
+
+        it('should set download limit via setprops', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: { build: 12345 } }
+            ]);
+
+            await adapter.setDownloadLimit('ABC123', 204800);
+
+            expect(fetchSpy).toHaveBeenCalledTimes(2);
+            const url = fetchSpy.mock.calls[1][0] as string;
+            expect(url).toContain('action=setprops');
+            expect(url).toContain('s=dlrate');
+            expect(url).toContain('v=204800');
         });
     });
 
@@ -239,66 +397,13 @@ describe('UTorrentAdapter', () => {
         });
     });
 
-    describe('status mapping', () => {
-        it('should map downloading status (bit 1)', async () => {
-            const response = createTorrentListResponse([{
-                hash: 'test', status: 1, name: 'Test', size: 100, percent: 500,
-                downSpeed: 100, upSpeed: 0, eta: 100, label: 'test'
-            }]);
-            createMockFetch([
-                { ok: true, status: 200, body: tokenHtml },
-                { ok: true, status: 200, body: response }
-            ]);
-            const result = await adapter.getTorrents();
-            expect(result[0].status).toBe('downloading');
-        });
-
-        it('should map paused status (bit 32)', async () => {
-            const response = createTorrentListResponse([{
-                hash: 'test', status: 32, name: 'Test', size: 100, percent: 500,
-                downSpeed: 0, upSpeed: 0, eta: 0, label: 'test'
-            }]);
-            createMockFetch([
-                { ok: true, status: 200, body: tokenHtml },
-                { ok: true, status: 200, body: response }
-            ]);
-            const result = await adapter.getTorrents();
-            expect(result[0].status).toBe('paused');
-        });
-
-        it('should map error status (bit 16)', async () => {
-            const response = createTorrentListResponse([{
-                hash: 'test', status: 16, name: 'Test', size: 100, percent: 500,
-                downSpeed: 0, upSpeed: 0, eta: 0, label: 'test'
-            }]);
-            createMockFetch([
-                { ok: true, status: 200, body: tokenHtml },
-                { ok: true, status: 200, body: response }
-            ]);
-            const result = await adapter.getTorrents();
-            expect(result[0].status).toBe('error');
-        });
-
-        it('should map checking status (bit 2)', async () => {
-            const response = createTorrentListResponse([{
-                hash: 'test', status: 2, name: 'Test', size: 100, percent: 500,
-                downSpeed: 0, upSpeed: 0, eta: 0, label: 'test'
-            }]);
-            createMockFetch([
-                { ok: true, status: 200, body: tokenHtml },
-                { ok: true, status: 200, body: response }
-            ]);
-            const result = await adapter.getTorrents();
-            expect(result[0].status).toBe('checking');
-        });
-    });
-
     describe('categories', () => {
         it('should return labels from list response', async () => {
             const response = {
                 build: 12345,
                 torrents: [],
-                label: [['movies', 5], ['tv', 3]]
+                label: [['movies', 5], ['tv', 3]],
+                torrentc: '123'
             };
             createMockFetch([
                 { ok: true, status: 200, body: tokenHtml },
@@ -319,6 +424,117 @@ describe('UTorrentAdapter', () => {
             await adapter.setCategory('ABC123', 'movies');
 
             expect(fetchSpy).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    describe('file management', () => {
+        it('should get files for a torrent', async () => {
+            const filesResponse = {
+                build: 12345,
+                files: [['ABC123', [
+                    ['movie.mkv', 1000000, 500000, 2],
+                    ['subtitles.srt', 50000, 50000, 2]
+                ]]]
+            };
+            createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: filesResponse }
+            ]);
+
+            const files = await adapter.getFiles('ABC123');
+
+            expect(files).toHaveLength(2);
+            expect(files[0]).toMatchObject({
+                index: 0,
+                name: 'movie.mkv',
+                size: 1000000,
+                downloaded: 500000,
+                priority: 2,
+                progress: 50
+            });
+        });
+
+        it('should set file priority via setprio action', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: { build: 12345 } }
+            ]);
+
+            await adapter.setFilePriority('ABC123', 0, 3);
+
+            expect(fetchSpy).toHaveBeenCalledTimes(2);
+            const url = fetchSpy.mock.calls[1][0] as string;
+            expect(url).toContain('action=setprio');
+            expect(url).toContain('f=0');
+            expect(url).toContain('p=3');
+        });
+
+        it('should skip file by setting priority to 0', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: { build: 12345 } }
+            ]);
+
+            await adapter.skipFile('ABC123', 1);
+
+            expect(fetchSpy).toHaveBeenCalledTimes(2);
+            const url = fetchSpy.mock.calls[1][0] as string;
+            expect(url).toContain('p=0');
+        });
+    });
+
+    describe('tracker management', () => {
+        it('should get trackers from props', async () => {
+            const propsResponse = {
+                build: 12345,
+                props: [{
+                    hash: 'ABC123',
+                    trackers: 'http://tracker1.com/announce\r\nhttp://tracker2.com/announce'
+                }]
+            };
+            createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: propsResponse }
+            ]);
+
+            const trackers = await adapter.getTrackers('ABC123');
+
+            expect(trackers).toEqual([
+                'http://tracker1.com/announce',
+                'http://tracker2.com/announce'
+            ]);
+        });
+
+        it('should add tracker to torrent', async () => {
+            const propsResponse = {
+                build: 12345,
+                props: [{ hash: 'ABC123', trackers: 'http://tracker1.com/announce' }]
+            };
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: propsResponse },
+                { ok: true, status: 200, body: { build: 12345 } }
+            ]);
+
+            await adapter.addTracker('ABC123', 'http://newtracker.com/announce');
+
+            expect(fetchSpy).toHaveBeenCalledTimes(3);
+            const url = fetchSpy.mock.calls[2][0] as string;
+            expect(url).toContain('action=setprops');
+            expect(url).toContain('s=trackers');
+        });
+
+        it('should set all trackers for a torrent', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: { build: 12345 } }
+            ]);
+
+            await adapter.setTrackers('ABC123', ['http://t1.com', 'http://t2.com']);
+
+            expect(fetchSpy).toHaveBeenCalledTimes(2);
+            const url = fetchSpy.mock.calls[1][0] as string;
+            expect(url).toContain('s=trackers');
         });
     });
 });

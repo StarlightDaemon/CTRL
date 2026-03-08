@@ -85,19 +85,31 @@ export class VaultService {
         if (!key) throw new Error('Vault is locked');
 
         const encrypted = await storage.getItem<{ iv: number[], ciphertext: number[] }>(VAULT_DATA_KEY);
-        if (!encrypted) return []; // Empty vault OR no data? (Empty vault implies initialized but empty)
-        // If uninitialized, storage returns null.
+        if (!encrypted) {
+            if (typeof __UI_DEBUG_MODE__ !== 'undefined' && __UI_DEBUG_MODE__) console.log('[VaultService] getServers: no vaultData found, returning []');
+            return []; // Empty vault
+        }
 
         const iv = new Uint8Array(encrypted.iv);
         const ciphertext = new Uint8Array(encrypted.ciphertext).buffer;
 
         const plaintext = await SecurityService.decrypt(ciphertext as ArrayBuffer, iv, key);
-        return JSON.parse(plaintext);
+        const servers = JSON.parse(plaintext);
+
+        if (typeof __UI_DEBUG_MODE__ !== 'undefined' && __UI_DEBUG_MODE__) {
+            console.log(`[VaultService] getServers: loaded ${servers.length} server(s)`);
+        }
+
+        return servers;
     }
 
     static async saveServers(servers: ServerConfig[]): Promise<void> {
         const key = await KeyManager.getSessionKey();
         if (!key) throw new Error('Vault is locked');
+
+        if (typeof __UI_DEBUG_MODE__ !== 'undefined' && __UI_DEBUG_MODE__) {
+            console.log(`[VaultService] saveServers: saving ${servers.length} server(s)`);
+        }
 
         const plaintext = JSON.stringify(servers);
         const { iv, ciphertext } = await SecurityService.encrypt(plaintext, key);
@@ -106,6 +118,10 @@ export class VaultService {
             iv: Array.from(iv),
             ciphertext: Array.from(new Uint8Array(ciphertext))
         });
+
+        if (typeof __UI_DEBUG_MODE__ !== 'undefined' && __UI_DEBUG_MODE__) {
+            console.log('[VaultService] saveServers: write complete');
+        }
     }
 
     /**

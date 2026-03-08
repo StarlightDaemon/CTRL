@@ -68,8 +68,8 @@ describe('SynologyAdapter', () => {
             const adapter = new SynologyAdapter(mockConfig);
             const getTaskError = (adapter as any).getTaskError.bind(adapter);
 
-            expect(getTaskError(401)).toBe('Max number of tasks reached');
-            expect(getTaskError(403)).toBe('Destination does not exist');
+            expect(getTaskError(401)).toBe('Max number of concurrent tasks reached');
+            expect(getTaskError(403)).toBe('Destination access denied - check permissions');
             expect(getTaskError(999)).toContain('code: 999');
         });
     });

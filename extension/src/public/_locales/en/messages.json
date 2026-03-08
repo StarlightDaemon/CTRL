@@ -258,5 +258,353 @@
   "sidebarGeneral": {
     "message": "General",
     "description": "Sidebar general label"
+  },
+  "navDashboard": {
+    "message": "Dashboard",
+    "description": "Navigation dashboard label"
+  },
+  "navServers": {
+    "message": "Servers",
+    "description": "Navigation servers label"
+  },
+  "navSettings": {
+    "message": "Settings",
+    "description": "Navigation settings label"
+  },
+  "navAppearance": {
+    "message": "Appearance",
+    "description": "Navigation appearance label"
+  },
+  "navUtilities": {
+    "message": "Utilities",
+    "description": "Navigation utilities label"
+  },
+  "navSystem": {
+    "message": "System",
+    "description": "Navigation system label"
+  },
+  "navAbout": {
+    "message": "About",
+    "description": "Navigation about label"
+  },
+  "popupTabControl": {
+    "message": "Control",
+    "description": "Popup control tab label"
+  },
+  "popupTabSettings": {
+    "message": "Settings",
+    "description": "Popup settings tab label"
+  },
+  "popupTabDebug": {
+    "message": "Debug",
+    "description": "Popup debug tab label"
+  },
+  "lockVault": {
+    "message": "Lock Vault",
+    "description": "Lock vault action label"
+  },
+  "popupGlobalSettings": {
+    "message": "Global Settings",
+    "description": "Popup global settings header"
+  },
+  "popupDescription": {
+    "message": "Manage your torrents, adjust settings, or inspect the UI.",
+    "description": "Popup description text"
+  },
+  "popupOpenOptions": {
+    "message": "Open Options Dashboard",
+    "description": "Popup open options button"
+  },
+  "popupDebugTools": {
+    "message": "Debug Tools",
+    "description": "Popup debug tools header"
+  },
+  "popupUiInspection": {
+    "message": "UI Inspection",
+    "description": "Popup UI inspection subheader"
+  },
+  "popupToggleOverlay": {
+    "message": "Toggle Overlay",
+    "description": "Popup toggle overlay button"
+  },
+  "dashboardTitle": {
+    "message": "Torrent Control",
+    "description": "Dashboard main title"
+  },
+  "dashboardSetupNow": {
+    "message": "Setup Now",
+    "description": "Dashboard setup button"
+  },
+  "dashboardQuickAdd": {
+    "message": "Quick Add",
+    "description": "Dashboard quick add section"
+  },
+  "dashboardMagnetPlaceholder": {
+    "message": "Magnet link or URL",
+    "description": "Dashboard quick add placeholder"
+  },
+  "dashboardAddTorrentTooltip": {
+    "message": "Add Torrent",
+    "description": "Dashboard quick add button tooltip"
+  },
+  "dashboardActiveTorrents": {
+    "message": "Active Torrents",
+    "description": "Dashboard active torrents section"
+  },
+  "dashboardWebUi": {
+    "message": "Web UI",
+    "description": "Dashboard Web UI button"
+  },
+  "dashboardTest": {
+    "message": "Test",
+    "description": "Dashboard test button"
+  },
+  "dashboardOpenSettings": {
+    "message": "Open Settings",
+    "description": "Dashboard open settings button"
+  },
+  "dashboardCurrentServer": {
+    "message": "Current Server",
+    "description": "Dashboard current server label"
+  },
+  "dashboardEmptyState": {
+    "message": "Extension not configured.",
+    "description": "Dashboard empty state message"
+  },
+  "dashboardSelectServer": {
+    "message": "Select Server",
+    "description": "Dashboard server select label"
+  },
+  "dialogAddTorrent": {
+    "message": "Add Torrent",
+    "description": "Add torrent dialog title/button"
+  },
+  "dialogAdding": {
+    "message": "Adding...",
+    "description": "Add torrent dialog adding state"
+  },
+  "dialogCancel": {
+    "message": "Cancel",
+    "description": "Add torrent dialog cancel button"
+  },
+  "dialogUrlLabel": {
+    "message": "Torrent URL / Magnet",
+    "description": "Add torrent dialog URL label"
+  },
+  "dialogPathLabel": {
+    "message": "Download Location",
+    "description": "Add torrent dialog path label"
+  },
+  "dialogLabelLabel": {
+    "message": "Label",
+    "description": "Add torrent dialog label label"
+  },
+  "dialogStartPaused": {
+    "message": "Start Paused",
+    "description": "Add torrent dialog paused checkbox"
+  },
+  "aboutTitle": {
+    "message": "About CTRL",
+    "description": "About page title"
+  },
+  "aboutDescription": {
+    "message": "Version info, links, and diagnostics.",
+    "description": "About page description"
+  },
+  "aboutProject": {
+    "message": "Project",
+    "description": "About page project card"
+  },
+  "aboutFeatures": {
+    "message": "Key Features",
+    "description": "About page features card"
+  },
+  "utilitiesTitle": {
+    "message": "Utilities",
+    "description": "Utilities page title"
+  },
+  "utilitiesDescription": {
+    "message": "Tools for hash conversion, cache recovery, and privacy diagnostics.",
+    "description": "Utilities page description"
+  },
+  "utilitiesDiagnostics": {
+    "message": "Diagnostics",
+    "description": "Utilities page diagnostics section"
+  },
+  "utilitiesDataManagement": {
+    "message": "Data Management",
+    "description": "Utilities page data management section"
+  },
+  "utilitiesViewDiagnostics": {
+    "message": "View Diagnostics →",
+    "description": "Utilities view diagnostics button"
+  },
+  "utilitiesManageData": {
+    "message": "Manage Data →",
+    "description": "Utilities manage data button"
+  },
+  "utilitiesHashConverter": {
+    "message": "Hash Converter",
+    "description": "Utilities hash converter title"
+  },
+  "utilitiesMagnetLink": {
+    "message": "Magnet Link",
+    "description": "Utilities magnet link label"
+  },
+  "utilitiesInfoHash": {
+    "message": "Info Hash",
+    "description": "Utilities info hash label"
+  },
+  "utilitiesExtractHash": {
+    "message": "Extract Hash",
+    "description": "Utilities extract hash button"
+  },
+  "utilitiesToMagnet": {
+    "message": "To Magnet",
+    "description": "Utilities to magnet button"
+  },
+  "systemTitle": {
+    "message": "System & Tools",
+    "description": "System page title"
+  },
+  "systemDescription": {
+    "message": "Manage system backups and extension diagnostics.",
+    "description": "System page description"
+  },
+  "systemDiagnostics": {
+    "message": "Diagnostics & Testing",
+    "description": "System page diagnostics section"
+  },
+  "systemEnhancedDiagnostics": {
+    "message": "Enhanced Diagnostics",
+    "description": "System page enhanced diagnostics label"
+  },
+  "systemRunSelfTest": {
+    "message": "Run Self-Test",
+    "description": "System page run self-test button"
+  },
+  "systemRunning": {
+    "message": "Running...",
+    "description": "System page running state"
+  },
+  "systemHealth": {
+    "message": "Environment Health",
+    "description": "System page health section"
+  },
+  "commonSave": {
+    "message": "Save",
+    "description": "Common save action"
+  },
+  "commonCancel": {
+    "message": "Cancel",
+    "description": "Common cancel action"
+  },
+  "commonEdit": {
+    "message": "Edit",
+    "description": "Common edit action"
+  },
+  "commonRemove": {
+    "message": "Remove",
+    "description": "Common remove action"
+  },
+  "commonOn": {
+    "message": "On",
+    "description": "Common on state"
+  },
+  "commonOff": {
+    "message": "Off",
+    "description": "Common off state"
+  },
+  "commonNone": {
+    "message": "None",
+    "description": "Common none option"
+  },
+  "commonLoading": {
+    "message": "Loading...",
+    "description": "Common loading state"
+  },
+  "commonError": {
+    "message": "Error",
+    "description": "Common error heading"
+  },
+  "commonStatus": {
+    "message": "Status",
+    "description": "Common status label"
+  },
+  "commonVersion": {
+    "message": "Version",
+    "description": "Common version label"
+  },
+  "commonUptime": {
+    "message": "Uptime",
+    "description": "Common uptime label"
+  },
+  "commonPlatform": {
+    "message": "Platform",
+    "description": "Common platform label"
+  },
+  "aboutProjectGithub": {
+    "message": "GitHub Repository",
+    "description": "About page GitHub link"
+  },
+  "aboutProjectReportIssue": {
+    "message": "Report an Issue",
+    "description": "About page report issue link"
+  },
+  "aboutProjectRequestFeature": {
+    "message": "Request a Feature",
+    "description": "About page request feature link"
+  },
+  "aboutProjectDescription": {
+    "message": "A modern, powerful extension to manage your torrents directly from your browser. Built with performance and security in mind, it supports multiple clients, drag-and-drop, and seamless context menu integration.",
+    "description": "About page project description"
+  },
+  "aboutProjectTileDescription": {
+    "message": "View source code, contribute, or audit the implementation on GitHub.",
+    "description": "About page project tile description"
+  },
+  "aboutFeaturePerformanceTitle": {
+    "message": "High Performance",
+    "description": "About page feature performance title"
+  },
+  "aboutFeaturePerformanceDescription": {
+    "message": "Virtualization for large torrent collections.",
+    "description": "About page feature performance description"
+  },
+  "aboutFeatureSecureTitle": {
+    "message": "Secure",
+    "description": "About page feature secure title"
+  },
+  "aboutFeatureSecureDescription": {
+    "message": "Optional permissions and encrypted server storage.",
+    "description": "About page feature secure description"
+  },
+  "aboutFeatureGlobalTitle": {
+    "message": "Global",
+    "description": "About page feature global title"
+  },
+  "aboutFeatureGlobalDescription": {
+    "message": "Localized UI support across multiple languages.",
+    "description": "About page feature global description"
+  },
+  "aboutFeatureReliableTitle": {
+    "message": "Reliable",
+    "description": "About page feature reliable title"
+  },
+  "aboutFeatureReliableDescription": {
+    "message": "Automated test coverage for core flows.",
+    "description": "About page feature reliable description"
+  },
+  "aboutKeyFeatures": {
+    "message": "Key Features",
+    "description": "About page key features section header"
+  },
+  "aboutLicense": {
+    "message": "Released under the MIT License",
+    "description": "About page license text"
+  },
+  "aboutCopyright": {
+    "message": "© 2025 CTRL (Torrent Control Reloaded)",
+    "description": "About page copyright text"
   }
 }

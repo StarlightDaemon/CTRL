@@ -1,5 +1,6 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
+import { Tabs, TabList, Tab } from '@carbon/react';
 
 interface TabItem {
     id: string;
@@ -24,16 +25,16 @@ export const PageHeader: React.FC<Props> = ({
     rightContent
 }) => {
     return (
-        <div className="bg-panel/80 backdrop-blur-md border-b border-border sticky top-0 z-20 transition-all duration-300">
-            <div className="px-8 pt-6 pb-0">
-                <div className="flex items-center justify-between mb-6">
+        <div className="bg-[var(--cds-layer-01)] border-b border-[var(--cds-border-subtle)] sticky top-0 z-20">
+            <div className="px-8 pt-4">
+                <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-4">
                         {Icon && (
-                            <div className="p-2.5 rounded-lg bg-accent/10 border border-accent/20 text-accent neon-icon">
-                                <Icon size={24} strokeWidth={2.5} />
+                            <div className="p-1.5 rounded-lg bg-[var(--cds-layer-03)] text-[var(--cds-link-primary)]">
+                                <Icon size={24} strokeWidth={2} />
                             </div>
                         )}
-                        <h1 className="text-2xl font-bold tracking-tight text-text-primary">
+                        <h1 className="text-2xl font-bold tracking-tight text-[var(--cds-text-primary)]">
                             {title}
                         </h1>
                     </div>
@@ -41,32 +42,17 @@ export const PageHeader: React.FC<Props> = ({
                 </div>
 
                 {tabs && tabs.length > 0 && (
-                    <div className="flex gap-6 relative">
-                        {tabs.map((tab) => {
-                            const isActive = activeTab === tab.id;
-                            return (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => onTabChange?.(tab.id)}
-                                    className={`
-                                        group relative pb-4 px-1 text-sm font-medium transition-colors duration-200
-                                        ${isActive ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}
-                                    `}
-                                >
-                                    {tab.label}
-
-                                    {/* Neon Active Indicator */}
-                                    {isActive && (
-                                        <div className="absolute bottom-0 left-0 w-full h-[2px] bg-accent shadow-[0_0_10px_var(--accent)] neon-underline"></div>
-                                    )}
-
-                                    {/* Hover Indicator (Subtler) */}
-                                    {!isActive && (
-                                        <div className="absolute bottom-0 left-0 w-full h-[2px] bg-border scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
-                                    )}
-                                </button>
-                            );
-                        })}
+                    <div className="-ml-4">
+                        <Tabs
+                            selectedIndex={tabs.findIndex(t => t.id === activeTab)}
+                            onChange={({ selectedIndex }) => onTabChange?.(tabs[selectedIndex].id)}
+                        >
+                            <TabList aria-label="Page sub-tabs" contained>
+                                {tabs.map((tab) => (
+                                    <Tab key={tab.id}>{tab.label}</Tab>
+                                ))}
+                            </TabList>
+                        </Tabs>
                     </div>
                 )}
             </div>

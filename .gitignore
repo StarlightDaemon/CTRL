@@ -75,3 +75,7 @@ extension/test-results/
 extension/playwright-report/
 
 old_brain/
+
+# Generated UI exported data and build logs
+ctrl-servers-full-*.json
+extension/build_log.txt

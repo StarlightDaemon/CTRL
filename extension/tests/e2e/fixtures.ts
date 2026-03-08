@@ -1,4 +1,12 @@
-import { test as base, chromium, type BrowserContext, type Worker } from '@playwright/test';
+/**
+ * E2E Test Fixtures for CTRL Extension
+ * 
+ * Provides:
+ * - Persistent browser context with extension loaded
+ * - Extension ID extraction from service worker
+ * - Unique temp directories per test to avoid conflicts
+ */
+import { test as base, chromium, type BrowserContext, type Page } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -7,52 +15,142 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Extension build path
+const EXTENSION_PATH = path.resolve(__dirname, '../../builds/chrome-mv3');
+
+/**
+ * Custom test fixture extending Playwright's base
+ */
 export const test = base.extend<{
     context: BrowserContext;
     extensionId: string;
-    backgroundWorker: Worker;
+    extensionPage: Page;
 }>({
+    // Persistent context with extension loaded
     context: async ({ }, use, testInfo) => {
-        // Resolve to the WXT build output
-        const pathToExtension = path.resolve(__dirname, '../../builds/chrome-mv3');
-
-        // Validation
-        if (!fs.existsSync(pathToExtension)) {
-            throw new Error(`Extension build not found at ${pathToExtension}. Run 'npm run build:chrome' first.`);
+        // Validate extension build exists
+        if (!fs.existsSync(EXTENSION_PATH)) {
+            throw new Error(
+                `Extension build not found at ${EXTENSION_PATH}.\n` +
+                `Run 'npm run build:chrome' first.`
+            );
         }
 
         // Use unique temp directory per test to avoid SingletonLock conflicts
-        const userDataDir = path.join(os.tmpdir(), `pw-ext-${testInfo.workerIndex}-${Date.now()}`);
+        const userDataDir = path.join(
+            os.tmpdir(),
+            `ctrl-e2e-${testInfo.workerIndex}-${Date.now()}`
+        );
         await fs.promises.mkdir(userDataDir, { recursive: true });
 
-        // Launch Persistent Context
+        // Launch persistent context with extension
         const context = await chromium.launchPersistentContext(userDataDir, {
-            headless: true, // Use headless mode
+            headless: true,
             args: [
-                `--disable-extensions-except=${pathToExtension}`,
-                `--load-extension=${pathToExtension}`,
+                `--disable-extensions-except=${EXTENSION_PATH}`,
+                `--load-extension=${EXTENSION_PATH}`,
                 '--no-sandbox',
                 '--disable-gpu',
-            ].filter(Boolean),
+                '--disable-dev-shm-usage', // Prevent shared memory issues in CI
+            ],
         });
+
+        // Wait for service worker to be ready
+        await waitForServiceWorker(context);
 
         await use(context);
 
+        // Cleanup
         await context.close();
-        // Clean up temp directory
-        try {
-            await fs.promises.rm(userDataDir, { recursive: true, force: true });
-        } catch (e) { /* Ignore cleanup errors */ }
+        await cleanupTempDir(userDataDir);
     },
 
+    // Extract extension ID from service worker URL
     extensionId: async ({ context }, use) => {
-        let [worker] = context.serviceWorkers();
-        if (!worker) {
-            worker = await context.waitForEvent('serviceworker');
-        }
+        const worker = await getServiceWorker(context);
         const extensionId = worker.url().split('/')[2];
         await use(extensionId);
+    },
+
+    // Convenience: Pre-opened extension page
+    extensionPage: async ({ context, extensionId }, use) => {
+        const page = await context.newPage();
+        await page.goto(`chrome-extension://${extensionId}/popup.html`);
+        await page.waitForLoadState('domcontentloaded');
+        await use(page);
+        await page.close();
     },
 });
 
 export const expect = test.expect;
+
+// ============ Helper Functions ============
+
+/**
+ * Wait for service worker to be available
+ */
+async function waitForServiceWorker(context: BrowserContext, timeout = 10000): Promise<void> {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+        const workers = context.serviceWorkers();
+        if (workers.length > 0) {
+            return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // If no workers yet, wait for the event
+    await context.waitForEvent('serviceworker', { timeout: timeout / 2 });
+}
+
+/**
+ * Get the extension's service worker
+ */
+async function getServiceWorker(context: BrowserContext) {
+    let [worker] = context.serviceWorkers();
+    if (!worker) {
+        worker = await context.waitForEvent('serviceworker', { timeout: 10000 });
+    }
+    return worker;
+}
+
+/**
+ * Clean up temp directory, ignoring errors
+ */
+async function cleanupTempDir(dir: string): Promise<void> {
+    try {
+        await fs.promises.rm(dir, { recursive: true, force: true });
+    } catch {
+        // Ignore cleanup errors - Windows often has file locks
+    }
+}
+
+// ============ Test Utilities ============
+
+/**
+ * Wait for extension to be fully loaded and responsive
+ */
+export async function waitForExtensionReady(page: Page): Promise<void> {
+    // Wait for React to hydrate
+    await page.waitForLoadState('networkidle');
+
+    // Wait for any loading spinners to disappear
+    const spinner = page.locator('[data-testid="loading"], .loading, [aria-busy="true"]');
+    if (await spinner.count() > 0) {
+        await spinner.first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => { });
+    }
+}
+
+/**
+ * Navigate to extension page with proper waits
+ */
+export async function gotoExtensionPage(
+    page: Page,
+    extensionId: string,
+    pageName: 'popup' | 'options' = 'popup'
+): Promise<void> {
+    await page.goto(`chrome-extension://${extensionId}/${pageName}.html`);
+    await waitForExtensionReady(page);
+}
+

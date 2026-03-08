@@ -8,27 +8,31 @@ export default defineConfig({
   srcDir: 'src',
   outDir: 'builds',
   manifest: (env) => {
-    const permissions = ['storage', 'contextMenus', 'notifications', 'activeTab', 'downloads', 'alarms', 'cookies', 'declarativeNetRequest'];
+    const permissions = ['storage', 'contextMenus', 'notifications', 'activeTab', 'alarms', 'declarativeNetRequest', 'scripting'];
 
-    // Chrome requires 'offscreen' for Keep-Alive
-    if (env.browser === 'chrome') {
-      permissions.push('offscreen');
+    // Normalize version for Chrome compatibility (e.g., "0.2.0-beta.1" -> "0.2.0.1")
+    const [baseVersion, preRelease] = packageJson.version.split('-');
+    let numericVersion = baseVersion;
+    if (preRelease) {
+      const parts = preRelease.split('.');
+      const suffix = parts[parts.length - 1];
+      numericVersion = /^\d+$/.test(suffix) ? `${baseVersion}.${suffix}` : `${baseVersion}.0`;
     }
 
     return {
       name: `CTRL v${packageJson.version}`,
       description: 'Manage your torrents from the browser',
-      version: packageJson.version,
+      version: numericVersion,
+      version_name: packageJson.version,
       default_locale: 'en',
       permissions: permissions,
-      optional_host_permissions: ['<all_urls>'],
-      protocol_handlers: [
-        {
-          protocol: 'magnet',
-          name: 'Torrent Control',
-          uriTemplate: 'options.html?magnet=%s'
-        }
+      optional_host_permissions: [
+        'http://*/*',
+        'https://*/*',
+        'ws://*/*',
+        'wss://*/*',
       ],
+
       action: {
         default_title: 'Torrent Control',
         default_popup: 'popup.html',
@@ -52,45 +56,47 @@ export default defineConfig({
         open_in_tab: true,
       },
       content_security_policy: {
-        extension_pages: "script-src 'self'; object-src 'self'; connect-src * data: blob: filesystem:;",
+        extension_pages: "script-src 'self'; object-src 'self'; connect-src http: https: ws: wss: data: blob:;",
       },
-      web_accessible_resources: [
-        {
-          resources: ['popup.html', 'options.html'],
-          matches: ['<all_urls>'],
-        },
-      ],
+
     };
   },
-  vite: () => ({
-    plugins: [
-      Inspector({
-        toggleButtonVisibility: 'never', // We'll trigger it via our own overlay if needed, or just use the attributes
-      }),
-      react({
-        babel: {
-          plugins: [
-            ['@babel/plugin-proposal-decorators', { legacy: true }],
-            ['react-component-data-attribute', { onlyRootComponents: false }]
-          ]
-        }
-      })
-    ],
-    build: {
-      sourcemap: true,
-      minify: false,
-    },
-    define: {
-      __UI_DEBUG_MODE__: JSON.stringify(true),
-      __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
-      __APP_VERSION__: JSON.stringify(packageJson.version),
-    },
-    resolve: {
-      alias: {
-        '@': path.resolve(__dirname, './src'),
+  vite: (env) => {
+    const isDev = env.mode === 'development';
+
+    return {
+      plugins: [
+        // Only include Inspector in development
+        ...(isDev ? [Inspector({
+          toggleButtonVisibility: 'never',
+        })] : []),
+        react({
+          babel: {
+            plugins: [
+              ['@babel/plugin-proposal-decorators', { legacy: true }],
+              ['react-component-data-attribute', { onlyRootComponents: false }]
+            ]
+          }
+        })
+      ],
+      build: {
+        // Disable sourcemaps in production
+        sourcemap: isDev,
+        // Enable minification in production
+        minify: !isDev,
       },
-    },
-  }),
+      define: {
+        __UI_DEBUG_MODE__: JSON.stringify(isDev),
+        __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
+        __APP_VERSION__: JSON.stringify(packageJson.version),
+      },
+      resolve: {
+        alias: {
+          '@': path.resolve(__dirname, './src'),
+        },
+      },
+    };
+  },
   hooks: {
     'build:manifestGenerated': (wxt, manifest) => {
       if (manifest.options_ui) {

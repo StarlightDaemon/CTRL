@@ -1,9 +1,9 @@
 import React from 'react';
 import { AppOptions } from '@/shared/lib/types';
-import { SettingsPageLayout } from '@/shared/ui/settings/SettingsPageLayout';
 import { SettingsCard } from '@/shared/ui/settings/SettingsCard';
 import { SettingsToggle } from '@/shared/ui/settings/SettingsToggle';
-import { Bell, CheckCircle } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
+import { Select, SelectItem, Button, Stack } from '@carbon/react';
 
 import { useDebugId } from '@/shared/lib/hooks/useDebugId';
 
@@ -14,8 +14,7 @@ interface Props {
     previewNotificationLevel: string;
     setPreviewNotificationLevel: (level: string) => void;
     applyNotifications: () => void;
-    updateSettings: (newSettings: AppOptions) => void;
-    previewTheme: string;
+    updateSettings: (newSettings: AppOptions) => Promise<void> | void;
 }
 
 export const NotificationSettings: React.FC<Props> = ({
@@ -25,8 +24,7 @@ export const NotificationSettings: React.FC<Props> = ({
     previewNotificationLevel,
     setPreviewNotificationLevel,
     applyNotifications,
-    updateSettings,
-    previewTheme
+    updateSettings
 }) => {
     // Debug IDs
     const applyBtnDebug = useDebugId('settings', 'notifications', 'apply-button');
@@ -39,18 +37,18 @@ export const NotificationSettings: React.FC<Props> = ({
             title="Notifications"
             headerActions={
                 (previewNotification !== settings.globals.enableNotifications || previewNotificationLevel !== settings.globals.notificationLevel) && (
-                    <button
+                    <Button
                         onClick={applyNotifications}
-                        className="bg-accent text-white px-3 py-1.5 rounded text-sm hover:bg-accent-hover transition-colors"
+                        size="sm"
                         {...applyBtnDebug}
                     >
                         Apply
-                    </button>
+                    </Button>
                 )
             }
         >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
+                <Stack gap={5}>
                     <SettingsToggle
                         checked={previewNotification}
                         onChange={() => setPreviewNotification(!previewNotification)}
@@ -59,51 +57,48 @@ export const NotificationSettings: React.FC<Props> = ({
                     />
 
                     {previewNotification && (
-                        <div className="space-y-4 pt-4 border-t border-border">
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary mb-1">Notification Level</label>
-                                <select
-                                    value={previewNotificationLevel}
-                                    onChange={(e) => setPreviewNotificationLevel(e.target.value)}
-                                    className="block w-full rounded-md border-border bg-surface text-text-primary shadow-sm focus:border-accent focus:ring-accent sm:text-sm p-2 border"
-                                    {...levelSelectDebug}
-                                >
-                                    <option value="standard">Standard (Success & Errors)</option>
-                                    <option value="verbose">Verbose (Detailed Steps)</option>
-                                    <option value="error">Errors Only</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary mb-1">Notification Style</label>
-                                <select
-                                    value={settings.globals.notificationStyle}
-                                    onChange={(e) => updateSettings({ ...settings, globals: { ...settings.globals, notificationStyle: e.target.value as any } })}
-                                    className="block w-full rounded-md border-border bg-surface text-text-primary shadow-sm focus:border-accent focus:ring-accent sm:text-sm p-2 border"
-                                    {...styleSelectDebug}
-                                >
-                                    <option value="toast">Toast (Bottom Right)</option>
-                                    <option value="banner">Banner (Top Width)</option>
-                                    <option value="modal">Modal (Center Alert)</option>
-                                </select>
-                            </div>
-                        </div>
+                        <Stack gap={5} className="pt-4 border-t border-[var(--cds-border-subtle)]">
+                            <Select
+                                id="notification-level"
+                                labelText="Notification Level"
+                                value={previewNotificationLevel}
+                                onChange={(e) => setPreviewNotificationLevel(e.target.value)}
+                                {...levelSelectDebug}
+                            >
+                                <SelectItem value="standard" text="Standard (Success & Errors)" />
+                                <SelectItem value="verbose" text="Verbose (Detailed Steps)" />
+                                <SelectItem value="error" text="Errors Only" />
+                            </Select>
+
+                            <Select
+                                id="notification-style"
+                                labelText="Notification Style"
+                                value={settings.globals.notificationStyle}
+                                onChange={(e) => updateSettings({ ...settings, globals: { ...settings.globals, notificationStyle: e.target.value as any } })}
+                                {...styleSelectDebug}
+                            >
+                                <SelectItem value="toast" text="Toast (Bottom Right)" />
+                                <SelectItem value="banner" text="Banner (Top Width)" />
+                                <SelectItem value="modal" text="Modal (Center Alert)" />
+                            </Select>
+                        </Stack>
                     )}
-                </div>
+                </Stack>
 
                 {/* Notification Mockup */}
-                <div className="border border-border rounded-lg bg-gray-100 dark:bg-gray-900 p-4 relative h-32 flex items-end justify-end overflow-hidden" data-theme={previewTheme}>
+                <div className="border border-[var(--cds-border-subtle)] rounded-lg bg-[var(--cds-layer-01)] p-4 relative h-32 flex items-end justify-end overflow-hidden">
                     {previewNotification ? (
-                        <div className={`bg-card border border-border shadow-lg rounded p-3 flex items-start space-x-3 w-64 ${settings.appearance.performance !== 'low' ? 'animate-bounce-in' : ''}`}>
-                            <div className="bg-accent rounded-full p-1">
+                        <div className="bg-[var(--cds-layer-03)] border border-[var(--cds-border-subtle)] shadow-lg rounded p-3 flex items-start space-x-3 w-64 animate-in fade-in slide-in-from-bottom-2">
+                            <div className="bg-[var(--cds-support-success)] rounded-full p-1">
                                 <CheckCircle className="w-4 h-4 text-white" />
                             </div>
                             <div>
-                                <div className="text-sm font-bold text-text-primary">Torrent Added</div>
-                                <div className="text-xs text-text-secondary">Linux ISO.iso added to download queue.</div>
+                                <div className="text-sm font-bold text-[var(--cds-text-primary)]">Torrent Added</div>
+                                <div className="text-xs text-[var(--cds-text-secondary)]">Linux ISO.iso added to download queue.</div>
                             </div>
                         </div>
                     ) : (
-                        <div className="text-xs text-text-secondary w-full text-center self-center">Notifications Disabled</div>
+                        <div className="text-xs text-[var(--cds-text-helper)] w-full text-center self-center">Notifications Disabled</div>
                     )}
                 </div>
             </div>
