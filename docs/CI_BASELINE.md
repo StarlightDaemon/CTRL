@@ -12,6 +12,8 @@ The GitHub Actions CI pipeline (`.github/workflows/ci.yml`) consists of 4 sequen
 lint → test → build → e2e
 ```
 
+All jobs run from `extension/` and install dependencies with `npm ci`. Node setup uses npm caching with `extension/package-lock.json`, which is the tracked lockfile baseline for deterministic CI behavior.
+
 ### Job 1: `lint`
 - **Purpose:** Run ESLint to catch code quality issues
 - **Command:** `npm run lint`
@@ -23,7 +25,8 @@ lint → test → build → e2e
 - **Commands:**
   - `npm run compile` (TypeScript type checking)
   - `npm run test` (Vitest unit tests)
-- **Expected:** 153/153 tests passing
+- **Expected:** Type check passes and the current Vitest baseline passes
+- **Current Baseline:** 16 test files / 357 tests passing (observed 2026-03-08)
 - **Duration:** ~2 minutes
 
 ### Job 3: `build`
@@ -74,7 +77,7 @@ These are excluded from CI to ensure fast, reproducible builds. Integration test
 1. Run `npm run test` locally
 2. Check the failing test output
 3. Fix the test or implementation
-4. Ensure all 153 tests pass before pushing
+4. Ensure the suite passes before pushing; the current baseline is 357 passing tests
 
 ### Build Failures
 **Symptom:** `build` job fails during Chrome or Firefox build.
@@ -123,3 +126,7 @@ These are excluded from CI to ensure fast, reproducible builds. Integration test
   - 4 jobs: lint, test, build, e2e
   - 153 unit tests
   - E2E excludes `@integration`
+- **2026-03-08:** Post-beta baseline refresh
+  - deterministic npm caching uses tracked `extension/package-lock.json`
+  - installs use `npm ci`
+  - observed local validation baseline: 16 test files / 357 tests passing
