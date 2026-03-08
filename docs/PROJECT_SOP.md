@@ -211,7 +211,7 @@ import { ServerCard } from '@/features/torrent-control/ui/ServerCard';
 |------|---------|
 | `README.md` | Project overview, quick start, badges |
 | `LICENSE` | Legal terms (MIT, GPL, etc.) |
-| `CHANGELOG.md` | Version history (Keep a Changelog format) |
+| `extension/CHANGELOG.md` | Version history (Keep a Changelog format) |
 | `CONTRIBUTING.md` | How to contribute |
 | `CODE_OF_CONDUCT.md` | Community standards |
 | `SECURITY.md` | Vulnerability reporting |
@@ -361,4 +361,4 @@ import { Torrent } from '@/entities/torrent';
 
 ---
 
-*Last Updated: December 2025*
+*Last Updated: March 8, 2026*
