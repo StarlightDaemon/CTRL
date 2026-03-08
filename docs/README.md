@@ -12,7 +12,6 @@
 
 | Folder | Contents |
 |--------|----------|
-| `decisions/` | Architecture Decision Records |
-| `specs/` | Technical specifications |
-| `reports/` | Research reports |
+| `reference/` | Active/historical research, API prompts, and ADRs |
 | `archive/` | Historical reference materials |
+| `reports/` | Sprint working documents (gitignored) |
