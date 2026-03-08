@@ -22,37 +22,37 @@ This document defines the **Single Source of Truth** for CTRL project organizati
 
 ## 2. Repository Structure
 
-```
+```text
 CTRL/
 ├── .github/                      # GitHub configuration
 │   ├── workflows/                # CI/CD pipelines
 │   │   ├── ci.yml               # Lint, test, build on PR
-│   │   ├── release.yml          # Publish builds
-│   │   └── codeql.yml           # Security scanning
+│   │   └── auto-localize.yml    # i18n automation
 │   ├── ISSUE_TEMPLATE/          # Bug/feature templates
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── CODEOWNERS
 │
+├── backups/                      # Internal snapshots (gitignored)
+│
 ├── docs/                         # Project documentation
 │   ├── ARCHITECTURE.md          # High-level system design
 │   ├── DEVELOPMENT.md           # Dev setup guide
-│   ├── decisions/               # Architecture Decision Records (ADRs)
+│   ├── reference/               # Active research, specs, and ADRs
 │   │   └── 001-use-fsd.md
-│   └── api/                     # Generated API docs
+│   ├── archive/                 # Historical reference material
+│   └── reports/                 # Sprint working documents (gitignored)
 │
 ├── extension/                    # WXT Extension (primary package)
 │   └── [see Section 3]
 │
-├── research/                     # Research & specs
-│   ├── active/                  # Current research
-│   └── archive/                 # Completed research
+├── reports/                      # Formal test & audit reports
 │
 ├── .editorconfig                # Editor consistency
 ├── .gitignore
 ├── .nvmrc                       # Node version lock
 ├── LICENSE
 ├── README.md                    # Project overview
-├── CHANGELOG.md                 # Version history
+├── ROADMAP.md                   # Strategic direction and milestones
 ├── CONTRIBUTING.md              # Contribution guide
 ├── CODE_OF_CONDUCT.md           # Community standards
 └── SECURITY.md                  # Security policy
@@ -267,7 +267,7 @@ npm run test:e2e      # Playwright E2E
 
 ### Architecture Decision Records (ADRs)
 
-For significant decisions, create `docs/decisions/NNN-title.md`:
+For significant decisions, create `docs/reference/NNN-title.md`:
 
 ```markdown
 # NNN. Decision Title
