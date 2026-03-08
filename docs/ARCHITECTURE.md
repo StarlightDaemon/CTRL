@@ -72,4 +72,4 @@ Credentials encrypted at rest using:
 
 ## Directory Structure
 
-See [PROJECT_SOP.md](../research/docs/PROJECT_SOP.md) for complete structure.
+See [PROJECT_SOP.md](PROJECT_SOP.md) for complete structure.
