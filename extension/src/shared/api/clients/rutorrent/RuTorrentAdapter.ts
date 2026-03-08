@@ -247,12 +247,8 @@ export class RuTorrentAdapter implements ITorrentClient {
     }
 
     async testConnection(): Promise<boolean> {
-        try {
-            await this.login();
-            return true;
-        } catch {
-            return false;
-        }
+        await this.login();
+        return true;
     }
 
     async ping(): Promise<number> {

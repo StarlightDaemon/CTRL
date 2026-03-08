@@ -150,16 +150,8 @@ export class Aria2Adapter implements ITorrentClient {
      * Returns true if connection successful, false otherwise.
      */
     async testConnection(): Promise<boolean> {
-        try {
-            await this.getVersionInfo();
-            return true;
-        } catch (error) {
-            if (error instanceof Aria2Error) {
-                // Log specific error type for diagnostics
-                console.error(`Aria2 connection test failed: ${error.code} - ${error.message}`);
-            }
-            return false;
-        }
+        await this.getVersionInfo();
+        return true;
     }
 
     async ping(): Promise<number> {

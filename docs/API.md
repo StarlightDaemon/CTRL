@@ -165,9 +165,13 @@ try {
 }
 ```
 
-Use `testConnection()` for safe connection testing:
+Use `testConnection()` for connection testing and validation:
 
 ```typescript
-const isConnected = await client.testConnection();
-// Returns false instead of throwing
+try {
+  await client.testConnection();
+  // Connection successful
+} catch (error) {
+  // Throws descriptive error for UI display
+}
 ```

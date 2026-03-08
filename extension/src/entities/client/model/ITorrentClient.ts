@@ -52,7 +52,7 @@ export interface ITorrentClient {
 
     /**
      * Tests the connection to the client.
-     * Returns true if successful, false otherwise.
+     * Returns true if successful. Throws a descriptive Error if the connection fails.
      */
     testConnection(): Promise<boolean>;
 

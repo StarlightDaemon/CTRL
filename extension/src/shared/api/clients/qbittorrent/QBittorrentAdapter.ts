@@ -221,17 +221,12 @@ export class QBittorrentAdapter implements ITorrentClient {
     }
 
     async testConnection(): Promise<boolean> {
-        try {
-            console.log('[QBit] Testing Connection...');
-            await this.login();
-            console.log('[QBit] Login passed, checking version...');
-            const v = await this.getAppVersion();
-            console.log(`[QBit] Version response: ${v}`);
-            return true;
-        } catch (error) {
-            console.error('[QBit] Connection test failed:', error);
-            return false;
-        }
+        console.log('[QBit] Testing Connection...');
+        await this.login();
+        console.log('[QBit] Login passed, checking version...');
+        const v = await this.getAppVersion();
+        console.log(`[QBit] Version response: ${v}`);
+        return true;
     }
 
     async ping(): Promise<number> {
