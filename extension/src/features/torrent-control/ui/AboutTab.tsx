@@ -1,8 +1,8 @@
 import React from 'react';
 import { AppOptions } from '@/shared/lib/types';
-import { Github, Bug, Lightbulb, ExternalLink, Shield, Zap, Globe, TestTube, Info } from 'lucide-react';
 import { SettingsPageLayout } from '@/shared/ui/settings/SettingsPageLayout';
 import { SettingsCard } from '@/shared/ui/settings/SettingsCard';
+import { Link, Stack, Grid, Column, Tag, Tile, ClickableTile } from '@carbon/react';
 
 interface Props {
     settings: AppOptions;
@@ -11,95 +11,103 @@ interface Props {
 
 const AboutInfoCard: React.FC = () => {
     const links = [
-        { icon: Github, label: 'GitHub Repository', url: 'https://github.com/physton/torrent-control' },
-        { icon: Bug, label: 'Report an Issue', url: 'https://github.com/physton/torrent-control/issues' },
-        { icon: Lightbulb, label: 'Request a Feature', url: 'https://github.com/physton/torrent-control/discussions' },
+        { label: browser.i18n.getMessage('aboutProjectGithub'), url: 'https://github.com/StarlightDaemon/CTRL' },
+        { label: browser.i18n.getMessage('aboutProjectReportIssue'), url: 'https://github.com/StarlightDaemon/CTRL/issues' },
+        { label: browser.i18n.getMessage('aboutProjectRequestFeature'), url: 'https://github.com/StarlightDaemon/CTRL/discussions' },
     ];
 
     return (
-        <SettingsCard title="About">
-            <p className="text-text-secondary leading-relaxed mb-6">
-                A modern, powerful extension to manage your torrents directly from your browser.
-                Built with performance and security in mind, it supports multiple clients,
-                drag-and-drop, and seamless context menu integration.
+        <SettingsCard title={browser.i18n.getMessage('aboutProject')} className="h-full">
+            <p className="text-[var(--cds-text-secondary)] leading-relaxed mb-6">
+                {browser.i18n.getMessage('aboutProjectDescription')}
             </p>
-            <div className="space-y-3">
+            <Stack gap={4}>
+                <ClickableTile
+                    href="https://github.com/StarlightDaemon/CTRL"
+                    className="h-full flex flex-col p-6"
+                >
+                    <Stack gap={3}>
+                        <h3 className="text-lg font-bold">{browser.i18n.getMessage('aboutProject')}</h3>
+                        <p className="text-[var(--cds-text-secondary)] leading-relaxed">
+                            {browser.i18n.getMessage('aboutProjectTileDescription')}
+                        </p>
+                    </Stack>
+                </ClickableTile>
                 {links.map((link, i) => (
-                    <a
+                    <Link
                         key={i}
                         href={link.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center p-3 rounded-md hover:bg-hover transition-colors group"
+                        className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] no-underline"
                     >
-                        <link.icon className="w-5 h-5 text-text-secondary group-hover:text-accent mr-3" />
-                        <span className="text-text-primary font-medium">{link.label}</span>
-                        <ExternalLink className="w-4 h-4 text-text-secondary ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </a>
+                        <span className="font-medium">{link.label}</span>
+                    </Link>
                 ))}
-            </div>
+            </Stack>
         </SettingsCard>
     );
 };
 
 const AboutFeaturesCard: React.FC = () => {
     const features = [
-        { icon: Zap, title: 'High Performance', desc: 'Virtualization for 10k+ torrents' },
-        { icon: Shield, title: 'Secure', desc: 'Optional permissions & token storage' },
-        { icon: Globe, title: 'Global', desc: 'Zero-touch localization' },
-        { icon: TestTube, title: 'Reliable', desc: 'Automated E2E testing' },
+        { title: browser.i18n.getMessage('aboutFeaturePerformanceTitle'), desc: browser.i18n.getMessage('aboutFeaturePerformanceDescription') },
+        { title: browser.i18n.getMessage('aboutFeatureSecureTitle'), desc: browser.i18n.getMessage('aboutFeatureSecureDescription') },
+        { title: browser.i18n.getMessage('aboutFeatureGlobalTitle'), desc: browser.i18n.getMessage('aboutFeatureGlobalDescription') },
+        { title: browser.i18n.getMessage('aboutFeatureReliableTitle'), desc: browser.i18n.getMessage('aboutFeatureReliableDescription') },
     ];
 
     return (
-        <SettingsCard title="Key Features">
-            <div className="grid grid-cols-1 gap-4">
+        <SettingsCard title={browser.i18n.getMessage('aboutKeyFeatures')} className="h-full">
+            <Stack gap={4}>
                 {features.map((feat, i) => (
-                    <div key={i} className="flex items-start">
-                        <div className="p-2 rounded-lg bg-surface mr-4">
-                            <feat.icon className="w-5 h-5 text-accent" />
-                        </div>
+                    <div key={i} className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
                         <div>
-                            <h4 className="font-medium text-text-primary">{feat.title}</h4>
-                            <p className="text-sm text-text-secondary">{feat.desc}</p>
+                            <h4 className="font-medium text-[var(--cds-text-primary)]">{feat.title}</h4>
+                            <p className="text-sm text-[var(--cds-text-secondary)]">{feat.desc}</p>
                         </div>
                     </div>
                 ))}
-            </div>
+            </Stack>
         </SettingsCard>
     );
 };
 
-
-
 const AboutFooter: React.FC = () => (
-    <div className="text-center text-sm text-text-secondary pt-8 pb-4">
-        <p>Released under the MIT License</p>
-        <p className="mt-1">© 2025 CTRL (Torrent Control Reloaded)</p>
+    <div className="text-center text-sm text-[var(--cds-text-secondary)] pt-8 pb-4">
+        <p>{browser.i18n.getMessage('aboutLicense')}</p>
+        <p className="mt-1">{browser.i18n.getMessage('aboutCopyright')}</p>
     </div>
 );
 
-export const AboutTab: React.FC<Props> = (props) => {
+export const AboutTab: React.FC<Props> = () => {
     return (
         <SettingsPageLayout
-            title="About CTRL"
-            description="Version info, links, and diagnostics."
-            icon={Info}
+            title={browser.i18n.getMessage('aboutTitle')}
+            description={browser.i18n.getMessage('aboutDescription')}
         >
-            <div className="text-center mb-6">
-                <img src="/icon/default-64.png" alt="Logo" className="w-24 h-24 mx-auto mb-4" />
-                <h2 className="text-3xl font-bold text-text-primary">CTRL</h2>
-                <p className="text-text-secondary text-lg">Torrent Control Reloaded</p>
-                <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full bg-accent/10 text-accent text-sm font-medium">
-                    v{chrome.runtime.getManifest().version}
+            <div className="flex flex-col gap-1 mb-6">
+                <h1 className="text-2xl font-bold text-[var(--cds-text-primary)]">
+                    {browser.i18n.getMessage('aboutTitle')}
+                </h1>
+                <p className="text-[var(--cds-text-secondary)]">
+                    {browser.i18n.getMessage('aboutDescription')}
+                </p>
+                <div className="mt-2 text-left">
+                    <Tag type="blue" size="md">
+                        v{chrome.runtime.getManifest().version}
+                    </Tag>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <AboutInfoCard />
-                <AboutFeaturesCard />
-            </div>
-
-
+            <Grid className="p-0" narrow>
+                <Column sm={4} md={4} lg={8} className="flex flex-col">
+                    <AboutInfoCard />
+                </Column>
+                <Column sm={4} md={4} lg={8} className="flex flex-col">
+                    <AboutFeaturesCard />
+                </Column>
+            </Grid>
 
             <AboutFooter />
         </SettingsPageLayout>

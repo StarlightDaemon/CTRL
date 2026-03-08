@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { ServerConfig } from '@/shared/lib/types';
+import {
+    Modal,
+    TextInput,
+    Select,
+    SelectItem,
+    Checkbox,
+    InlineNotification,
+    Form,
+    Stack
+} from '@carbon/react';
 
 interface Props {
     isOpen: boolean;
@@ -28,10 +38,7 @@ export const AddTorrentDialog: React.FC<Props> = ({ isOpen, onClose, onAdd, init
         }
     }, [isOpen, initialUrl, server]);
 
-    if (!isOpen) return null;
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async () => {
         if (!url) return;
 
         setIsSubmitting(true);
@@ -47,107 +54,70 @@ export const AddTorrentDialog: React.FC<Props> = ({ isOpen, onClose, onAdd, init
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-panel w-full max-w-sm mx-4 rounded-xl shadow-2xl border border-border overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="bg-surface px-4 py-3 border-b border-border flex justify-between items-center">
-                    <h3 className="font-bold text-text-primary">Add Torrent</h3>
-                    <button onClick={onClose} aria-label="Close" className="text-text-secondary hover:text-text-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded">
-                        ✕
-                    </button>
-                </div>
+        <Modal
+            open={isOpen}
+            modalHeading={browser.i18n.getMessage('dialogAddTorrent')}
+            primaryButtonText={isSubmitting ? browser.i18n.getMessage('dialogAdding') : browser.i18n.getMessage('dialogAddTorrent')}
+            secondaryButtonText={browser.i18n.getMessage('dialogCancel')}
+            onRequestClose={onClose}
+            onRequestSubmit={handleSubmit}
+            primaryButtonDisabled={!url || isSubmitting}
+        >
+            <Form>
+                <Stack gap={7}>
+                    <TextInput
+                        id="torrent-url"
+                        labelText={browser.i18n.getMessage('dialogUrlLabel')}
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        placeholder="magnet:?xt=urn:btih..."
+                        autoFocus
+                    />
 
-                <form onSubmit={handleSubmit} className="p-4 space-y-4">
-                    {/* URL Input */}
-                    <div>
-                        <label className="block text-xs font-medium text-text-secondary uppercase mb-1">Torrent URL / Magnet</label>
-                        <input
-                            type="text"
-                            value={url}
-                            onChange={(e) => setUrl(e.target.value)}
-                            placeholder="magnet:?xt=urn:btih..."
-                            className="w-full p-2 bg-input border border-border rounded text-sm text-text-primary focus:ring-accent focus:border-accent"
-                            autoFocus
-                        />
-                    </div>
-
-                    {/* Download Location */}
                     {(server.directories || []).length > 0 && (
-                        <div>
-                            <label className="block text-xs font-medium text-text-secondary uppercase mb-1">Download Location</label>
-                            <select
-                                value={path}
-                                onChange={(e) => setPath(e.target.value)}
-                                className="w-full p-2 bg-input border border-border rounded text-sm text-text-primary focus:ring-accent focus:border-accent"
-                            >
-                                {(server.directories || []).map((dir, i) => (
-                                    <option key={i} value={dir}>{dir}</option>
-                                ))}
-                            </select>
-                        </div>
+                        <Select
+                            id="download-path"
+                            labelText={browser.i18n.getMessage('dialogPathLabel')}
+                            value={path}
+                            onChange={(e) => setPath(e.target.value)}
+                        >
+                            {(server.directories || []).map((dir, i) => (
+                                <SelectItem key={i} value={dir} text={dir} />
+                            ))}
+                        </Select>
                     )}
 
-                    {/* Label */}
                     {labels.length > 0 && (
-                        <div>
-                            <label className="block text-xs font-medium text-text-secondary uppercase mb-1">Label</label>
-                            <select
-                                value={label}
-                                onChange={(e) => setLabel(e.target.value)}
-                                className="w-full p-2 bg-input border border-border rounded text-sm text-text-primary focus:ring-accent focus:border-accent"
-                            >
-                                <option value="">None</option>
-                                {labels.map((l, i) => (
-                                    <option key={i} value={l}>{l}</option>
-                                ))}
-                            </select>
-                        </div>
+                        <Select
+                            id="torrent-label"
+                            labelText={browser.i18n.getMessage('dialogLabelLabel')}
+                            value={label}
+                            onChange={(e) => setLabel(e.target.value)}
+                        >
+                            <SelectItem value="" text={browser.i18n.getMessage('commonNone')} />
+                            {labels.map((l, i) => (
+                                <SelectItem key={i} value={l} text={l} />
+                            ))}
+                        </Select>
                     )}
 
-                    {/* Options */}
-                    <div className="flex items-center space-x-2">
-                        <input
-                            type="checkbox"
-                            id="start-paused"
-                            checked={paused}
-                            onChange={(e) => setPaused(e.target.checked)}
-                            className="rounded text-accent focus:ring-accent bg-input border-border"
-                        />
-                        <label htmlFor="start-paused" className="text-sm text-text-primary cursor-pointer select-none">Start Paused</label>
-                    </div>
+                    <Checkbox
+                        id="start-paused"
+                        labelText={browser.i18n.getMessage('dialogStartPaused')}
+                        checked={paused}
+                        onChange={(_e, { checked }) => setPaused(checked)}
+                    />
 
-                    {/* Error Message */}
                     {error && (
-                        <div className="text-xs text-red-500 bg-red-500/10 p-2 rounded border border-red-500/20">
-                            {error}
-                        </div>
+                        <InlineNotification
+                            kind="error"
+                            title="Error"
+                            subtitle={error}
+                            hideCloseButton
+                        />
                     )}
-
-                    {/* Actions */}
-                    <div className="flex justify-end space-x-2 pt-2">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-4 py-2 text-sm text-text-primary hover:bg-hover rounded transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={!url || isSubmitting}
-                            className="px-4 py-2 text-sm bg-accent text-white rounded hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                        >
-                            {isSubmitting ? (
-                                <>
-                                    <span className="block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
-                                    Adding...
-                                </>
-                            ) : (
-                                'Add Torrent'
-                            )}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                </Stack>
+            </Form>
+        </Modal>
     );
 };

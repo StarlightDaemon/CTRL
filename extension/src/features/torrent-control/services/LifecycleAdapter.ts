@@ -1,12 +1,8 @@
 import { browser } from 'wxt/browser';
-import { WebSocketKeepalive } from '@/shared/lib/websocket/WebSocketKeepalive';
-import { OffscreenManager } from '@/features/torrent-control/model/services/OffscreenManager';
-
-/**
+import { WebSocketKeepalive } from '@/shared/lib/websocket/WebSocketKeepalive';/**
  * Service to handle browser-specific lifecycle management.
  * 
  * - Chrome 116+: Uses Native WebSocket Keep-Alive for persistent connections.
- * - Chrome <116: Uses Offscreen Document with ping interval.
  * - Firefox/Brave: Uses Alarms API "Heartbeat" to prevent idle suspension.
  * - Safari: (Not fully supported yet, falls back to Hydration).
  */
@@ -20,10 +16,6 @@ export const LifecycleAdapter = {
         // Feature detection for Firefox-like extensive environments vs Chrome-like restricted environments.
         // 'browser.runtime.getBrowserInfo' is typically Firefox-only and not in the standard WebExtension types.
         const isFirefox = typeof (browser.runtime as any).getBrowserInfo !== 'undefined';
-
-        // Check for offscreen API as a proxy for Chrome MV3 (not available in all environments)
-        const hasOffscreen = typeof chrome !== 'undefined' && typeof (chrome as any).offscreen !== 'undefined';
-
         // Check Chrome version for WebSocket support in SW (Chrome 116+)
         const chromeVersion = LifecycleAdapter.getChromeVersion();
         const hasWebSocketInSW = chromeVersion >= 116;
@@ -41,13 +33,6 @@ export const LifecycleAdapter = {
             // For now, we just log capability. Actual connection happens when needed.
             return;
         }
-
-        if (hasOffscreen) {
-            console.log('[LifecycleAdapter] Chrome <116 detected. Using Offscreen document keepalive.');
-            await OffscreenManager.ensureCreated();
-            return;
-        }
-
         console.log('[LifecycleAdapter] No keepalive mechanism available. Relying on Alarms + Hydration.');
     },
 

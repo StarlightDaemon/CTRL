@@ -1,4 +1,5 @@
 import React from 'react';
+import { Toggle, Stack } from '@carbon/react';
 
 interface Props {
     checked: boolean;
@@ -9,36 +10,28 @@ interface Props {
 }
 
 export const SettingsToggle: React.FC<Props> = ({ checked, onChange, label, description, icon }) => {
-    const renderSwitch = () => (
-        <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-            <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={checked}
-                onChange={onChange}
-            />
-            <div className="ctrl-toggle-track w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
-        </label>
-    );
-
-    if (!label) {
-        return renderSwitch();
-    }
-
     return (
-        <div className="flex items-center justify-between p-4 rounded-lg bg-background/50 hover:bg-background/80 transition-colors">
+        <div className="flex items-center justify-between p-4 rounded bg-[var(--cds-layer-01)] hover:bg-[var(--cds-layer-hover-01)] transition-colors border border-[var(--cds-border-subtle)]">
             <div className="flex items-center space-x-4">
                 {icon && (
-                    <div className="p-2 rounded-lg bg-accent/10 text-accent">
+                    <div className="p-2 rounded bg-[var(--cds-layer-03)] text-[var(--cds-link-primary)]">
                         {icon}
                     </div>
                 )}
-                <div>
-                    <h4 className="font-medium text-text-primary">{label}</h4>
-                    {description && <p className="text-sm text-text-secondary">{description}</p>}
-                </div>
+                <Stack gap={0}>
+                    <h4 className="font-medium text-[var(--cds-text-primary)]">{label}</h4>
+                    {description && <p className="text-sm text-[var(--cds-text-secondary)]">{description}</p>}
+                </Stack>
             </div>
-            {renderSwitch()}
+            <Toggle
+                id={`toggle-${label?.replace(/\s+/g, '-').toLowerCase() || Math.random()}`}
+                labelA=""
+                labelB=""
+                hideLabel
+                toggled={checked}
+                onToggle={onChange}
+                size="sm"
+            />
         </div>
     );
 };

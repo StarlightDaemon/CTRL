@@ -6,7 +6,38 @@ import { ServerConfig } from '@/shared/lib/types';
  * Uses dynamic imports to ensure code for unused clients is not loaded.
  */
 export class ClientFactory {
+    /**
+     * Validates the server configuration by shape/schema.
+     * Prevents instantiation of clients with incomplete or obviously invalid data.
+     */
+    static validate(config: ServerConfig): boolean {
+        if (!config) return false;
+
+        // Core required fields for any client
+        if (!config.hostname || !config.type) {
+            return false;
+        }
+
+        // Hostname must be a valid URL (at least starts with http/https/ws/wss)
+        try {
+            new URL(config.hostname);
+        } catch (e) {
+            return false;
+        }
+
+        // Additional type-specific validation could go here if needed.
+        // For now, presence of hostname and type is the primary requirement.
+
+        return true;
+    }
+
     async create(config: ServerConfig): Promise<ITorrentClient> {
+        // Final guard: Ensure config is valid before proceeding
+        if (!ClientFactory.validate(config)) {
+            console.error('[ClientFactory] Refusing to create client for invalid config:', config);
+            throw new Error('Invalid server configuration. Please configure a server in options.');
+        }
+
         switch (config.type) {
             case 'qbittorrent': {
                 const { QBittorrentAdapter } = await import('@/shared/api/clients/qbittorrent/QBittorrentAdapter');

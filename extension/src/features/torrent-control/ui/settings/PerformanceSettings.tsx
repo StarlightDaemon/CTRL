@@ -1,7 +1,8 @@
 import React from 'react';
+import { Select, SelectItem, InlineNotification } from '@carbon/react';
 import { AppOptions } from '@/shared/lib/types';
-import { SettingsCard } from '@/shared/ui/settings/SettingsCard';
 import { useDebugId } from '@/shared/lib/hooks/useDebugId';
+import { SettingsCard } from '@/shared/ui/settings/SettingsCard';
 
 interface Props {
     settings: AppOptions;
@@ -15,21 +16,29 @@ export const PerformanceSettings: React.FC<Props> = ({ settings, updateSettings 
     return (
         <SettingsCard title="Performance">
             <div className="space-y-4">
-                <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 p-2 rounded mb-2 text-xs">
-                    Performance mode is locked to <strong>Standard</strong> for testing purposes.
-                </div>
-                <select
+                <InlineNotification
+                    kind="warning"
+                    lowContrast
+                    title="Locked"
+                    subtitle="Performance mode is locked to Standard for testing purposes."
+                    hideCloseButton
+                />
+
+                <Select
+                    id="performance-select"
+                    labelText="Performance Mode"
+                    hideLabel
                     value="standard"
                     disabled
-                    className="block w-full rounded-md border-border bg-input text-text-secondary shadow-sm cursor-not-allowed opacity-60 sm:text-sm p-2 border"
+                    className="w-full"
                     {...performanceSelectDebug}
                 >
-                    <option value="low">Low (Disabled)</option>
-                    <option value="standard">Standard</option>
-                    <option value="fancy">Fancy (Disabled)</option>
-                </select>
+                    <SelectItem value="low" text="Low (Disabled)" />
+                    <SelectItem value="standard" text="Standard" />
+                    <SelectItem value="fancy" text="Fancy (Disabled)" />
+                </Select>
 
-                <div className="bg-surface p-3 rounded border border-border text-sm text-text-secondary">
+                <div className="bg-[var(--cds-layer-03)] p-3 rounded border border-[var(--cds-border-subtle)] text-sm text-[var(--cds-text-secondary)]">
                     {settings.appearance.performance === 'low' && (
                         <p><strong>Low:</strong> Disables all animations, transparency, and blur effects. Best for older devices or maximum battery life.</p>
                     )}

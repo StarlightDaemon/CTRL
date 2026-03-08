@@ -48,8 +48,10 @@ const SecureContent: React.FC<{
                 await saveServers(newServers);
             }
 
-            // Update global settings, ensuring servers is excluded/empty in storage
-            await updateSettings({ ...newSettings, servers: [] });
+            // Update global settings, ensuring servers is excluded from the payload
+            // to prevent accidental vault wipes if useSettings handles 'servers' if present.
+            const { servers, ...settingsWithoutServers } = newSettings;
+            await updateSettings(settingsWithoutServers as AppSettings);
         };
 
         return (

@@ -204,9 +204,12 @@ export const ServiceWorkerKeepalive = {
             return;
         }
 
-        // Use provided URL or default to a public echo server for testing
-        // In production, this should connect to the user's torrent client if it supports WS
-        const wsUrl = url || 'wss://echo.websocket.org';
+        if (!url) {
+            console.warn('[SWKeepalive] No URL provided, skipping keepalive');
+            return;
+        }
+
+        const wsUrl = url;
 
         this.keepalive = new WebSocketKeepalive({
             url: wsUrl,

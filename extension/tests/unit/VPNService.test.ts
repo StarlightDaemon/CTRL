@@ -89,22 +89,23 @@ describe('VPNService', () => {
         });
     });
 
-    describe('quickIPCheck', () => {
-        it('should return IP on successful fetch', async () => {
+    describe('getNetworkIdentity', () => {
+        it('should return identity on successful fetch', async () => {
             global.fetch = vi.fn().mockResolvedValue({
                 ok: true,
-                json: () => Promise.resolve({ ip: '1.2.3.4' })
+                json: () => Promise.resolve({ ip: '1.2.3.4', org: 'Test Org' })
             });
 
-            const ip = await service.quickIPCheck();
-            expect(ip).toBe('1.2.3.4');
+            const identity = await service.getNetworkIdentity();
+            expect(identity).not.toBeNull();
+            expect(identity?.ip).toBe('1.2.3.4');
         });
 
         it('should return null on fetch failure', async () => {
             global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 
-            const ip = await service.quickIPCheck();
-            expect(ip).toBeNull();
+            const identity = await service.getNetworkIdentity();
+            expect(identity).toBeNull();
         });
     });
 

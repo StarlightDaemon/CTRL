@@ -6,6 +6,10 @@ test.describe('Popup UI - First Run', () => {
         await page.goto(`chrome-extension://${extensionId}/popup.html`);
 
         // 2. Assert Initial State
+        // Wait for loading to finish
+        const loadingSpinner = page.getByText('Loading settings...');
+        await expect(loadingSpinner).not.toBeVisible({ timeout: 10000 });
+
         const setupButton = page.getByRole('button', { name: 'Setup Now' });
         await expect(setupButton).toBeVisible();
 

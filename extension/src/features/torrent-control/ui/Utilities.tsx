@@ -1,10 +1,21 @@
 import React, { useState } from 'react';
+import { Button, Link, Stack, TextInput, Grid, Column, Tile } from '@carbon/react';
 import { SettingsPageLayout } from '@/shared/ui/settings/SettingsPageLayout';
 import { SettingsCard } from '@/shared/ui/settings/SettingsCard';
-import { Wrench, Globe, Database, ArrowLeftRight, ExternalLink, ShieldCheck } from 'lucide-react';
 import { EXTERNAL_RESOURCES } from '@/shared/lib/resources';
+import { Activity, Archive, ChevronLeft, Wrench } from 'lucide-react';
+import { DiagnosticsSettings } from './DiagnosticsSettings';
+import { DataManagement } from './DataManagement';
+import { AppOptions, ServerConfig } from '@/shared/lib/types';
 
-export const Utilities = () => {
+interface UtilitiesProps {
+    settings: AppOptions;
+    exportSystemBackup: (type?: 'full' | 'settings', sanitize?: boolean) => void;
+    importBackup: (file: File) => Promise<{ success: boolean; message: string }>;
+}
+
+export const Utilities: React.FC<UtilitiesProps> = ({ settings, exportSystemBackup, importBackup }) => {
+    const [subView, setSubView] = useState<'main' | 'diagnostics' | 'data'>('main');
     const [magnetInput, setMagnetInput] = useState('');
     const [hashInput, setHashInput] = useState('');
 
@@ -16,7 +27,7 @@ export const Utilities = () => {
             } else {
                 setHashInput('Invalid Magnet Link');
             }
-        } catch (e) {
+        } catch {
             setHashInput('Error parsing link');
         }
     };
@@ -29,110 +40,171 @@ export const Utilities = () => {
         setMagnetInput(`magnet:?xt=urn:btih:${hashInput.toLowerCase()}`);
     };
 
+    if (subView === 'diagnostics') {
+        return (
+            <div className="h-full flex flex-col">
+                <div className="p-4 border-b border-[var(--cds-border-subtle)] bg-[var(--cds-layer-01)] flex items-center">
+                    <Button
+                        kind="ghost"
+                        size="sm"
+                        hasIconOnly
+                        renderIcon={ChevronLeft}
+                        iconDescription="Back to Utilities"
+                        onClick={() => setSubView('main')}
+                    />
+                    <span className="ml-2 font-medium">Back to Utilities</span>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                    <DiagnosticsSettings settings={settings} />
+                </div>
+            </div>
+        );
+    }
+
+    if (subView === 'data') {
+        return (
+            <div className="h-full flex flex-col">
+                <div className="p-4 border-b border-[var(--cds-border-subtle)] bg-[var(--cds-layer-01)] flex items-center">
+                    <Button
+                        kind="ghost"
+                        size="sm"
+                        hasIconOnly
+                        renderIcon={ChevronLeft}
+                        iconDescription="Back to Utilities"
+                        onClick={() => setSubView('main')}
+                    />
+                    <span className="ml-2 font-medium">Back to Utilities</span>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                    <DataManagement
+                        settings={settings}
+                        exportSystemBackup={exportSystemBackup}
+                        importBackup={importBackup}
+                    />
+                </div>
+            </div>
+        );
+    }
+
     return (
         <SettingsPageLayout
-            title="Utilities & Extras"
-            description="Handy tools for torrent management and troubleshooting."
+            title={browser.i18n.getMessage('utilitiesTitle')}
+            description={browser.i18n.getMessage('utilitiesDescription')}
             icon={Wrench}
         >
-            <SettingsCard title="Hash Converter">
-                <div className="space-y-4">
-                    <p className="text-sm text-text-secondary">Convert between Magnet Links and Info Hashes.</p>
+            <Grid className="p-0 mb-8" narrow>
+                <Column lg={8} md={4} sm={4}>
+                    <Tile
+                        className="h-full bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] hover:border-[var(--cds-link-primary)] focus:outline focus:outline-2 focus:outline-[var(--cds-focus)] focus:outline-offset-[-2px] cursor-pointer transition-colors p-6"
+                        onClick={() => setSubView('diagnostics')}
+                        onKeyDown={(e) => e.key === 'Enter' && setSubView('diagnostics')}
+                        tabIndex={0}
+                        role="button"
+                        aria-label="View Diagnostics"
+                    >
+                        <Stack gap={4}>
+                            <div className="flex items-center gap-3">
+                                <Activity className="w-6 h-6 text-[var(--cds-link-primary)]" />
+                                <h3 className="text-lg font-medium">{browser.i18n.getMessage('utilitiesDiagnostics')}</h3>
+                            </div>
+                            <p className="text-sm text-[var(--cds-text-secondary)]">
+                                Test server connections, verify environment compatibility, and check background worker health.
+                            </p>
+                            <Button kind="ghost" size="sm" className="p-0 h-auto min-h-0 text-[var(--cds-link-primary)]">
+                                {browser.i18n.getMessage('utilitiesViewDiagnostics')}
+                            </Button>
+                        </Stack>
+                    </Tile>
+                </Column>
+                <Column lg={8} md={4} sm={4}>
+                    <Tile
+                        className="h-full bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] hover:border-[var(--cds-link-primary)] focus:outline focus:outline-2 focus:outline-[var(--cds-focus)] focus:outline-offset-[-2px] cursor-pointer transition-colors p-6"
+                        onClick={() => setSubView('data')}
+                        onKeyDown={(e) => e.key === 'Enter' && setSubView('data')}
+                        tabIndex={0}
+                        role="button"
+                        aria-label="Manage Data"
+                    >
+                        <Stack gap={4}>
+                            <div className="flex items-center gap-3">
+                                <Archive className="w-6 h-6 text-[var(--cds-link-primary)]" />
+                                <h3 className="text-lg font-medium">{browser.i18n.getMessage('utilitiesDataManagement')}</h3>
+                            </div>
+                            <p className="text-sm text-[var(--cds-text-secondary)]">
+                                Export full system backups, configuration snapshots, or import existing settings from file.
+                            </p>
+                            <Button kind="ghost" size="sm" className="p-0 h-auto min-h-0 text-[var(--cds-link-primary)]">
+                                {browser.i18n.getMessage('utilitiesManageData')}
+                            </Button>
+                        </Stack>
+                    </Tile>
+                </Column>
+            </Grid>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-text-primary">Magnet Link</label>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={magnetInput}
-                                onChange={(e) => setMagnetInput(e.target.value)}
-                                placeholder="magnet:?xt=urn:btih:..."
-                                className="flex-1 rounded-md border border-border bg-input text-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                                data-component="Input"
-                            />
-                            <button
-                                onClick={convertMagnetToHash}
-                                className="px-4 py-2 bg-accent text-white rounded-md text-sm hover:bg-accent-hover transition-colors"
-                                data-component="Button"
-                            >
-                                Extract Hash
-                            </button>
-                        </div>
+            <SettingsCard title={browser.i18n.getMessage('utilitiesHashConverter')}>
+                <Stack gap={5}>
+                    <p className="text-sm text-[var(--cds-text-secondary)]">
+                        Convert between Magnet links and 40-character info hashes.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end">
+                        <TextInput
+                            id="magnet-link-input"
+                            labelText={browser.i18n.getMessage('utilitiesMagnetLink')}
+                            value={magnetInput}
+                            onChange={(e) => setMagnetInput(e.target.value)}
+                            placeholder="magnet:?xt=urn:btih:..."
+                        />
+                        <Button onClick={convertMagnetToHash}>{browser.i18n.getMessage('utilitiesExtractHash')}</Button>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-text-primary">Info Hash</label>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={hashInput}
-                                onChange={(e) => setHashInput(e.target.value)}
-                                placeholder="e.g. 5B3260..."
-                                className="flex-1 rounded-md border border-border bg-input text-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                                data-component="Input"
-                            />
-                            <button
-                                onClick={convertHashToMagnet}
-                                className="px-4 py-2 bg-secondary text-text-primary border border-border rounded-md text-sm hover:bg-border transition-colors"
-                                data-component="Button"
-                            >
-                                To Magnet
-                            </button>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end">
+                        <TextInput
+                            id="info-hash-input"
+                            labelText={browser.i18n.getMessage('utilitiesInfoHash')}
+                            value={hashInput}
+                            onChange={(e) => setHashInput(e.target.value)}
+                            placeholder="e.g. 5B3260..."
+                        />
+                        <Button kind="secondary" onClick={convertHashToMagnet}>
+                            {browser.i18n.getMessage('utilitiesToMagnet')}
+                        </Button>
                     </div>
-                </div>
+                </Stack>
             </SettingsCard>
 
             <SettingsCard title="Cache & Recovery">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {EXTERNAL_RESOURCES.cache.map((res) => (
-                        <a
-                            key={res.name}
-                            href={res.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-between p-4 rounded-lg bg-background/50 border border-border hover:border-accent group transition-colors"
-                        >
-                            <span className="font-medium text-text-primary">{res.name}</span>
-                            <ExternalLink size={16} className="text-text-secondary group-hover:text-accent" />
-                        </a>
-                    ))}
-                </div>
-                <p className="mt-4 text-xs text-text-secondary">
-                    These external services cache .torrent files. If a magnet link is stalled (0 metadata), you can search these caches using the info hash.
-                </p>
+                <Stack gap={4}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {EXTERNAL_RESOURCES.cache.map((res) => (
+                            <div key={res.name} className="p-4 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
+                                <Link href={res.url} target="_blank" rel="noopener noreferrer" className="font-medium">
+                                    {res.name}
+                                </Link>
+                            </div>
+                        ))}
+                    </div>
+                    <p className="text-xs text-[var(--cds-text-secondary)]">
+                        These services cache torrent metadata and can help recover stalled magnet metadata by info hash.
+                    </p>
+                </Stack>
             </SettingsCard>
 
             <SettingsCard title="Privacy & Diagnostics">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {EXTERNAL_RESOURCES.privacy.map((res) => (
-                        <a
-                            key={res.name}
-                            href={res.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-between p-4 rounded-lg bg-background/50 border border-border hover:border-accent group transition-colors"
-                        >
-                            <span className="font-medium text-text-primary">{res.name}</span>
-                            <ExternalLink size={16} className="text-text-secondary group-hover:text-accent" />
-                        </a>
-                    ))}
-                    {EXTERNAL_RESOURCES.diagnostics.map((res) => (
-                        <a
-                            key={res.name}
-                            href={res.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-between p-4 rounded-lg bg-background/50 border border-border hover:border-accent group transition-colors"
-                        >
-                            <span className="font-medium text-text-primary">{res.name}</span>
-                            <ExternalLink size={16} className="text-text-secondary group-hover:text-accent" />
-                        </a>
-                    ))}
-                </div>
-                <p className="mt-4 text-xs text-text-secondary">
-                    Tools to verify your connection security and IP exposure.
-                </p>
+                <Stack gap={4}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {[...EXTERNAL_RESOURCES.privacy, ...EXTERNAL_RESOURCES.diagnostics].map((res) => (
+                            <div key={res.name} className="p-4 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
+                                <Link href={res.url} target="_blank" rel="noopener noreferrer" className="font-medium">
+                                    {res.name}
+                                </Link>
+                            </div>
+                        ))}
+                    </div>
+                    <p className="text-xs text-[var(--cds-text-secondary)]">
+                        Tools to verify network privacy and browser torrent capability.
+                    </p>
+                </Stack>
             </SettingsCard>
         </SettingsPageLayout>
     );
