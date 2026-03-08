@@ -389,11 +389,10 @@ describe('UTorrentAdapter', () => {
             expect(result).toBe(true);
         });
 
-        it('should return false on connection failure', async () => {
+        it('should throw error on connection failure', async () => {
             vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'));
 
-            const result = await adapter.testConnection();
-            expect(result).toBe(false);
+            await expect(adapter.testConnection()).rejects.toThrow('Network error');
         });
     });
 

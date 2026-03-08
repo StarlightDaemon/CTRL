@@ -192,14 +192,10 @@ export class FloodAdapter implements ITorrentClient {
     }
 
     async testConnection(): Promise<boolean> {
-        try {
-            await this.login();
-            // Also verify session to check backend connectivity
-            await this.verifySession();
-            return true;
-        } catch {
-            return false;
-        }
+        await this.login();
+        // Also verify session to check backend connectivity
+        await this.verifySession();
+        return true;
     }
 
     async ping(): Promise<number> {

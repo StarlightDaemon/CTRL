@@ -252,12 +252,12 @@ export class BiglyBTAdapter implements ITorrentClient {
                 if (errorType === 'CONNECTION_REFUSED' || errorType === 'TIMEOUT') {
                     await sleep(delay);
                 } else {
-                    return false;
+                    throw e;
                 }
             }
         }
 
-        return false;
+        throw new Error(`BiglyBT connection failed after ${retryConfig.maxAttempts} attempts`);
     }
 
     /**
@@ -570,12 +570,8 @@ export class BiglyBTAdapter implements ITorrentClient {
      * Test connection to BiglyBT
      */
     async testConnection(): Promise<boolean> {
-        try {
-            await this.call('session-get', {});
-            return true;
-        } catch (_e) {
-            return false;
-        }
+        await this.call('session-get', {});
+        return true;
     }
 
     /**
