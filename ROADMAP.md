@@ -13,25 +13,32 @@ Transform CTRL from a working port into a **Best-in-Class** torrent management s
 
 ---
 
-## Current Status: v0.2.0-beta.1 (Jan 2026)
+## Current Status: Post-Beta Stabilization (March 2026)
 
-### ✅ Completed
-- **Phase 1: Beta Release** (Jan 2026)
-  - Public GitHub Release
-  - 153 Unit Tests passing
-  - CI/CD Pipeline active
-  - Privacy Policy published
+### ✅ Current Baseline
+- **Phase 1: Beta Release** shipped in January 2026
+- **357 unit tests** currently pass in the maintained local/CI baseline
+- **Deterministic CI** is restored with tracked lockfile, `npm ci`, and npm caching
+- **Mainline rewrite and normalization** are complete
+- **Privacy Policy** and beta distribution remain in place
 
-### 🚀 Upcoming: Phase 2 (Technical Excellence)
-- **Focus**: Stability, Performance Tuning, E2E testing
+### 🚀 Phase 2: Technical Excellence (In Progress)
+- **Focus**: Stability, Error Handling, Performance Tuning, Accessibility, and stronger validation after beta
 
 ### 🟡 P1 - Important
 
 | Goal | Description | Status |
 |------|-------------|--------|
-| **Performance Tuning** | Profile and optimize 5k+ torrent handling | 📋 Planned |
-| **Error Handling** | Graceful degradation, retry logic | 📋 Planned |
-| **Accessibility** | WCAG 2.1 AA compliance | 📋 Planned |
+| **Stability** | Keep `main`, CI, and release builds operational after beta | ✅ Active |
+| **Error Handling** | Graceful degradation, retry logic, truthful connection reporting | 🟡 In Progress |
+| **Performance Tuning** | Profile and optimize 5k+ torrent handling | 📋 Not Started |
+| **Accessibility** | WCAG 2.1 AA compliance | 📋 Not Started |
+
+### Recently Completed Post-Beta Infrastructure
+
+- Deterministic CI normalization with tracked `extension/package-lock.json`
+- Mainline rewrite completed with archived pre-rewrite history
+- Ongoing Chrome and Firefox build verification during stabilization
 
 ---
 
@@ -70,7 +77,6 @@ Transform CTRL from a working port into a **Best-in-Class** torrent management s
 | Aggregated Search | Use Prowlarr/Jackett instead |
 | Ad Blocking | Use uBlock Origin instead |
 | Novelty Themes | Keep UI professional |
-| Synology Download Station | API complexity, low usage |
 | Mobile/Responsive UI | Desktop extension, not beneficial |
 
 ---
@@ -93,5 +99,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get involved.
 
 ---
 
-*Last Updated: January 2026*
-
+*Last Updated: March 2026*
