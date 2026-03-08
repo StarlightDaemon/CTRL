@@ -34,14 +34,10 @@ Untracked files:
 
 ```
 On branch main
-Your branch is ahead of 'origin/main' by 5 commits. (after commit)
-
-Changes to be committed:
-        modified:   docs/PROJECT_SOP.md
-        modified:   docs/README.md
-        new file:   reports/2026-03-08__minor_post_review_doc_fixes_report.md
+Your branch is ahead of 'origin/main' by 5 commits.
 
 Untracked files:
+        reports/2026-03-08__minor_post_review_doc_fixes_report.md
         reports/2026-03-08__archive_cleanup_execution_report.md
         reports/2026-03-08__governance_finalization_report.md
         reports/2026-03-08__post_cleanup_reviewer_pass.md
@@ -56,4 +52,5 @@ Untracked files:
 ## Commit Created
 
 - **Status**: Created
-- **SHA**: c26d06282845cbed8e916ea0c950efd0f41edeb5 (truncated: c26d062)
+- **SHA**: 4e79372446891c84db8f6190885375136cf9de37 (truncated: 4e79372)
+- **Message**: `docs: address minor reviewer follow-up findings`
