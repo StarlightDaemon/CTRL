@@ -7,10 +7,11 @@ import { SettingsPageLayout } from '@/shared/ui/settings/SettingsPageLayout';
 import { SettingsCard } from '@/shared/ui/settings/SettingsCard';
 import { Server, ShieldAlert } from 'lucide-react';
 import { useDebugId } from '@/shared/lib/hooks/useDebugId';
+import { VaultService } from '@/shared/api/security/VaultService';
 
 interface Props {
     settings: AppOptions;
-    updateSettings: (newSettings: AppOptions) => void;
+    updateSettings: (newSettings: AppOptions) => Promise<void>;
     exportServerConfig: (sanitize?: boolean) => void;
     importBackup: (file: File) => Promise<{ success: boolean; message: string }>;
 }
@@ -19,7 +20,28 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [isAdding, setIsAdding] = useState(false);
     const [testStatus, setTestStatus] = useState<{ loading: boolean; success: boolean; message: string | null }>({ loading: false, success: false, message: null });
+    const [saveError, setSaveError] = useState<string | null>(null);
     const [hasPermission, setHasPermission] = useState(true);
+    const [vaultStatus, setVaultStatus] = useState<string>('');
+
+    React.useEffect(() => {
+        const checkVault = async () => {
+            try {
+                const isInit = await VaultService.isInitialized();
+                if (!isInit) {
+                    setVaultStatus('Vault: Uninitialized');
+                    return;
+                }
+                const isLocked = await VaultService.isLocked();
+                setVaultStatus(isLocked ? 'Vault: Locked' : 'Vault: Unlocked');
+            } catch (e) {
+                console.error('Failed to check vault status', e);
+            }
+        };
+        checkVault();
+        const interval = setInterval(checkVault, 2000);
+        return () => clearInterval(interval);
+    }, []);
 
     // Temp state for the server being edited/added
     const [tempServer, setTempServer] = useState<ServerConfig>({
@@ -56,6 +78,7 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
             clientOptions: {},
         });
         setTestStatus({ loading: false, success: false, message: null });
+        setSaveError(null);
         setIsAdding(true);
         setEditingIndex(null);
     };
@@ -63,6 +86,7 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
     const startEdit = (index: number) => {
         setTempServer({ ...settings.servers[index] });
         setTestStatus({ loading: false, success: false, message: null });
+        setSaveError(null);
         setEditingIndex(index);
         setIsAdding(false);
     };
@@ -70,9 +94,11 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
     const cancelEdit = () => {
         setIsAdding(false);
         setEditingIndex(null);
+        setSaveError(null);
     };
 
-    const saveServer = () => {
+    const saveServer = async () => {
+        setSaveError(null);
         const newServers = [...settings.servers];
         if (isAdding) {
             newServers.push(tempServer);
@@ -80,37 +106,52 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
             newServers[editingIndex] = tempServer;
         }
 
-        updateSettings({
-            ...settings,
-            servers: newServers,
-            // If we just added the first server, make it default
-            globals: {
-                ...settings.globals,
-                currentServer: settings.globals.currentServer >= newServers.length ? 0 : settings.globals.currentServer
-            }
-        });
-        cancelEdit();
+        try {
+            await updateSettings({
+                ...settings,
+                servers: newServers,
+                // If we just added the first server, make it default
+                globals: {
+                    ...settings.globals,
+                    currentServer: settings.globals.currentServer >= newServers.length ? 0 : settings.globals.currentServer
+                }
+            });
+            cancelEdit();
+        } catch (e: unknown) {
+            const errMsg = e instanceof Error ? e.message : 'Failed to save server settings';
+            setSaveError(errMsg);
+        }
     };
 
-    const removeServer = (index: number) => {
+    const removeServer = async (index: number) => {
         if (confirm('Are you sure you want to remove this server?')) {
             const newServers = settings.servers.filter((_, i) => i !== index);
             let newCurrent = settings.globals.currentServer;
             if (newCurrent >= index && newCurrent > 0) newCurrent--;
 
-            updateSettings({
-                ...settings,
-                servers: newServers,
-                globals: { ...settings.globals, currentServer: newCurrent }
-            });
+            try {
+                await updateSettings({
+                    ...settings,
+                    servers: newServers,
+                    globals: { ...settings.globals, currentServer: newCurrent }
+                });
+            } catch (e: unknown) {
+                const errMsg = e instanceof Error ? e.message : 'Failed to remove server';
+                alert(errMsg);
+            }
         }
     };
 
-    const setDefault = (index: number) => {
-        updateSettings({
-            ...settings,
-            globals: { ...settings.globals, currentServer: index }
-        });
+    const setDefault = async (index: number) => {
+        try {
+            await updateSettings({
+                ...settings,
+                globals: { ...settings.globals, currentServer: index }
+            });
+        } catch (e: unknown) {
+            const errMsg = e instanceof Error ? e.message : 'Failed to set default server';
+            alert(errMsg);
+        }
     };
 
     const testConnection = async () => {
@@ -118,10 +159,15 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
         try {
             // Pass the raw config to background for testing
             const res = await chrome.runtime.sendMessage({ type: 'TEST_CONNECTION', config: tempServer });
+
             if (res === true) {
                 setTestStatus({ loading: false, success: true, message: 'Connection Successful!' });
+            } else if (res && typeof res === 'object' && typeof res.error === 'string' && res.error) {
+                setTestStatus({ loading: false, success: false, message: res.error });
+            } else if (res === false) {
+                setTestStatus({ loading: false, success: false, message: 'Connection failed' });
             } else {
-                setTestStatus({ loading: false, success: false, message: 'Authentication Failed' });
+                setTestStatus({ loading: false, success: false, message: 'Connection Error' });
             }
         } catch (e: unknown) {
             const errMsg = e instanceof Error ? e.message : 'Connection Error';
@@ -297,10 +343,22 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
                             </div>
                         </div>
 
-                        <div className="space-x-3">
+                        <div className="space-x-3 flex items-center">
+                            {saveError && (
+                                <span className="text-sm font-medium text-red-500 mr-2">
+                                    {saveError}
+                                </span>
+                            )}
+                            {vaultStatus === 'Vault: Locked' && (
+                                <span className="text-sm font-medium text-red-500 mr-2">
+                                    Unlock vault to save
+                                </span>
+                            )}
                             <button
                                 onClick={saveServer}
-                                className="bg-accent text-white px-4 py-2 rounded-md hover:bg-accent-hover shadow-sm"
+                                disabled={vaultStatus === 'Vault: Locked' || !hasPermission}
+                                className={`px-4 py-2 rounded-md shadow-sm ${(vaultStatus === 'Vault: Locked' || !hasPermission) ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-accent text-white hover:bg-accent-hover'
+                                    }`}
                             >
                                 Save Server
                             </button>

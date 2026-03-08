@@ -55,8 +55,20 @@ export class VPNService {
     /**
      * Perform a comprehensive VPN status check
      */
-    async checkStatus(): Promise<VPNStatus> {
+    async checkStatus(force = false): Promise<VPNStatus> {
         const startTime = Date.now();
+
+        // Privacy Safeguard: Block automatic status checks in v1 to align with Privacy Policy.
+        // Full checks involve contacting 3rd party IP APIs and Google STUN servers.
+        if (!force) {
+            return {
+                isProtected: false,
+                identity: null,
+                leakCheck: null,
+                lastChecked: startTime,
+                error: 'Auto-check disabled for privacy'
+            };
+        }
 
         try {
             // 1. Get public IP identity
@@ -316,20 +328,7 @@ export class VPNService {
         return this.lastStatus;
     }
 
-    /**
-     * Quick check - just get IP without full analysis
-     */
-    async quickIPCheck(): Promise<string | null> {
-        try {
-            const response = await fetch('https://api.ipify.org?format=json', {
-                signal: AbortSignal.timeout(3000)
-            });
-            const data = await response.json();
-            return data.ip;
-        } catch {
-            return null;
-        }
-    }
+
 }
 
 // Singleton instance

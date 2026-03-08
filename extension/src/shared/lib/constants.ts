@@ -99,6 +99,23 @@ export const CLIENT_LIST: ClientCapability[] = [
         addressPlaceholder: 'http://127.0.0.1:6800/jsonrpc',
         defaultPort: '6800',
         clientCapabilities: ['paused', 'httpAuth']
+    },
+    {
+        id: 'synology',
+        name: 'Synology Download Station',
+        addressPlaceholder: 'https://192.168.1.x:5001/',
+        defaultPort: '5001',
+        clientCapabilities: ['paused', 'path'],
+        clientOptions: [
+            {
+                name: 'otpCode',
+                description: '2FA Code (if enabled)'
+            },
+            {
+                name: 'deviceToken',
+                description: 'Device Token (for 2FA bypass)'
+            }
+        ]
     }
 ];
 
@@ -115,7 +132,7 @@ export const DEFAULT_OPTIONS: AppOptions = {
         currentServer: 0,
         showDiagnostics: false,
         badgeInfo: 'count',
-        catchTorrents: true,
+
         notificationStyle: 'toast',
         contextMenuCustomOptions: {
             addToClient: true,

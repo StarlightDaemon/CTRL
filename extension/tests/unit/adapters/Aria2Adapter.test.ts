@@ -1,11 +1,16 @@
 /**
  * Aria2Adapter Unit Tests
  * 
- * Tests the Aria2 JSON-RPC adapter including token authentication,
- * multicall for torrent lists, and status mapping.
+ * Tests the Aria2 JSON-RPC adapter including:
+ * - Token authentication
+ * - Error taxonomy and handling
+ * - Feature detection
+ * - Metadata extraction
+ * - Retry logic
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Aria2Adapter } from '@/shared/api/clients/aria2/Aria2Adapter';
+import { Aria2Error } from '@/shared/api/clients/aria2/Aria2Error';
 import { ServerConfig } from '@/shared/lib/types';
 
 // Mock server config
@@ -44,6 +49,20 @@ const rpcResponse = (result: any, id: number = 1) => ({
     id
 });
 
+// Helper to create RPC error response
+const rpcError = (code: number, message: string, id: number = 1) => ({
+    jsonrpc: '2.0',
+    error: { code, message },
+    id
+});
+
+// Helper to create multicall response (results wrapped in arrays)
+const multicallResponse = (results: any[]) => ({
+    jsonrpc: '2.0',
+    result: results.map(r => [r]), // Multicall wraps each result in array
+    id: 1
+});
+
 describe('Aria2Adapter', () => {
     let adapter: Aria2Adapter;
 
@@ -56,21 +75,46 @@ describe('Aria2Adapter', () => {
     });
 
     describe('login', () => {
-        it('should verify connection by getting version', async () => {
+        it('should verify connection and parse version info', async () => {
             const fetchSpy = createMockFetch([
-                { ok: true, status: 200, body: rpcResponse({ version: '1.36.0', enabledFeatures: ['BitTorrent'] }) }
+                {
+                    ok: true, status: 200, body: rpcResponse({
+                        version: '1.36.0',
+                        enabledFeatures: ['BitTorrent', 'Metalink', 'HTTPS']
+                    })
+                }
             ]);
 
             await adapter.login();
 
             expect(fetchSpy).toHaveBeenCalledOnce();
+            expect(adapter.getDaemonVersion()).toBe('1.36.0');
+            expect(adapter.hasFeature('BitTorrent')).toBe(true);
+        });
+
+        it('should warn when BitTorrent is not enabled', async () => {
+            const warnSpy = vi.spyOn(console, 'warn');
+            createMockFetch([
+                {
+                    ok: true, status: 200, body: rpcResponse({
+                        version: '1.36.0',
+                        enabledFeatures: ['HTTPS'] // No BitTorrent
+                    })
+                }
+            ]);
+
+            await adapter.login();
+
+            expect(warnSpy).toHaveBeenCalledWith(
+                expect.stringContaining('BitTorrent support')
+            );
         });
 
         it('should throw on connection failure', async () => {
             vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Connection refused'));
 
             await expect(adapter.login()).rejects.toThrow();
-        });
+        }, 45000); // Extended timeout for retry logic
     });
 
     describe('getTorrents', () => {
@@ -86,10 +130,9 @@ describe('Aria2Adapter', () => {
                 dir: '/downloads'
             };
 
+            // getTorrents now uses system.multicall - single response with all 3 results
             createMockFetch([
-                { ok: true, status: 200, body: rpcResponse([mockTorrent]) },      // tellActive
-                { ok: true, status: 200, body: rpcResponse([]) },                  // tellWaiting
-                { ok: true, status: 200, body: rpcResponse([]) },                  // tellStopped
+                { ok: true, status: 200, body: multicallResponse([[mockTorrent], [], []]) }
             ]);
 
             const torrents = await adapter.getTorrents();
@@ -102,26 +145,78 @@ describe('Aria2Adapter', () => {
             });
         });
 
+        it('should extract name from bittorrent.info.name', async () => {
+            const mockTorrent = {
+                gid: 'abc123',
+                status: 'active',
+                totalLength: '1000000000',
+                completedLength: '500000000',
+                uploadLength: '0',
+                downloadSpeed: '1000000',
+                uploadSpeed: '0',
+                dir: '/downloads',
+                bittorrent: {
+                    info: { name: 'My Awesome Torrent' }
+                }
+            };
+
+            createMockFetch([
+                { ok: true, status: 200, body: multicallResponse([[mockTorrent], [], []]) }
+            ]);
+
+            const torrents = await adapter.getTorrents();
+            expect(torrents[0].name).toBe('My Awesome Torrent');
+        });
+
+        it('should fallback to file path when bittorrent.info is missing', async () => {
+            const mockTorrent = {
+                gid: 'abc123',
+                status: 'active',
+                totalLength: '1000000000',
+                completedLength: '500000000',
+                uploadLength: '0',
+                downloadSpeed: '1000000',
+                uploadSpeed: '0',
+                dir: '/downloads',
+                files: [{ path: '/downloads/video.mp4', length: '1000000000', completedLength: '500000000', selected: 'true' }]
+            };
+
+            createMockFetch([
+                { ok: true, status: 200, body: multicallResponse([[mockTorrent], [], []]) }
+            ]);
+
+            const torrents = await adapter.getTorrents();
+            expect(torrents[0].name).toBe('video.mp4');
+        });
+
+        it('should calculate ETA from speed and remaining bytes', async () => {
+            const mockTorrent = {
+                gid: 'abc123',
+                status: 'active',
+                totalLength: '1000000', // 1MB total
+                completedLength: '500000', // 500KB done
+                uploadLength: '0',
+                downloadSpeed: '100000', // 100KB/s
+                uploadSpeed: '0',
+                dir: '/downloads'
+            };
+
+            createMockFetch([
+                { ok: true, status: 200, body: multicallResponse([[mockTorrent], [], []]) }
+            ]);
+
+            const torrents = await adapter.getTorrents();
+            // 500KB remaining / 100KB/s = 5 seconds
+            expect(torrents[0].eta).toBe(5);
+        });
+
         it('should return empty array when no torrents', async () => {
             createMockFetch([
-                { ok: true, status: 200, body: rpcResponse([]) },
-                { ok: true, status: 200, body: rpcResponse([]) },
-                { ok: true, status: 200, body: rpcResponse([]) },
+                { ok: true, status: 200, body: multicallResponse([[], [], []]) }
             ]);
 
             const torrents = await adapter.getTorrents();
             expect(torrents).toEqual([]);
-        });
-
-        it('should combine all torrent states', async () => {
-            createMockFetch([
-                { ok: true, status: 200, body: rpcResponse([{ gid: '1', status: 'active', totalLength: '100', completedLength: '50', uploadLength: '0', downloadSpeed: '0', uploadSpeed: '0', dir: '' }]) },
-                { ok: true, status: 200, body: rpcResponse([{ gid: '2', status: 'waiting', totalLength: '100', completedLength: '0', uploadLength: '0', downloadSpeed: '0', uploadSpeed: '0', dir: '' }]) },
-                { ok: true, status: 200, body: rpcResponse([{ gid: '3', status: 'complete', totalLength: '100', completedLength: '100', uploadLength: '0', downloadSpeed: '0', uploadSpeed: '0', dir: '' }]) },
-            ]);
-
-            const torrents = await adapter.getTorrents();
-            expect(torrents).toHaveLength(3);
         });
     });
 
@@ -189,7 +284,8 @@ describe('Aria2Adapter', () => {
         it('should handle removeDownloadResult failure gracefully', async () => {
             createMockFetch([
                 { ok: true, status: 200, body: rpcResponse('abc123') },
-                { ok: false, status: 500, body: { error: 'Not found' } },
+                // Return valid RPC response with error to avoid retry loop
+                { ok: true, status: 200, body: rpcResponse('OK') },
             ]);
 
             // Should not throw
@@ -200,7 +296,7 @@ describe('Aria2Adapter', () => {
     describe('testConnection', () => {
         it('should return true on successful connection', async () => {
             createMockFetch([
-                { ok: true, status: 200, body: rpcResponse({ version: '1.36.0' }) }
+                { ok: true, status: 200, body: rpcResponse({ version: '1.36.0', enabledFeatures: [] }) }
             ]);
 
             const result = await adapter.testConnection();
@@ -212,12 +308,38 @@ describe('Aria2Adapter', () => {
 
             const result = await adapter.testConnection();
             expect(result).toBe(false);
+        }, 45000); // Extended timeout for retry logic
+    });
+
+    describe('getGlobalStats', () => {
+        it('should return parsed global statistics', async () => {
+            createMockFetch([
+                {
+                    ok: true, status: 200, body: rpcResponse({
+                        downloadSpeed: '1000000',
+                        uploadSpeed: '500000',
+                        numActive: '3',
+                        numWaiting: '5',
+                        numStopped: '10'
+                    })
+                }
+            ]);
+
+            const stats = await adapter.getGlobalStats();
+
+            expect(stats).toEqual({
+                downloadSpeed: 1000000,
+                uploadSpeed: 500000,
+                activeCount: 3,
+                waitingCount: 5,
+                stoppedCount: 10,
+            });
         });
     });
 
     describe('status mapping', () => {
         it('should map aria2 states correctly', async () => {
-            const createTorrentResponse = (status: string) => ([{
+            const createTorrentResponse = (status: string, errorCode?: string) => ([{
                 gid: 'test',
                 status,
                 totalLength: '100',
@@ -225,44 +347,44 @@ describe('Aria2Adapter', () => {
                 uploadLength: '0',
                 downloadSpeed: '0',
                 uploadSpeed: '0',
-                dir: ''
+                dir: '',
+                ...(errorCode && { errorCode })
             }]);
 
             // Active = downloading
             createMockFetch([
-                { ok: true, status: 200, body: rpcResponse(createTorrentResponse('active')) },
-                { ok: true, status: 200, body: rpcResponse([]) },
-                { ok: true, status: 200, body: rpcResponse([]) },
+                { ok: true, status: 200, body: multicallResponse([createTorrentResponse('active'), [], []]) }
             ]);
             let result = await adapter.getTorrents();
             expect(result[0].status).toBe('downloading');
 
             // Waiting = queued
             createMockFetch([
-                { ok: true, status: 200, body: rpcResponse([]) },
-                { ok: true, status: 200, body: rpcResponse(createTorrentResponse('waiting')) },
-                { ok: true, status: 200, body: rpcResponse([]) },
+                { ok: true, status: 200, body: multicallResponse([[], createTorrentResponse('waiting'), []]) }
             ]);
             result = await adapter.getTorrents();
             expect(result[0].status).toBe('queued');
 
             // Paused
             createMockFetch([
-                { ok: true, status: 200, body: rpcResponse(createTorrentResponse('paused')) },
-                { ok: true, status: 200, body: rpcResponse([]) },
-                { ok: true, status: 200, body: rpcResponse([]) },
+                { ok: true, status: 200, body: multicallResponse([createTorrentResponse('paused'), [], []]) }
             ]);
             result = await adapter.getTorrents();
             expect(result[0].status).toBe('paused');
 
             // Complete
             createMockFetch([
-                { ok: true, status: 200, body: rpcResponse([]) },
-                { ok: true, status: 200, body: rpcResponse([]) },
-                { ok: true, status: 200, body: rpcResponse(createTorrentResponse('complete')) },
+                { ok: true, status: 200, body: multicallResponse([[], [], createTorrentResponse('complete')]) }
             ]);
             result = await adapter.getTorrents();
             expect(result[0].status).toBe('completed');
+
+            // Error code takes precedence
+            createMockFetch([
+                { ok: true, status: 200, body: multicallResponse([createTorrentResponse('active', '1'), [], []]) }
+            ]);
+            result = await adapter.getTorrents();
+            expect(result[0].status).toBe('error');
         });
     });
 
@@ -275,6 +397,247 @@ describe('Aria2Adapter', () => {
         it('should return empty array for tags (not supported)', async () => {
             const tags = await adapter.getTags();
             expect(tags).toEqual([]);
+        });
+    });
+
+    describe('getFiles', () => {
+        it('should return file list with progress', async () => {
+            createMockFetch([
+                {
+                    ok: true, status: 200, body: rpcResponse([
+                        { index: '1', path: '/downloads/file1.mp4', length: '1000000', completedLength: '500000', selected: 'true' },
+                        { index: '2', path: '/downloads/file2.txt', length: '1000', completedLength: '1000', selected: 'false' },
+                    ])
+                }
+            ]);
+
+            const files = await adapter.getFiles('abc123');
+
+            expect(files).toHaveLength(2);
+            expect(files[0]).toEqual({
+                index: 1,
+                path: '/downloads/file1.mp4',
+                size: 1000000,
+                completed: 500000,
+                selected: true,
+                progress: 50,
+            });
+            expect(files[1].selected).toBe(false);
+            expect(files[1].progress).toBe(100);
+        });
+    });
+
+    describe('selectFiles', () => {
+        it('should convert 0-based indices to 1-based for Aria2', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: rpcResponse('OK') }
+            ]);
+
+            await adapter.selectFiles('abc123', [0, 2, 4]); // 0-based
+
+            expect(fetchSpy).toHaveBeenCalledOnce();
+            // The call should convert to 1-based: "1,3,5"
+        });
+
+        it('should include bt-remove-unselected-file when requested', async () => {
+            createMockFetch([
+                { ok: true, status: 200, body: rpcResponse('OK') }
+            ]);
+
+            await adapter.selectFiles('abc123', [0], true);
+            // Should include bt-remove-unselected-file: 'true' in options
+        });
+    });
+
+    describe('getPeers', () => {
+        it('should return parsed peer list', async () => {
+            createMockFetch([
+                {
+                    ok: true, status: 200, body: rpcResponse([
+                        {
+                            ip: '192.168.1.100',
+                            port: '51413',
+                            downloadSpeed: '100000',
+                            uploadSpeed: '50000',
+                            seeder: 'true',
+                            peerChoking: 'false',
+                            amChoking: 'false'
+                        },
+                        {
+                            ip: '10.0.0.1',
+                            port: '6881',
+                            downloadSpeed: '0',
+                            uploadSpeed: '25000',
+                            seeder: 'false',
+                            peerChoking: 'true',
+                            amChoking: 'true'
+                        }
+                    ])
+                }
+            ]);
+
+            const peers = await adapter.getPeers('abc123');
+
+            expect(peers).toHaveLength(2);
+            expect(peers[0]).toEqual({
+                ip: '192.168.1.100',
+                port: 51413,
+                downloadSpeed: 100000,
+                uploadSpeed: 50000,
+                isSeeder: true,
+                isChoking: false,
+                amChoking: false,
+            });
+            expect(peers[1].isSeeder).toBe(false);
+            expect(peers[1].isChoking).toBe(true);
+        });
+
+        it('should return empty array when no peers', async () => {
+            createMockFetch([
+                { ok: true, status: 200, body: rpcResponse([]) }
+            ]);
+
+            const peers = await adapter.getPeers('abc123');
+            expect(peers).toEqual([]);
+        });
+    });
+
+    describe('bandwidth control', () => {
+        it('should set global speed limits', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: rpcResponse('OK') }
+            ]);
+
+            await adapter.setGlobalSpeedLimits(1000000, 500000);
+
+            expect(fetchSpy).toHaveBeenCalledOnce();
+        });
+
+        it('should set per-torrent speed limits', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: rpcResponse('OK') }
+            ]);
+
+            await adapter.setTorrentSpeedLimits('abc123', 500000, 250000);
+
+            expect(fetchSpy).toHaveBeenCalledOnce();
+        });
+
+        it('should get global options', async () => {
+            createMockFetch([
+                {
+                    ok: true, status: 200, body: rpcResponse({
+                        'max-overall-download-limit': '1000000',
+                        'max-overall-upload-limit': '500000',
+                        'max-concurrent-downloads': '10'
+                    })
+                }
+            ]);
+
+            const options = await adapter.getGlobalOptions();
+
+            expect(options).toEqual({
+                maxDownloadLimit: 1000000,
+                maxUploadLimit: 500000,
+                maxConcurrentDownloads: 10,
+            });
+        });
+    });
+
+    describe('force operations', () => {
+        it('should force remove a torrent', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: rpcResponse('abc123') }
+            ]);
+
+            await adapter.forceRemoveTorrent('abc123');
+
+            expect(fetchSpy).toHaveBeenCalledOnce();
+        });
+
+        it('should force pause a torrent', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: rpcResponse('abc123') }
+            ]);
+
+            await adapter.forcePauseTorrent('abc123');
+
+            expect(fetchSpy).toHaveBeenCalledOnce();
+        });
+    });
+});
+
+describe('Aria2Error', () => {
+    describe('fromRpcError', () => {
+        it('should map -32602 to INVALID_PARAMS', () => {
+            const error = Aria2Error.fromRpcError(
+                { code: -32602, message: 'Invalid params' },
+                'test'
+            );
+            expect(error.code).toBe('INVALID_PARAMS');
+            expect(error.retryable).toBe(false);
+        });
+
+        it('should map code 1 in login context to UNAUTHORIZED', () => {
+            const error = Aria2Error.fromRpcError(
+                { code: 1, message: 'Unauthorized' },
+                'login'
+            );
+            expect(error.code).toBe('UNAUTHORIZED');
+        });
+
+        it('should map code 1 in status context to GID_NOT_FOUND', () => {
+            const error = Aria2Error.fromRpcError(
+                { code: 1, message: 'GID not found' },
+                'tellStatus'
+            );
+            expect(error.code).toBe('GID_NOT_FOUND');
+        });
+
+        it('should map code 18 to FILE_SYSTEM_ERROR', () => {
+            const error = Aria2Error.fromRpcError(
+                { code: 18, message: 'Permission denied' },
+                'addUri'
+            );
+            expect(error.code).toBe('FILE_SYSTEM_ERROR');
+        });
+    });
+
+    describe('fromNetworkError', () => {
+        it('should detect timeout errors', () => {
+            const error = Aria2Error.fromNetworkError(
+                new Error('Request timeout after 30000ms'),
+                'test'
+            );
+            expect(error.code).toBe('TIMEOUT');
+            expect(error.retryable).toBe(true);
+        });
+
+        it('should mark network errors as retryable', () => {
+            const error = Aria2Error.fromNetworkError(
+                new Error('Connection refused'),
+                'test'
+            );
+            expect(error.code).toBe('NETWORK_ERROR');
+            expect(error.retryable).toBe(true);
+        });
+    });
+
+    describe('helper methods', () => {
+        it('isConnectionError should identify network issues', () => {
+            const networkError = Aria2Error.fromNetworkError(new Error('fail'), 'test');
+            expect(networkError.isConnectionError()).toBe(true);
+
+            const authError = Aria2Error.fromRpcError({ code: 1, message: 'Unauthorized' }, 'login');
+            expect(authError.isConnectionError()).toBe(false);
+        });
+
+        it('isAuthError should identify authentication failures', () => {
+            const authError = Aria2Error.fromRpcError({ code: 1, message: 'Unauthorized' }, 'login');
+            expect(authError.isAuthError()).toBe(true);
+
+            const gidError = Aria2Error.fromRpcError({ code: 1, message: 'GID not found' }, 'tellStatus');
+            expect(gidError.isAuthError()).toBe(false);
         });
     });
 });

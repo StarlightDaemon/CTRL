@@ -5,6 +5,7 @@ export interface RequestConfig extends RequestInit {
     params?: Record<string, string>;
     /** Enable retry with exponential backoff for transient failures */
     retry?: boolean | RetryOptions;
+    timeoutMs?: number;
 }
 
 export class FetchHttpClient {
@@ -21,23 +22,48 @@ export class FetchHttpClient {
         }
 
         const doFetch = async (): Promise<T> => {
-            const response = await fetch(url.toString(), {
-                credentials: 'include',
-                ...fetchConfig,
-            });
-
-            if (!response.ok) {
-                throw new HttpError(response.status, response.statusText, response);
-            }
-
-            // Handle empty responses (e.g. "Ok.")
-            const text = await response.text();
-            if (!text) return {} as T;
+            const headers = new Headers(fetchConfig.headers);
+            const controller = new AbortController();
+            const timeoutMs = config.timeoutMs ?? 10000;
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs); // default 10s timeout
 
             try {
-                return JSON.parse(text);
-            } catch {
-                return text as unknown as T;
+                const origin = new URL(this.baseUrl).origin;
+                if (!headers.has('Origin')) headers.set('Origin', origin);
+                if (!headers.has('Referer')) headers.set('Referer', origin + '/');
+            } catch (e) {
+                console.warn('[FetchHttpClient] Failed to derive Origin/Referer from baseUrl:', this.baseUrl);
+            }
+
+            try {
+                const response = await fetch(url.toString(), {
+                    credentials: 'omit',
+                    ...fetchConfig,
+                    headers,
+                    signal: controller.signal,
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new HttpError(response.status, response.statusText, response);
+                }
+
+                // Handle empty responses (e.g. "Ok.")
+                const text = await response.text();
+                if (!text) return {} as T;
+
+                try {
+                    return JSON.parse(text);
+                } catch {
+                    return text as unknown as T;
+                }
+            } catch (error) {
+                clearTimeout(timeoutId);
+                if (error instanceof Error && error.name === 'AbortError') {
+                    throw new Error(`Connection timed out after ${timeoutMs}ms`);
+                }
+                throw error;
             }
         };
 

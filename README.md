@@ -34,6 +34,7 @@ A browser extension for managing BitTorrent clients. Built with WXT, React, and 
 | BiglyBT | ✅ Full | Basic Control |
 | Vuze | ✅ Full | Basic Control |
 | Aria2 | ✅ Basic | RPC Multicall |
+| Synology | ✅ Full | 2FA, Device Token, NAS Integration |
 
 ---
 

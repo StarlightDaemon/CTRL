@@ -41,7 +41,9 @@ export const useTorrentPoller = (intervalMs = 2000) => {
         chrome.runtime.sendMessage({ type: 'FORCE_REFRESH' }).catch(() => { });
 
         port.onDisconnect.addListener(() => {
-            console.log('Poller: Port disconnected (SW died or Unloaded)');
+            if (__UI_DEBUG_MODE__) {
+                console.log('Poller: Port disconnected (SW died or Unloaded)');
+            }
         });
 
         return () => {

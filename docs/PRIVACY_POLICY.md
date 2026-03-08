@@ -51,19 +51,24 @@ CTRL explicitly does **NOT** collect, store, or transmit:
 
 ## How CTRL Works
 
-### Site Integration (Content Scripts)
-CTRL injects user interface components into torrent indexing websites (e.g., TorrentGalaxy, 1337x, Nyaa) to provide one-click "Add to Client" functionality.
+### User-Initiated Actions
+CTRL operates only when you explicitly interact with it. It does not automatically modify web pages or background-monitor your browsing activity.
+
+**How you interact with CTRL**:
+1. **Context Menus**: You can right-click on a magnet link or a page to send torrents directly to your client.
+2. **Scan Page**: You can manually trigger a "Scan Page for Magnets" action from the context menu. This generically scans the current page for magnet links (`magnet:?xt=...`) and adds them to your selected client.
+3. **Manual Addition**: You can add torrents by pasting URLs or magnet links directly into the extension popup.
 
 **What happens**:
-1. CTRL detects magnet links on supported pages
-2. Adds UI buttons next to those links
-3. When you click a button, the magnet link is processed **locally** 
-4. The link is sent directly to **your configured torrent client** (on your local network or remote server)
+1. When you initiate an action, CTRL processes the request **locally**.
+2. If scanning a page, it identifies links matching the magnet protocol.
+3. The link is sent directly to **your configured torrent client** (on your local network or remote server).
 
 **What does NOT happen**:
-- CTRL does not read page content beyond detecting magnet links
-- CTRL does not track which torrents you view or download
-- CTRL does not send any data about your browsing to external servers
+- CTRL does not automatically inject UI components or buttons into websites.
+- CTRL does not detect magnet links on page load; it only scans when you tell it to.
+- CTRL does not track which torrents you view or download.
+- CTRL does not send any data about your browsing to external servers.
 
 ### Protocol Handling
 CTRL is **content-agnostic**. It processes magnet URI hashes (strings) without knowledge of what content they represent. The extension does not know if a magnet link points to a Linux ISO, open-source software, or any other type of file.
@@ -99,9 +104,13 @@ CTRL requests the following browser permissions:
 **Purpose**: To notify you when downloads complete or errors occur.  
 **Data Access**: None. Notifications are created locally.
 
-### `host_permissions` (specific domains)
-**Purpose**: To inject UI components on supported torrent indexing sites (e.g., `*://torrentgalaxy.to/*`).  
-**Data Access**: Only the ability to detect magnet links (href attributes) on these specific sites. No page content is read or transmitted.
+### `activeTab`
+**Purpose**: To generically scan the current page for magnet links when you manually select the "Scan Page" option from the context menu.  
+**Data Access**: Only the ability to identify magnet link URLs (`href` attributes) on the page you are currently viewing and have interacted with.
+
+### `optional_host_permissions`
+**Purpose**: To allow communication with your self-hosted torrent client (e.g., qBittorrent, Transmission).  
+**Data Access**: Permissions are only requested for the specific URL of your torrent client. No data from other websites is accessed using these permissions.
 
 ## Your Rights
 

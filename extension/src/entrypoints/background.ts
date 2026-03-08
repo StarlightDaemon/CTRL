@@ -9,16 +9,32 @@ import { LifecycleAdapter } from '../features/torrent-control/services/Lifecycle
 import { StateHydrator } from '../features/torrent-control/services/StateHydrator';
 import { ViewportManager } from '../features/torrent-control/services/ViewportManager';
 import { Torrent } from '../entities/torrent/model/Torrent';
-import { VaultService } from '@/shared/api/security/VaultService';
+import { VaultService, VAULT_DATA_KEY } from '@/shared/api/security/VaultService';
 import { SESSION_KEY_KEY } from '@/shared/api/security/VaultService';
+import { DEFAULT_OPTIONS } from '@/shared/lib/constants';
+import { ServerResolver, ResolutionState } from '@/shared/api/server/ServerResolver';
 
-import { HeaderRewriter } from '@/shared/api/network/HeaderRewriter';
+// HeaderRewriter import removed (DNR Dependency Elimination)
 
 export default defineBackground(() => {
     console.log('Torrent Control: Background Service Worker Initialized (Phase 2 w/ Persistence & Vault)');
 
     // 1. Initialize Persistence (Cross-Browser)
     LifecycleAdapter.initKeepAlive();
+
+    // [FF MV3 Fix] Clear session fallback on browser startup to maintain "session" semantics
+    // Also rebuild context menus — Firefox MV3 does not persist them across restarts.
+    chrome.runtime.onStartup.addListener(async () => {
+        if (navigator.userAgent.includes('Firefox')) {
+            await storage.removeItem('local:session_encryptionKey');
+            console.log('[Background] Firefox session fallback cleared on startup.');
+        }
+        // Rebuild context menus on every cold start (required for Firefox MV3, harmless on Chrome)
+        contextMenuService.ensureMenus();
+        console.log('[Background] onStartup: context menus rebuild triggered.');
+    });
+
+    // DNR dependency removed
 
     const factory = new ClientFactory();
     const contextMenuService = new ContextMenuService();
@@ -33,66 +49,47 @@ export default defineBackground(() => {
         }
     });
 
-    // Helper to get current client
-    const getClient = async (serverIndex?: number): Promise<ITorrentClient> => {
-        // Retrieve decrypted servers from Vault
-        let servers: ServerConfig[] = [];
-        let isLocked = false;
-        try {
-            servers = await VaultService.getServers();
-        } catch (e: unknown) {
-            const message = e instanceof Error ? e.message : String(e);
-            if (message === 'Vault is locked') {
-                isLocked = true;
-            } else {
-                console.error('Vault access error:', e);
-            }
-        }
+    // Helper to get client with structured result (Soft-fail)
+    const getClientResult = async (serverIndex?: number): Promise<{ client: ITorrentClient | null, state: ResolutionState }> => {
+        const { state, servers, activeServer } = await ServerResolver.resolve();
 
-        if (isLocked || !servers.length) {
-            // Check legacy if vault is empty? 
-            // Phase 1 migration assumes we moved data.
-            // If locked and we need credentials, prompt user.
-            // But we can't prompt easily from here except generic notification if user initiated action.
-            if (isLocked) {
-                // If this request came from a user action (like context menu), we should throw specific error.
-                // But for polling, we just return null or throw.
-                throw new Error('Vault is locked');
-            }
-            throw new Error('No configuration found');
+        if (state !== ResolutionState.OK && serverIndex === undefined) {
+            return { client: null, state };
         }
-
-        // We have decrypted servers
-        const settings = await storage.getItem<AppSettings>('local:options');
-        if (!settings) throw new Error('No configuration found');
 
         if (serverIndex !== undefined) {
-            if (!servers[serverIndex]) throw new Error('Invalid server index');
-            return await factory.create(servers[serverIndex]);
+            const target = servers[serverIndex];
+            if (!target) return { client: null, state: ResolutionState.INVALID_CONFIG };
+            try {
+                return { client: await factory.create(target), state: ResolutionState.OK };
+            } catch (e) {
+                return { client: null, state: ResolutionState.INVALID_CONFIG };
+            }
         }
 
+        if (!activeServer) {
+            return { client: null, state: ResolutionState.NO_ACTIVE_SERVER };
+        }
+
+        // If activeClient already exists, we should still ensure it's not null before proceeding.
+        // However, we MUST NOT blindly return it if the activeServer has changed.
+        // For simplicity and correctness, we rely on the storage watchers below to clear activeClient.
         if (activeClient) {
-            return activeClient;
+            return { client: activeClient, state: ResolutionState.OK };
         }
-
-        const currentServer = servers[settings.globals.currentServer || 0];
-        if (!currentServer) throw new Error('No configuration found');
 
         try {
-            // Configure rules for ALL servers to support concurrent access/switching
-            await HeaderRewriter.configure(servers);
-
-            activeClient = await factory.create(currentServer);
+            activeClient = await factory.create(activeServer);
             console.log('Background: Client created successfully');
+            return { client: activeClient, state: ResolutionState.OK };
         } catch (e) {
             console.error('Background: Factory failed to create client', e);
-            throw e;
+            return { client: null, state: ResolutionState.INVALID_CONFIG };
         }
-        return activeClient!;
     };
 
     // Initialize Services
-    contextMenuService.initialize(getClient);
+    contextMenuService.initialize(getClientResult);
 
     // Badge Update Logic
     const updateBadge = async (torrents?: Torrent[]) => {
@@ -150,16 +147,24 @@ export default defineBackground(() => {
 
     const performCheck = async () => {
         try {
+            // Resolve current state
+            const { state, activeServer } = await ServerResolver.resolve();
+
+            if (state !== ResolutionState.OK) {
+                if (state === ResolutionState.LOCKED) {
+                    updateBadge();
+                }
+                activeClient = null;
+                return;
+            }
+
             // Ensure connection
-            if (!activeClient) {
+            if (!activeClient && activeServer) {
                 try {
-                    await getClient();
-                } catch (e: unknown) {
-                    const message = e instanceof Error ? e.message : String(e);
-                    if (message === 'Vault is locked') {
-                        updateBadge();
-                        return;
-                    }
+                    activeClient = await factory.create(activeServer);
+                } catch (e) {
+                    console.error('Background: Failed to initialize active client:', e);
+                    return;
                 }
             }
 
@@ -236,7 +241,7 @@ export default defineBackground(() => {
 
     // ------------------------------------------------
 
-    // Watch for Unlock
+    // Watch for Unlock & Vault changes
     try {
         storage.watch(SESSION_KEY_KEY, (newValue) => {
             if (newValue) {
@@ -247,6 +252,13 @@ export default defineBackground(() => {
             } else {
                 activeClient = null;
                 updateBadge();
+            }
+        });
+
+        storage.watch(VAULT_DATA_KEY, (newValue) => {
+            if (newValue) {
+                console.log('[Background] Vault data changed, clearing active client cache.');
+                activeClient = null;
             }
         });
     } catch (e) { console.error('Watch error', e) }
@@ -262,43 +274,56 @@ export default defineBackground(() => {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const handleMessage = async () => {
             try {
-                const getTargetClient = async (): Promise<ITorrentClient> => {
+                // Attempt to resolve target client
+                const getTargetClient = async (): Promise<{ client: ITorrentClient | null, error?: string }> => {
                     if (message.config) {
-                        await HeaderRewriter.configureTemporary(message.config.hostname);
-                        return await factory.create(message.config);
+                        try {
+                            return { client: await factory.create(message.config) };
+                        } catch (e) {
+                            return { client: null, error: e instanceof Error ? e.message : 'Invalid config' };
+                        }
                     }
+
+                    const { state, servers, activeServer } = await ServerResolver.resolve();
+
+                    if (state !== ResolutionState.OK) {
+                        if (state === ResolutionState.LOCKED || state === ResolutionState.UNINITIALIZED) {
+                            if (message.type === 'ADD_TORRENT_URL') {
+                                chrome.notifications.create({
+                                    type: 'basic',
+                                    iconUrl: 'icon/default-64.png',
+                                    title: 'Vault Locked',
+                                    message: 'Please unlock CTRL to add this torrent.',
+                                    priority: 2
+                                });
+                            }
+                            return { client: null, error: 'Vault is locked' };
+                        }
+                        return { client: null, error: `Resolution failed: ${state}` };
+                    }
+
                     if (typeof message.serverIndex === 'number') {
-                        return await getClient(message.serverIndex);
+                        const target = servers[message.serverIndex];
+                        if (!target) return { client: null, error: `Server at index ${message.serverIndex} not found.` };
+                        return { client: await factory.create(target) };
                     }
-                    return await getClient();
+
+                    // Default client
+                    try {
+                        const { client, state } = await getClientResult();
+                        return { client, error: client ? undefined : `Resolution failed: ${state}` };
+                    } catch (e) {
+                        return { client: null, error: e instanceof Error ? e.message : 'Client creation failed' };
+                    }
                 };
 
-                // NEW: Viewport Control
+                // NEW: Viewport Control (Keep as is since it doesn't need client)
                 if (message.type === 'UPDATE_VIEWPORT') {
                     if (message.data && typeof message.data.start === 'number') {
                         const end = message.data.end || (message.data.start + 50);
                         viewportManager.setViewport(message.data.start, end);
                     }
                     return { success: true };
-                }
-
-                if (message.type === 'PING_GLOBAL') {
-                    const targets: Record<string, string> = {
-                        'google': 'https://www.google.com/generate_204',
-                        'cloudflare': 'https://1.1.1.1',
-                        'baidu': 'https://www.baidu.com',
-                        'yandex': 'https://yandex.ru'
-                    };
-                    const url = targets[message.target] || targets['google'];
-                    const start = Date.now();
-                    try {
-                        await fetch(url, { method: 'HEAD', cache: 'no-store', mode: 'no-cors' });
-                        return Date.now() - start;
-                    } catch { return -1; }
-                }
-
-                if (message.type === 'KEEP_ALIVE_PING') {
-                    return { status: 'alive' };
                 }
 
                 if (message.type === 'SELF_TEST') {
@@ -312,25 +337,9 @@ export default defineBackground(() => {
                     };
                 }
 
-                // Attempt to get client
-                let client;
-                try {
-                    client = await getTargetClient();
-                } catch (e: unknown) {
-                    const errMsg = e instanceof Error ? e.message : String(e);
-                    if (errMsg === 'Vault is locked') {
-                        if (message.type === 'ADD_TORRENT_URL') {
-                            chrome.notifications.create({
-                                type: 'basic',
-                                iconUrl: 'icon/default-64.png',
-                                title: 'Vault Locked',
-                                message: 'Please unlock CTRL to add this torrent.',
-                                priority: 2
-                            });
-                        }
-                        return { error: 'Vault is locked' };
-                    }
-                    throw e;
+                const { client, error } = await getTargetClient();
+                if (error || !client) {
+                    return { error };
                 }
 
                 switch (message.type) {
@@ -373,8 +382,23 @@ export default defineBackground(() => {
                         break;
 
                     case 'TEST_CONNECTION':
-                    case 'TEST_CONNECTION_SERVER':
-                        return await client.testConnection();
+                    case 'TEST_CONNECTION_SERVER': {
+                        if (typeof __UI_DEBUG_MODE__ !== 'undefined' && __UI_DEBUG_MODE__) {
+                            console.log('[Background] TEST_CONNECTION received. Type:', message.config?.type);
+                        }
+                        const result = await client.testConnection();
+                        const r = result as any;
+                        console.info(JSON.stringify({
+                            event: 'TEST_CONNECTION_RESULT',
+                            messageType: message.type,
+                            hostnameTested: message.config?.hostname || 'unknown_persisted',
+                            configSource: message.config ? 'message.config' : 'ServerResolver',
+                            adapterType: client.constructor.name,
+                            resultShape: result === true ? 'true' : result === false ? 'false' : (r && typeof r === 'object' && r.error ? '{error}' : 'unknown'),
+                            errorMessage: r && typeof r === 'object' && r.error ? r.error : null
+                        }));
+                        return result;
+                    }
 
                     case 'PING':
                     case 'PING_SERVER':
@@ -387,6 +411,8 @@ export default defineBackground(() => {
                 const errorMessage = e instanceof Error ? e.message : String(e);
                 console.error('Background Error:', e);
                 return { error: errorMessage };
+            } finally {
+                // DNR dependency removed
             }
         };
 
@@ -394,39 +420,6 @@ export default defineBackground(() => {
         return true;
     });
 
-    // Download Handler
-    chrome.downloads.onCreated.addListener(async (downloadItem) => {
-        const settings = await storage.getItem<AppSettings>('local:options');
-        if (!settings?.globals.catchTorrents) return;
-        const isTorrent = downloadItem.filename.endsWith('.torrent') || downloadItem.mime === 'application/x-bittorrent';
-        if (!isTorrent) return;
-        chrome.downloads.cancel(downloadItem.id);
 
-        try {
-            const client = await getClient();
-            await client.addTorrentUrl(downloadItem.url);
-            performCheck();
-            if (settings.globals.enableNotifications) {
-                chrome.notifications.create({
-                    type: 'basic',
-                    iconUrl: 'icon/default-64.png',
-                    title: 'Torrent Control',
-                    message: `Intercepted and added: ${downloadItem.filename}`
-                });
-            }
-        } catch (e: unknown) {
-            const errorMessage = e instanceof Error ? e.message : String(e);
-            let msg = `Failed to add torrent: ${errorMessage}`;
-            if (errorMessage === 'Vault is locked') msg = 'Vault is locked. Please unlock extension.';
-            if (settings.globals.enableNotifications) {
-                chrome.notifications.create({
-                    type: 'basic',
-                    iconUrl: 'icon/default-64.png',
-                    title: 'Torrent Control',
-                    message: msg
-                });
-            }
-        }
-    });
 
 });

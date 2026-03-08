@@ -3,11 +3,77 @@ import { storage } from 'wxt/storage';
 import { AppOptions, ServerConfig } from '@/shared/lib/types';
 import { DEFAULT_OPTIONS } from '@/shared/lib/constants';
 
+import { z } from 'zod'; // Add Zod import
+
 export const settingsStorage = storage.defineItem<AppOptions>('local:options', {
     defaultValue: DEFAULT_OPTIONS,
 });
 
 import { VaultService } from '@/shared/api/security/VaultService';
+
+// Zod Schemas for Validation
+const ServerConfigSchema = z.object({
+    name: z.string().default('New Server'),
+    application: z.string(),
+    type: z.string(),
+    hostname: z.string(),
+    username: z.string().optional(),
+    password: z.string().optional(),
+    directories: z.array(z.string()).default([]),
+    clientOptions: z.record(z.any()).default({}),
+    httpAuth: z.object({
+        username: z.string(),
+        password: z.string().optional()
+    }).optional()
+}).passthrough();
+
+const GlobalOptionsSchema = z.object({
+    contextMenu: z.number().optional(),
+    addPaused: z.boolean().optional(),
+    addAdvanced: z.boolean().optional(),
+    enableNotifications: z.boolean().optional(),
+    notificationLevel: z.enum(['standard', 'verbose', 'error']).optional(),
+    debugMode: z.boolean().optional(),
+    matchRegExp: z.array(z.string()).optional(),
+    labels: z.array(z.string()).optional(),
+    currentServer: z.number().optional(),
+    showDiagnostics: z.boolean().optional(),
+    badgeInfo: z.enum(['none', 'count', 'speed']).optional(),
+    notificationStyle: z.enum(['toast', 'banner', 'modal']).optional(),
+    contextMenuCustomOptions: z.object({
+        addToClient: z.boolean(),
+        pauseResume: z.boolean(),
+        openWebUI: z.boolean(),
+    }).optional(),
+}).passthrough();
+
+const AppearanceSchema = z.object({
+    theme: z.string().optional(),
+    performance: z.enum(['low', 'standard', 'fancy']).optional(),
+}).passthrough();
+
+const LayoutSchema = z.object({
+    sidebar: z.array(z.object({
+        id: z.string(),
+        visible: z.boolean(),
+        order: z.number(),
+    })).optional()
+}).passthrough();
+
+const AppOptionsSchema = z.object({
+    globals: GlobalOptionsSchema.optional(),
+    appearance: AppearanceSchema.optional(),
+    layout: LayoutSchema.optional(),
+    servers: z.array(ServerConfigSchema).optional(),
+}).passthrough();
+
+const BackupSchema = z.object({
+    version: z.number().optional(),
+    type: z.enum(['system_backup', 'server_config']).optional(),
+    subtype: z.enum(['full', 'settings']).optional(),
+    timestamp: z.string().optional(),
+    data: z.record(z.any())
+});
 
 export function useSettings() {
     const [settings, setSettings] = useState<AppOptions | null>(null);
@@ -30,16 +96,26 @@ export function useSettings() {
                 const servers = await VaultService.getServers();
                 merged.servers = servers;
 
-                // CRITICAL FIX: If we successfully loaded from Vault, but 'val' (local storage) has servers,
-                // it means we have "stuck" plaintext server data (e.g. from a bad import or previous bug).
-                // We must clear this to prevent conflicts, crashes, and security risks.
+                // One-time migration: Check for stuck plaintext servers ONLY if not already migrated
+                // This prevents spurious storage writes on every load that could trigger background watchers
                 if (val && val.servers && val.servers.length > 0) {
-                    await settingsStorage.setValue({ ...val, servers: [] });
-                    console.log('Cleaned up stuck plaintext servers from storage.');
+                    const migrationKey = 'local:plaintext_servers_migrated';
+                    const migrated = await storage.getItem<boolean>(migrationKey);
+
+                    if (!migrated) {
+                        // This is a one-time cleanup, not triggered on every load
+                        await settingsStorage.setValue({ ...val, servers: [] });
+                        await storage.setItem(migrationKey, true);
+                        if (__UI_DEBUG_MODE__) {
+                            console.log('[Migration] Cleaned up stuck plaintext servers from storage (one-time).');
+                        }
+                    }
                 }
             }
         } catch (e) {
-            console.warn('Failed to load servers from vault in hook', e);
+            if (__UI_DEBUG_MODE__) {
+                console.warn('Failed to load servers from vault in hook', e);
+            }
         }
 
         setSettings(merged);
@@ -60,19 +136,26 @@ export function useSettings() {
     }, []);
 
     const updateSettings = async (newSettings: AppOptions) => {
-        setSettings(newSettings);
-
-        // 1. Handle Vault (Servers)
+        // 1. Handle Vault (Servers) - write first so if it fails, state remains unchanged
         if (newSettings.servers) {
             try {
-                if (await VaultService.isInitialized() && !await VaultService.isLocked()) {
-                    await VaultService.saveServers(newSettings.servers);
+                if (!await VaultService.isInitialized()) {
+                    throw new Error('Vault is not initialized.');
                 }
+                if (await VaultService.isLocked()) {
+                    throw new Error('Vault is locked. Cannot save server settings.');
+                }
+                await VaultService.saveServers(newSettings.servers);
             } catch (e) {
-                console.error('Failed to save servers to vault:', e);
-                // Should we alert user? 
+                if (__UI_DEBUG_MODE__) {
+                    console.error('Failed to save servers to vault:', e);
+                }
+                throw e; // Refuse to swallow, let caller show error
             }
         }
+
+        // Only update local UI state if Vault persistence succeeded
+        setSettings(newSettings);
 
         // 2. Handle Storage (Everything else)
         // Ensure we never write servers to local storage here
@@ -127,7 +210,9 @@ export function useSettings() {
 
         // Check if we actually have servers to export
         if (!serversToUse || serversToUse.length === 0) {
-            alert('No servers to export. If you have servers configured, ensure the Vault is unlocked.');
+            if (__UI_DEBUG_MODE__) {
+                console.warn('exportServerConfig: No servers to export.');
+            }
             return;
         }
 
@@ -175,95 +260,142 @@ export function useSettings() {
             reader.onload = async (e) => {
                 try {
                     const content = e.target?.result as string;
-                    const parsed = JSON.parse(content);
-                    const isInitialized = await VaultService.isInitialized();
-                    const isLocked = await VaultService.isLocked();
-
-                    // Helper to handle server saving
-                    const saveImportedServers = async (newServers: ServerConfig[]) => {
-                        if (isInitialized && !isLocked) {
-                            // Vault is ready, save directly
-                            await VaultService.saveServers(newServers);
-                        } else if (!isInitialized) {
-                            // Vault not set up, we can't save servers securely yet.
-                            // But we shouldn't save them to plaintext storage either if we want to enforce vault usage.
-                            // However, for first-time import (e.g. legacy), we might allow it?
-                            // Better approach: If vault is off, we cannot import servers securely. 
-                            throw new Error('Please setup and unlock the Vault before importing servers.');
-                        } else {
-                            throw new Error('Vault is locked. Please unlock it before importing.');
-                        }
-                    };
-
-                    if (!parsed.version) {
-                        // Legacy handling
-                        // Legacy backups contain everything in one object
-                        if (parsed.globals && Array.isArray(parsed.servers)) {
-                            // Split
-                            const { servers, ...rest } = parsed;
-
-                            // Update settings (without servers)
-                            await updateSettings({ ...DEFAULT_OPTIONS, ...rest, servers: [] });
-
-                            // Save servers to vault
-                            if (servers.length > 0) {
-                                await saveImportedServers(servers);
-                            }
-
-                            resolve({ success: true, message: 'Legacy full backup imported.' });
-                        } else {
-                            reject(new Error('Unknown legacy format.'));
-                        }
-                        return;
+                    let raw: any;
+                    try {
+                        raw = JSON.parse(content);
+                    } catch (err) {
+                        throw new Error('Invalid JSON: The file could not be parsed.');
                     }
 
-                    if (parsed.type === 'server_config') {
-                        if (!parsed.data.servers) throw new Error('Invalid server config file.');
-                        await saveImportedServers(parsed.data.servers);
+                    // 1. Identify Format
+                    const isLegacy = !raw.version && raw.globals && Array.isArray(raw.servers);
+                    const isModern = !!raw.version && typeof raw.type === 'string';
 
-                        // Refresh settings to reflect new vault data
-                        await load();
-
-                        resolve({ success: true, message: 'Server configuration imported.' });
-                        return;
+                    if (!isLegacy && !isModern) {
+                        throw new Error('Unrecognized or malformed backup format.');
                     }
 
-                    if (parsed.type === 'system_backup') {
-                        const current = await settingsStorage.getValue() || DEFAULT_OPTIONS;
+                    // 2. Full Validation (Zero state changes until this completes)
+                    let serversToImport: ServerConfig[] | undefined;
+                    let settingsToImport: any; // Collector for validated settings, using any to handle partial shapes before merge
+                    let successMessage = '';
 
-                        if (parsed.subtype === 'full') {
-                            const { servers, ...rest } = parsed.data;
-                            // Update generic settings
-                            await updateSettings({ ...current, ...rest, servers: [] });
-                            // Update servers if present
-                            if (servers && Array.isArray(servers)) {
-                                await saveImportedServers(servers);
+                    const isVaultInitialized = await VaultService.isInitialized();
+                    const isVaultLocked = await VaultService.isLocked();
+
+                    if (isLegacy) {
+                        // Validate legacy payload
+                        const validatedGlobals = GlobalOptionsSchema.parse(raw.globals);
+                        const validatedServers = z.array(ServerConfigSchema).parse(raw.servers);
+
+                        const validatedAppearance = raw.appearance ? AppearanceSchema.parse(raw.appearance) : undefined;
+                        const validatedLayout = raw.layout ? LayoutSchema.parse(raw.layout) : undefined;
+
+                        settingsToImport = {
+                            globals: validatedGlobals,
+                            appearance: validatedAppearance,
+                            layout: validatedLayout
+                        };
+                        serversToImport = validatedServers;
+                        successMessage = 'Legacy full backup imported.';
+                    } else {
+                        // Validate modern payload
+                        const meta = BackupSchema.parse(raw);
+
+                        if (meta.type === 'server_config') {
+                            if (!meta.data || !Array.isArray(meta.data.servers)) {
+                                throw new Error('Invalid server config: missing servers data.');
+                            }
+                            serversToImport = z.array(ServerConfigSchema).parse(meta.data.servers);
+                            successMessage = 'Server configuration imported.';
+                        } else if (meta.type === 'system_backup') {
+                            const validatedData = AppOptionsSchema.parse(meta.data);
+                            if (meta.subtype === 'full') {
+                                settingsToImport = validatedData;
+                                serversToImport = validatedData.servers;
+                                successMessage = 'System backup imported.';
+                            } else {
+                                // Settings only - explicitly ensure servers are NOT in the import payload
+                                const { servers: _, ...rest } = validatedData;
+                                settingsToImport = rest;
+                                successMessage = 'System settings imported.';
                             }
                         } else {
-                            // Settings only
+                            throw new Error(`Unsupported backup type: ${meta.type}`);
+                        }
+                    }
+
+                    // 3. Pre-flight checks (Vault state)
+                    if (serversToImport && serversToImport.length > 0) {
+                        if (!isVaultInitialized) {
+                            throw new Error('Vault is not set up. Please initialize it before importing servers.');
+                        }
+                        if (isVaultLocked) {
+                            throw new Error('Vault is locked. Please unlock it before importing servers.');
+                        }
+                    }
+
+                    // 4. ATOMIC COMMIT (Mutation Phase)
+                    // If we reach here, validation passed and state is ready for mutation.
+
+                    // Snapshot current state for rollback on partial failure
+                    const vaultSnapshot = isVaultInitialized && !isVaultLocked
+                        ? await VaultService.getServers()
+                        : [];
+                    const optionsSnapshot = await settingsStorage.getValue() || DEFAULT_OPTIONS;
+
+                    try {
+                        // A. Update servers in Vault
+                        if (serversToImport && serversToImport.length > 0) {
+                            await VaultService.saveServers(serversToImport);
+                        }
+
+                        // B. Update settings in local storage
+                        if (settingsToImport) {
+                            const current = await settingsStorage.getValue() || DEFAULT_OPTIONS;
+                            const { servers: _, ...safeIncoming } = settingsToImport;
+
                             const merged = {
                                 ...current,
-                                ...parsed.data,
-                                servers: [] // Ensure we don't accidentally write servers to storage
-                            };
-                            // But wait, if we write servers: [], we wipe existing servers from storage?
-                            // No, 'servers' in storage SHOULD be empty.
-                            // But 'current' might have come from the hook state which MIGHT have decrypted servers in it?
-                            // settingsStorage.getValue() returns raw storage, so 'servers' should be empty there.
-                            // So current.servers is likely []. 
+                                ...safeIncoming,
+                                globals: safeIncoming.globals ? { ...current.globals, ...safeIncoming.globals } : current.globals,
+                                appearance: safeIncoming.appearance ? { ...current.appearance, ...safeIncoming.appearance } : current.appearance,
+                                layout: safeIncoming.layout ? { ...current.layout, ...safeIncoming.layout } : current.layout,
+                                servers: [] // Always empty in local storage
+                            } as AppOptions;
 
-                            await updateSettings(merged);
+                            await settingsStorage.setValue(merged);
                         }
 
-                        await load(); // Refresh state
-                        resolve({ success: true, message: 'System backup imported.' });
-                        return;
+                        // 5. Finalize state
+                        await load();
+                        resolve({ success: true, message: successMessage });
+                    } catch (importError) {
+                        // Rollback on failure
+                        if (__UI_DEBUG_MODE__) {
+                            console.error('[Import] Atomic commit failed, rolling back:', importError);
+                        }
+
+                        // Best-effort rollback (don't throw if rollback fails)
+                        try {
+                            if (vaultSnapshot.length > 0 || serversToImport) {
+                                await VaultService.saveServers(vaultSnapshot);
+                            }
+                            await settingsStorage.setValue(optionsSnapshot);
+                        } catch (rollbackError) {
+                            console.error('[Import] Rollback also failed:', rollbackError);
+                        }
+
+                        reject(new Error(`Import failed: ${importError instanceof Error ? importError.message : 'Unknown error'}`));
                     }
 
-                    reject(new Error('Unknown backup file type.'));
-
                 } catch (error: unknown) {
-                    const message = error instanceof Error ? error.message : 'Failed to parse file.';
+                    let message = 'Import failed.';
+                    if (error instanceof z.ZodError) {
+                        message = 'Invalid backup data shape: ' + error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+                    } else if (error instanceof Error) {
+                        message = error.message;
+                    }
                     reject(new Error(message));
                 }
             };

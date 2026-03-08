@@ -1,8 +1,21 @@
 import React, { useState, useEffect } from 'react';
+import {
+    Button,
+    TextInput,
+    Select,
+    SelectItem,
+    ProgressBar,
+    Tile,
+    Stack,
+    Layer,
+    Loading,
+    Grid,
+    Column
+} from '@carbon/react';
+import { Launch, Settings, Information, CheckmarkOutline, ErrorOutline, Add } from '@carbon/icons-react';
 
 // Hooks
 import { useSettings } from '@/features/torrent-control/model/useSettings';
-// import { useTheme } from '@/shared/lib/hooks/useTheme';
 
 // Entities
 import { Torrent } from '@/entities/torrent/model/Torrent';
@@ -11,15 +24,14 @@ import { Torrent } from '@/entities/torrent/model/Torrent';
 import { Logo } from '@/shared/ui/Logo';
 import { AddTorrentDialog } from './AddTorrentDialog';
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
+import { VaultService } from '@/shared/api/security/VaultService';
 
 import { useDebugId } from '@/shared/lib/hooks/useDebugId';
 
 export const Dashboard = () => {
-    console.log('Dashboard: Render start');
     const { settings, updateSettings, loading } = useSettings();
-    // useTheme hook removed
     const [status, setStatus] = useState<string>('Ready');
-    const [statusColor, setStatusColor] = useState<string>('text-green-600');
+    const [statusKind, setStatusKind] = useState<'success' | 'danger' | 'warning' | 'info'>('success');
     const [torrents, setTorrents] = useState<Torrent[]>([]);
     const [addUrl, setAddUrl] = useState('');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -32,6 +44,27 @@ export const Dashboard = () => {
     const webUiBtnDebug = useDebugId('dashboard', 'actions', 'web-ui-button');
     const testBtnDebug = useDebugId('dashboard', 'actions', 'test-connection-button');
     const settingsBtnDebug = useDebugId('dashboard', 'actions', 'open-settings-button');
+
+    const [vaultStatus, setVaultStatus] = useState<string>('');
+
+    useEffect(() => {
+        const checkVault = async () => {
+            try {
+                const isInit = await VaultService.isInitialized();
+                if (!isInit) {
+                    setVaultStatus('Vault: Uninitialized');
+                    return;
+                }
+                const isLocked = await VaultService.isLocked();
+                setVaultStatus(isLocked ? 'Vault: Locked' : 'Vault: Unlocked');
+            } catch (e) {
+                console.error('Failed to check vault status', e);
+            }
+        };
+        checkVault();
+        const interval = setInterval(checkVault, 2000);
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         if (settings && (settings.servers || []).length > 0) {
@@ -47,20 +80,21 @@ export const Dashboard = () => {
             if (response && !response.error) {
                 setTorrents(response);
                 setStatus('Online');
-                setStatusColor('text-green-600');
+                setStatusKind('success');
             } else if (response && response.error) {
                 setStatus('Error: ' + response.error);
-                setStatusColor('text-red-600');
+                setStatusKind('danger');
             }
         } catch (e) {
             setStatus('Connection Failed');
-            setStatusColor('text-red-600');
+            setStatusKind('danger');
         }
     };
 
     const handleAddTorrent = async () => {
         if (!addUrl) return;
         setStatus('Adding...');
+        setStatusKind('info');
         try {
             const response = await chrome.runtime.sendMessage({
                 type: 'ADD_TORRENT_URL',
@@ -71,17 +105,18 @@ export const Dashboard = () => {
             }
             setAddUrl('');
             setStatus('Torrent Added');
+            setStatusKind('success');
             fetchTorrents();
         } catch (e: any) {
             setStatus('Add Failed: ' + e.message);
-            setStatusColor('text-red-600');
+            setStatusKind('danger');
         }
     };
 
     if (loading || !settings) {
         return (
-            <div className="w-full h-full flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="w-full h-full flex items-center justify-center p-8">
+                <Loading withOverlay={false} description={browser.i18n.getMessage('commonLoading')} />
             </div>
         );
     }
@@ -119,8 +154,6 @@ export const Dashboard = () => {
 
     const isAdding = status === 'Adding...';
 
-
-
     const handleAddClick = () => {
         if (settings.globals.addAdvanced) {
             setIsDialogOpen(true);
@@ -131,6 +164,7 @@ export const Dashboard = () => {
 
     const handleDialogAdd = async (url: string, options: { path?: string; label?: string; paused?: boolean }) => {
         setStatus('Adding...');
+        setStatusKind('info');
         try {
             const response = await chrome.runtime.sendMessage({
                 type: 'ADD_TORRENT_URL',
@@ -142,179 +176,228 @@ export const Dashboard = () => {
             }
             setAddUrl('');
             setStatus('Torrent Added');
+            setStatusKind('success');
             fetchTorrents();
         } catch (e: any) {
             setStatus('Add Failed: ' + e.message);
-            setStatusColor('text-red-600');
-            throw e; // Re-throw for dialog to handle
+            setStatusKind('danger');
+            throw e;
+        }
+    };
+
+    const getStatusIcon = () => {
+        switch (statusKind) {
+            case 'success': return <CheckmarkOutline size={16} color="var(--cds-support-success)" />;
+            case 'danger': return <ErrorOutline size={16} color="var(--cds-support-error)" />;
+            default: return <Information size={16} color="var(--cds-support-info)" />;
         }
     };
 
     return (
         <ErrorBoundary>
-            <div className="w-full h-full bg-background p-4 font-sans text-text-primary relative overflow-y-auto">
-                <div className="flex justify-between items-center mb-4 border-b border-border pb-2">
-                    <h1 className="text-lg font-bold text-text-primary flex items-center">
-                        <Logo className="w-6 h-6 mr-2 text-text-primary" />
-                        Torrent Control
-                    </h1>
-                </div>
-
+            <div className="w-full h-full bg-[var(--cds-background)] p-4 font-sans text-[var(--cds-text-primary)] relative overflow-y-auto">
                 {!configured ? (
-                    <div className="text-center py-4">
-                        <p className="text-text-secondary mb-4">Extension not configured.</p>
-                        <button
-                            onClick={openOptions}
-                            className="w-full bg-accent text-white py-2 px-4 rounded hover:bg-accent-hover transition-colors"
-                            {...setupBtnDebug}
-                        >
-                            ⚙️ Setup Now
-                        </button>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="bg-card p-3 rounded shadow-sm border border-border">
-                            <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider mb-1">
-                                Current Server
-                            </label>
-
-                            {(settings.servers || []).length > 1 ? (
-                                <select
-                                    value={settings.globals.currentServer}
-                                    onChange={(e) => handleServerChange(Number(e.target.value))}
-                                    className="w-full p-2 border border-border bg-input text-text-primary rounded text-sm focus:ring-accent focus:border-accent"
-                                    {...serverSelectDebug}
-                                >
-                                    {(settings.servers || []).map((server, index) => (
-                                        <option key={index} value={index}>
-                                            {server.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            ) : (
-                                <div className="font-medium text-text-primary">{currentServer?.name || 'Unknown Server'}</div>
-                            )}
-
-                            <div className={`text-xs mt-2 font-medium ${statusColor} truncate flex items-center`}>
-                                <span className={`w-2 h-2 rounded-full mr-1.5 ${status === 'Online' ? 'bg-green-500' : status === 'Adding...' ? 'bg-blue-500 animate-pulse' : 'bg-red-500'}`}></span>
-                                {status}
-                            </div>
-                        </div>
-
-                        <div className="bg-card p-3 rounded shadow-sm border border-border">
-                            <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider mb-1">
-                                Add Torrent
-                            </label>
-                            <div className="flex space-x-2">
-                                <input
-                                    type="text"
-                                    value={addUrl}
-                                    onChange={(e) => setAddUrl(e.target.value)}
-                                    onKeyDown={handleKeyDown}
-                                    placeholder="Magnet link or URL"
-                                    className="flex-1 p-2 border border-border bg-input text-text-primary rounded text-sm focus:ring-accent focus:border-accent"
-                                    disabled={isAdding}
-                                    {...addInputDebug}
-                                />
-                                <button
-                                    onClick={handleAddClick}
-                                    disabled={isAdding || !addUrl}
-                                    aria-label="Add Torrent"
-                                    className={`bg-accent text-white px-3 py-2 rounded hover:bg-accent-hover transition-colors flex items-center justify-center min-w-[40px] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent ${isAdding ? 'opacity-70 cursor-not-allowed' : ''}`}
-                                    {...addBtnDebug}
-                                >
-                                    {isAdding ? (
-                                        <span className="block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                                    ) : (
-                                        '+'
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Mini Torrent List (Top 3) */}
-                        <div className="bg-card rounded shadow-sm border border-border overflow-hidden">
-                            <div className="bg-secondary px-3 py-1 text-xs font-medium text-text-secondary uppercase flex justify-between items-center">
-                                <span>Active Torrents</span>
-                                <span className="bg-primary px-1.5 rounded text-[10px]">{torrents?.length || 0}</span>
-                            </div>
-                            <div className="max-h-40 overflow-y-auto">
-                                {Array.isArray(torrents) && torrents.length > 0 ? (
-                                    torrents.slice(0, 3).map(t => (
-                                        <div
-                                            key={t.id}
-                                            className="p-2 border-b border-border last:border-0 hover:bg-primary/50 transition-colors"
-                                            data-debug-id={`dashboard:mini-list:row-${t.id}`}
-                                            data-component="MiniTorrentRow"
-                                        >
-                                            <div className="text-xs font-medium truncate text-text-primary mb-1" title={t.name || 'Unknown'}>{t.name || 'Unknown'}</div>
-                                            <div className="flex justify-between text-[10px] text-text-secondary mb-1">
-                                                <span className={(t.status as string) === 'Downloading' ? 'text-accent' : ''}>{String(t.status || '')}</span>
-                                                <span>{Math.round(t.progress || 0)}%</span>
-                                            </div>
-                                            <div className="w-full bg-primary h-1 rounded-full overflow-hidden">
-                                                <div
-                                                    className={`h-full transition-all duration-500 ${(t.status as string) === 'Downloading' ? 'bg-accent' : 'bg-gray-400'}`}
-                                                    style={{ width: `${t.progress || 0}%` }}
-                                                ></div>
-                                            </div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="p-4 text-center text-xs text-text-secondary italic">
-                                        No active torrents
+                    <Grid className="h-full">
+                        <Column lg={4} md={4} sm={4}>
+                            <Tile className="p-5">
+                                <Stack gap={7}>
+                                    <div className="flex flex-col items-start gap-4">
+                                        <Logo className="w-12 h-12" />
+                                        <h1 className="text-2xl font-bold">{browser.i18n.getMessage('dashboardTitle')}</h1>
                                     </div>
-                                )}
+
+                                    <p className="text-[var(--cds-text-secondary)]">{browser.i18n.getMessage('dashboardEmptyState')}</p>
+
+                                    <Button
+                                        onClick={openOptions}
+                                        renderIcon={Settings}
+                                        size="lg"
+                                        className="w-full"
+                                        {...setupBtnDebug}
+                                    >
+                                        {browser.i18n.getMessage('dashboardSetupNow')}
+                                    </Button>
+                                </Stack>
+                            </Tile>
+                        </Column>
+                    </Grid>
+                ) : (
+                    <Stack gap={5}>
+                        <div className="flex justify-between items-center border-b border-[var(--cds-border-subtle)] pb-2">
+                            <h1 className="text-lg font-bold flex items-center">
+                                <Logo className="w-6 h-6 mr-2" />
+                                {browser.i18n.getMessage('dashboardTitle')}
+                            </h1>
+                            {vaultStatus && (
+                                <div className={`text-xs px-2 py-1 rounded-full font-medium ${vaultStatus === 'Vault: Unlocked' ? 'bg-[var(--cds-support-success)] text-white' :
+                                        vaultStatus === 'Vault: Locked' ? 'bg-[var(--cds-support-error)] text-white' :
+                                            'bg-[var(--cds-support-warning)] text-black'
+                                    }`}>
+                                    {vaultStatus}
+                                </div>
+                            )}
+                        </div>
+
+                        <Stack gap={4}>
+                            <Layer level={1}>
+                                <Tile className="flex flex-col gap-2 p-3">
+                                    <label className="text-[var(--cds-text-helper)] text-[10px] font-bold uppercase tracking-wider">
+                                        {browser.i18n.getMessage('dashboardCurrentServer')}
+                                    </label>
+
+                                    {(settings.servers || []).length > 1 ? (
+                                        <Select
+                                            id="server-select"
+                                            hideLabel
+                                            labelText={browser.i18n.getMessage('dashboardSelectServer')}
+                                            value={settings.globals.currentServer}
+                                            onChange={(e) => handleServerChange(Number(e.target.value))}
+                                            size="sm"
+                                            {...serverSelectDebug}
+                                        >
+                                            {(settings.servers || []).map((server, index) => (
+                                                <SelectItem key={index} value={index} text={server.name} />
+                                            ))}
+                                        </Select>
+                                    ) : (
+                                        <div className="font-medium text-sm">{currentServer?.name || 'Unknown Server'}</div>
+                                    )}
+
+                                    <div className="flex items-center gap-2 text-xs font-medium">
+                                        {getStatusIcon()}
+                                        <span className="truncate">{status}</span>
+                                    </div>
+                                </Tile>
+                            </Layer>
+
+                            <Layer level={1}>
+                                <Tile className="flex flex-col gap-2 p-3">
+                                    <label className="text-[var(--cds-text-helper)] text-[10px] font-bold uppercase tracking-wider">
+                                        {browser.i18n.getMessage('dashboardQuickAdd')}
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <div className="flex-1">
+                                            <TextInput
+                                                id="add-url"
+                                                labelText={browser.i18n.getMessage('dashboardMagnetPlaceholder')}
+                                                hideLabel
+                                                value={addUrl}
+                                                onChange={(e) => setAddUrl(e.target.value)}
+                                                onKeyDown={handleKeyDown}
+                                                placeholder={browser.i18n.getMessage('dashboardMagnetPlaceholder')}
+                                                size="sm"
+                                                disabled={isAdding}
+                                                {...addInputDebug}
+                                            />
+                                        </div>
+                                        <Button
+                                            onClick={handleAddClick}
+                                            disabled={isAdding || !addUrl}
+                                            renderIcon={isAdding ? undefined : Add}
+                                            hasIconOnly
+                                            iconDescription={browser.i18n.getMessage('dashboardAddTorrentTooltip')}
+                                            size="sm"
+                                            tooltipPosition="left"
+                                            {...addBtnDebug}
+                                        >
+                                            {isAdding && <Loading withOverlay={false} small description={browser.i18n.getMessage('commonLoading')} />}
+                                        </Button>
+                                    </div>
+                                </Tile>
+                            </Layer>
+
+                            <Layer level={1}>
+                                <div className="rounded border border-[var(--cds-border-subtle)] overflow-hidden">
+                                    <div className="bg-[var(--cds-layer-02)] px-3 py-1.5 text-[10px] font-bold text-[var(--cds-text-helper)] uppercase flex justify-between items-center border-b border-[var(--cds-border-subtle)]">
+                                        <span>{browser.i18n.getMessage('dashboardActiveTorrents')}</span>
+                                        <span className="bg-[var(--cds-layer-03)] px-1.5 py-0.5 rounded-sm">{torrents?.length || 0}</span>
+                                    </div>
+                                    <div className="max-h-40 overflow-y-auto bg-[var(--cds-background)]">
+                                        {Array.isArray(torrents) && torrents.length > 0 ? (
+                                            torrents.slice(0, 3).map(t => (
+                                                <div
+                                                    key={t.id}
+                                                    className="p-3 border-b border-[var(--cds-border-subtle)] last:border-0 hover:bg-[var(--cds-layer-hover-01)] transition-colors"
+                                                    data-debug-id={`dashboard:mini-list:row-${t.id}`}
+                                                >
+                                                    <div className="text-xs font-semibold truncate mb-2" title={t.name || 'Unknown'}>
+                                                        {t.name || 'Unknown'}
+                                                    </div>
+                                                    <ProgressBar
+                                                        label={String(t.status || '')}
+                                                        helperText={`${Math.round(t.progress || 0)}% completed`}
+                                                        value={t.progress || 0}
+                                                        max={100}
+                                                        size="small"
+                                                        status={(t.status as string) === 'Downloading' ? 'active' : 'finished'}
+                                                    />
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="p-4 text-center text-xs text-[var(--cds-text-helper)] italic">
+                                                No active torrents
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </Layer>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                    kind="secondary"
+                                    size="sm"
+                                    onClick={openWebUI}
+                                    renderIcon={Launch}
+                                    className="w-full"
+                                    {...webUiBtnDebug}
+                                >
+                                    {browser.i18n.getMessage('dashboardWebUi')}
+                                </Button>
+                                <Button
+                                    kind="ghost"
+                                    size="sm"
+                                    onClick={async () => {
+                                        setStatus('Testing...');
+                                        setStatusKind('info');
+                                        const res = await chrome.runtime.sendMessage({ type: 'TEST_CONNECTION' });
+                                        if (res) {
+                                            setStatus('Online');
+                                            setStatusKind('success');
+                                        } else {
+                                            setStatus('Failed');
+                                            setStatusKind('danger');
+                                        }
+                                    }}
+                                    className="w-full"
+                                    {...testBtnDebug}
+                                >
+                                    {browser.i18n.getMessage('dashboardTest')}
+                                </Button>
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                            <button
-                                onClick={openWebUI}
-                                className="flex items-center justify-center bg-secondary text-text-primary py-2 px-3 rounded hover:bg-card transition-colors text-sm font-medium border border-border"
-                                {...webUiBtnDebug}
-                            >
-                                🌐 Web UI
-                            </button>
-                            <button
-                                onClick={async () => {
-                                    setStatus('Testing...');
-                                    setStatusColor('text-orange-500');
-                                    const res = await chrome.runtime.sendMessage({ type: 'TEST_CONNECTION' });
-                                    if (res) {
-                                        setStatus('Online');
-                                        setStatusColor('text-green-600');
-                                    } else {
-                                        setStatus('Failed');
-                                        setStatusColor('text-red-600');
-                                    }
-                                }}
-                                className="flex items-center justify-center bg-accent/10 text-accent py-2 px-3 rounded hover:bg-accent/20 transition-colors text-sm font-medium border border-accent/20"
-                                {...testBtnDebug}
-                            >
-                                🔌 Test
-                            </button>
-                        </div>
+                            <div className="pt-2 border-t border-[var(--cds-border-subtle)]">
+                                <Button
+                                    kind="ghost"
+                                    size="sm"
+                                    onClick={openOptions}
+                                    renderIcon={Settings}
+                                    className="w-full text-xs"
+                                    {...settingsBtnDebug}
+                                >
+                                    {browser.i18n.getMessage('dashboardOpenSettings')}
+                                </Button>
+                            </div>
 
-                        <div className="pt-2 border-t border-border">
-                            <button
-                                onClick={openOptions}
-                                className="text-xs text-text-secondary hover:text-accent flex items-center justify-center w-full"
-                                {...settingsBtnDebug}
-                            >
-                                Open Settings
-                            </button>
-                        </div>
-
-                        <AddTorrentDialog
-                            isOpen={isDialogOpen}
-                            onClose={() => setIsDialogOpen(false)}
-                            onAdd={handleDialogAdd}
-                            initialUrl={addUrl}
-                            server={currentServer}
-                            labels={settings.globals.labels || []}
-                        />
-                    </div>
+                            <AddTorrentDialog
+                                isOpen={isDialogOpen}
+                                onClose={() => setIsDialogOpen(false)}
+                                onAdd={handleDialogAdd}
+                                initialUrl={addUrl}
+                                server={currentServer}
+                                labels={settings.globals.labels || []}
+                            />
+                        </Stack>
+                    </Stack>
                 )}
             </div>
         </ErrorBoundary>

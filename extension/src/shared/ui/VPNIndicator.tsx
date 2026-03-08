@@ -22,7 +22,7 @@ interface VPNIndicatorProps {
 export const VPNIndicator: React.FC<VPNIndicatorProps> = ({
     showDetails = true,
     compact = false,
-    autoCheckInterval = 60000, // Check every minute by default
+    autoCheckInterval = 0, // Disabled by default for privacy alignment
 }) => {
     const [status, setStatus] = useState<VPNStatus | null>(null);
     const [isChecking, setIsChecking] = useState(false);
@@ -46,18 +46,16 @@ export const VPNIndicator: React.FC<VPNIndicatorProps> = ({
         }
     }, []);
 
-    // Initial check
+    // Initial check disabled for privacy compliance
     useEffect(() => {
-        // Try cached first
+        // Try cached only - never auto-trigger network request on mount
         const cached = vpnService.getCachedStatus();
         if (cached) {
             setStatus(cached);
-        } else {
-            checkVPN();
         }
     }, [checkVPN]);
 
-    // Auto-refresh
+    // Auto-refresh (only if manually enabled)
     useEffect(() => {
         if (autoCheckInterval <= 0) return;
 
@@ -67,44 +65,47 @@ export const VPNIndicator: React.FC<VPNIndicatorProps> = ({
 
     const getStatusIcon = () => {
         if (isChecking) {
-            return <RefreshCw className="w-5 h-5 text-yellow-500 animate-spin" aria-hidden="true" />;
+            return <RefreshCw className="w-5 h-5 text-status-warning animate-spin" aria-hidden="true" />;
         }
 
         if (!status) {
-            return <Shield className="w-5 h-5 text-gray-400" aria-hidden="true" />;
+            return <Shield className="w-5 h-5 text-text-disabled" aria-hidden="true" />;
         }
 
         if (status.error) {
-            return <ShieldAlert className="w-5 h-5 text-yellow-500" aria-hidden="true" />;
+            return <ShieldAlert className="w-5 h-5 text-status-warning" aria-hidden="true" />;
         }
 
         if (status.isProtected) {
-            return <ShieldCheck className="w-5 h-5 text-green-500" aria-hidden="true" />;
+            return <ShieldCheck className="w-5 h-5 text-status-success" aria-hidden="true" />;
         }
 
-        return <ShieldAlert className="w-5 h-5 text-red-500" aria-hidden="true" />;
+        return <ShieldAlert className="w-5 h-5 text-status-error" aria-hidden="true" />;
     };
 
     const getStatusText = () => {
         if (isChecking) return 'Checking...';
         if (!status) return 'Unknown';
-        if (status.error) return 'Check failed';
+        if (status.error) {
+            if (status.error.includes('privacy')) return 'Disabled';
+            return 'Check failed';
+        }
         if (status.isProtected) return 'VPN Active';
         return 'Exposed';
     };
 
     const getStatusColor = () => {
-        if (isChecking || !status) return 'text-yellow-500';
-        if (status.error) return 'text-yellow-500';
-        if (status.isProtected) return 'text-green-500';
-        return 'text-red-500';
+        if (isChecking || !status) return 'text-status-warning';
+        if (status.error) return 'text-status-warning';
+        if (status.isProtected) return 'text-status-success';
+        return 'text-status-error';
     };
 
     if (compact) {
         return (
             <button
                 onClick={checkVPN}
-                className="p-2 rounded-lg hover:bg-surface transition-colors"
+                className="p-2 rounded-lg hover:bg-layer-selected-hover transition-colors"
                 aria-label={`VPN Status: ${getStatusText()}`}
                 title={getStatusText()}
             >
@@ -121,10 +122,13 @@ export const VPNIndicator: React.FC<VPNIndicatorProps> = ({
         >
             <button
                 onClick={checkVPN}
+                onFocus={() => setShowTooltip(true)}
+                onBlur={() => setShowTooltip(false)}
                 disabled={isChecking}
                 className={`
                     flex items-center gap-2 px-3 py-2 rounded-lg
-                    bg-surface hover:bg-hover transition-colors
+                    bg-layer-01 hover:bg-layer-selected-hover transition-colors
+                    focus:outline focus:outline-2 focus:outline-[var(--cds-focus)] focus:outline-offset-2
                     border border-border-subtle
                     ${getStatusColor()}
                 `}
@@ -137,7 +141,7 @@ export const VPNIndicator: React.FC<VPNIndicatorProps> = ({
             {/* Tooltip with details */}
             {showDetails && showTooltip && status && !isChecking && (
                 <div
-                    className="absolute top-full left-0 mt-2 w-64 p-3 bg-panel border border-border rounded-lg shadow-lg z-50"
+                    className="absolute top-full left-0 mt-2 w-64 p-3 bg-layer-01 border border-border-subtle rounded-lg shadow-lg z-50"
                     role="tooltip"
                 >
                     <div className="space-y-2 text-sm">
@@ -159,7 +163,7 @@ export const VPNIndicator: React.FC<VPNIndicatorProps> = ({
                         {status.identity?.provider && (
                             <div className="flex justify-between">
                                 <span className="text-text-secondary">Provider:</span>
-                                <span className="text-green-500">{status.identity.provider}</span>
+                                <span className="text-status-success">{status.identity.provider}</span>
                             </div>
                         )}
 
@@ -167,7 +171,7 @@ export const VPNIndicator: React.FC<VPNIndicatorProps> = ({
                         {status.identity?.isDatacenter && (
                             <div className="flex justify-between">
                                 <span className="text-text-secondary">Type:</span>
-                                <span className="text-green-500">Datacenter/VPN</span>
+                                <span className="text-status-success">Datacenter/VPN</span>
                             </div>
                         )}
 
@@ -176,11 +180,11 @@ export const VPNIndicator: React.FC<VPNIndicatorProps> = ({
                             <div className="flex justify-between items-center">
                                 <span className="text-text-secondary">WebRTC Leak:</span>
                                 {status.leakCheck.hasLeak ? (
-                                    <span className="flex items-center gap-1 text-red-500">
+                                    <span className="flex items-center gap-1 text-status-error">
                                         <WifiOff className="w-3 h-3" /> Detected
                                     </span>
                                 ) : (
-                                    <span className="flex items-center gap-1 text-green-500">
+                                    <span className="flex items-center gap-1 text-status-success">
                                         <Wifi className="w-3 h-3" /> None
                                     </span>
                                 )}

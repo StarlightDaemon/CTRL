@@ -29,7 +29,7 @@ export interface GlobalOptions {
     currentServer: number;
     showDiagnostics: boolean;
     badgeInfo: 'none' | 'count' | 'speed';
-    catchTorrents: boolean;
+
     notificationStyle: 'toast' | 'banner' | 'modal';
     contextMenuCustomOptions?: {
         addToClient: boolean;

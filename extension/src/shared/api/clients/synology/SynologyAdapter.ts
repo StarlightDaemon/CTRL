@@ -32,6 +32,15 @@ export class SynologyAdapter implements ITorrentClient {
     private synotoken: string | null = null;
     private apiPaths: Record<string, string> = {};
 
+    // Session recovery tracking
+    private isRecovering: boolean = false;
+
+    // Rate limiting for login attempts (prevents IP blocking)
+    private loginAttempts: number = 0;
+    private lastLoginAttempt: number = 0;
+    private static readonly MAX_LOGIN_ATTEMPTS = 3;
+    private static readonly LOGIN_COOLDOWN_MS = 60000; // 1 minute cooldown after failures
+
     // Default paths (may be overridden by discovery)
     private static readonly DEFAULT_PATHS = {
         auth: '/webapi/auth.cgi',
@@ -41,6 +50,9 @@ export class SynologyAdapter implements ITorrentClient {
         entry: '/webapi/entry.cgi',
     };
 
+    // Q3: Longer timeout for hibernating NAS wake
+    private static readonly DISCOVERY_TIMEOUT_MS = 15000; // 15 seconds
+
     constructor(config: ServerConfig) {
         this.config = config;
         this.baseUrl = config.hostname.replace(/\/$/, '');
@@ -49,17 +61,29 @@ export class SynologyAdapter implements ITorrentClient {
 
     /**
      * Discover API paths via SYNO.API.Info
+     * Q1: Includes DownloadStation2 for DSM 7+ compatibility
+     * Q3: Uses 15s timeout for hibernating NAS devices
      */
     private async discoverAPIs(): Promise<void> {
+        const controller = new AbortController();
+        const timeout = setTimeout(
+            () => controller.abort(),
+            SynologyAdapter.DISCOVERY_TIMEOUT_MS
+        );
+
         try {
             const params = new URLSearchParams({
                 api: 'SYNO.API.Info',
                 version: '1',
                 method: 'query',
-                query: 'SYNO.API.Auth,SYNO.DownloadStation.Task,SYNO.DownloadStation.Info',
+                // Q1: Added SYNO.DownloadStation2.Task for DSM 7+
+                // Q2: Added SYNO.FileStation.List for folder enumeration
+                query: 'SYNO.API.Auth,SYNO.DownloadStation.Task,SYNO.DownloadStation2.Task,SYNO.DownloadStation.Info,SYNO.FileStation.List',
             });
 
-            const response = await this.client.get<any>(`/webapi/query.cgi?${params}`);
+            const response = await this.client.get<any>(`/webapi/query.cgi?${params}`, {
+                signal: controller.signal
+            });
 
             if (response?.success && response?.data) {
                 const validated = SynologyAPIInfoSchema.parse(response.data);
@@ -70,11 +94,22 @@ export class SynologyAdapter implements ITorrentClient {
                 if (validated['SYNO.DownloadStation.Task']) {
                     this.apiPaths.task = `/webapi/${validated['SYNO.DownloadStation.Task'].path}`;
                 }
+                // Q1: Store DownloadStation2 path for DSM 7+ task creation
+                if (validated['SYNO.DownloadStation2.Task']) {
+                    this.apiPaths.task2 = `/webapi/${validated['SYNO.DownloadStation2.Task'].path}`;
+                    console.log('[Synology] DownloadStation2 available (DSM 7+)');
+                }
 
                 console.log('[Synology] API Discovery successful:', this.apiPaths);
             }
         } catch (error) {
-            console.warn('[Synology] API Discovery failed, using defaults:', error);
+            if (error instanceof Error && error.name === 'AbortError') {
+                console.warn('[Synology] API Discovery timed out (NAS may be hibernating)');
+            } else {
+                console.warn('[Synology] API Discovery failed, using defaults:', error);
+            }
+        } finally {
+            clearTimeout(timeout);
         }
     }
 
@@ -87,6 +122,18 @@ export class SynologyAdapter implements ITorrentClient {
 
     async login(): Promise<void> {
         console.log(`[Synology] Logging in to ${this.baseUrl} as ${this.config.username}`);
+
+        // C4: Rate limiting - check if we're in cooldown after too many failures
+        const now = Date.now();
+        if (this.loginAttempts >= SynologyAdapter.MAX_LOGIN_ATTEMPTS) {
+            const timeSinceLastAttempt = now - this.lastLoginAttempt;
+            if (timeSinceLastAttempt < SynologyAdapter.LOGIN_COOLDOWN_MS) {
+                const waitSeconds = Math.ceil((SynologyAdapter.LOGIN_COOLDOWN_MS - timeSinceLastAttempt) / 1000);
+                throw new Error(`Too many login attempts. Wait ${waitSeconds}s to avoid IP block (407).`);
+            }
+            // Cooldown expired, reset counter
+            this.loginAttempts = 0;
+        }
 
         // First, discover API paths
         await this.discoverAPIs();
@@ -113,12 +160,24 @@ export class SynologyAdapter implements ITorrentClient {
             params.append('device_id', this.config.clientOptions.deviceToken as string);
         }
 
+        this.lastLoginAttempt = Date.now();
         const response = await this.client.get<any>(`${this.getPath('entry')}?${params}`);
 
         if (!response?.success) {
             const errorCode = response?.error?.code || 0;
+            this.loginAttempts++;
+
+            // Special handling for IP block - don't count further attempts
+            if (errorCode === 407 || errorCode === 408) {
+                this.loginAttempts = SynologyAdapter.MAX_LOGIN_ATTEMPTS;
+                throw new Error(this.getAuthError(errorCode));
+            }
+
             throw new Error(this.getAuthError(errorCode));
         }
+
+        // Success - reset attempt counter
+        this.loginAttempts = 0;
 
         const authData = SynologyAuthDataSchema.parse(response.data);
         this.sid = authData.sid;
@@ -135,19 +194,31 @@ export class SynologyAdapter implements ITorrentClient {
 
     /**
      * Get human-readable error message for auth error codes
+     * Includes universal DSM codes (100-119) and auth-specific codes (400+)
      */
     private getAuthError(code: number): string {
         const errors: Record<number, string> = {
+            // Universal error codes (all DSM APIs)
+            100: 'Unknown error (retry)',
+            101: 'Invalid parameter',
+            102: 'API does not exist (re-run discovery)',
+            103: 'Method does not exist',
+            104: 'This API version is not supported',
+            105: 'Insufficient privilege',
+            106: 'Session timeout',
+            107: 'Session interrupted by duplicate login',
+            119: 'Session expired (re-login required)',
+            // Auth-specific error codes
             400: 'No such account or incorrect password',
             401: 'Account disabled',
             402: 'Permission denied',
             403: '2-factor authentication code required',
             404: '2-factor authentication failed',
             406: 'Enforce 2FA required',
-            407: 'Blocked IP source',
+            407: 'Blocked IP source - too many failed attempts',
             408: 'Account is blocked due to too many failed attempts',
             409: 'Network failure',
-            410: 'SID not found',
+            410: 'SID not found (session expired)',
             411: 'Account expired',
         };
         return errors[code] || `Authentication failed (code: ${code})`;
@@ -177,67 +248,88 @@ export class SynologyAdapter implements ITorrentClient {
     async getTorrents(): Promise<Torrent[]> {
         await this.ensureSession();
 
-        const params = new URLSearchParams({
-            api: 'SYNO.DownloadStation.Task',
-            version: '1',
-            method: 'list',
-            additional: 'detail,transfer,file',
-            _sid: this.sid!,
+        return this.withSessionRecovery(async () => {
+            const params = new URLSearchParams({
+                api: 'SYNO.DownloadStation.Task',
+                version: '1',
+                method: 'list',
+                additional: 'detail,transfer,file',
+                _sid: this.sid!,
+            });
+
+            const response = await this.client.get<any>(`${this.getPath('entry')}?${params}`);
+
+            if (!response?.success) {
+                const code = response?.error?.code || 0;
+                throw new Error(this.getTaskError(code));
+            }
+
+            const data = SynologyTaskListSchema.parse(response.data);
+            return data.tasks.map(t => this.mapTorrent(t));
         });
-
-        const response = await this.client.get<any>(`${this.getPath('entry')}?${params}`);
-
-        if (!response?.success) {
-            throw new Error('Failed to get torrents');
-        }
-
-        const data = SynologyTaskListSchema.parse(response.data);
-        return data.tasks.map(t => this.mapTorrent(t));
     }
 
     async addTorrentUrl(url: string, options?: AddTorrentOptions): Promise<void> {
         await this.ensureSession();
 
-        const params = new URLSearchParams({
-            api: 'SYNO.DownloadStation.Task',
-            version: '1',
-            method: 'create',
-            uri: url,
-            _sid: this.sid!,
+        return this.withSessionRecovery(async () => {
+            // Use DownloadStation2.Task v2 for proper destination support (DSM 7+)
+            const form = new FormData();
+            form.append('api', 'SYNO.DownloadStation2.Task');
+            form.append('version', '2');
+            form.append('method', 'create');
+            form.append('type', 'url');
+            // URL-encode to fix DSM 7 Error 117 with special characters
+            form.append('url', encodeURIComponent(url));
+            form.append('_sid', this.sid!);
+
+            // CSRF protection (mandatory for DSM 7 write operations)
+            if (this.synotoken) {
+                form.append('SynoToken', this.synotoken);
+            }
+
+            if (options?.path) {
+                form.append('destination', options.path);
+            }
+
+            const response = await this.client.post<any>(this.getPath('entry'), form);
+
+            if (!response?.success) {
+                const code = response?.error?.code || 0;
+                throw new Error(this.getTaskError(code));
+            }
         });
-
-        if (options?.path) {
-            params.append('destination', options.path);
-        }
-
-        const response = await this.client.get<any>(`${this.getPath('entry')}?${params}`);
-
-        if (!response?.success) {
-            const code = response?.error?.code || 0;
-            throw new Error(this.getTaskError(code));
-        }
     }
 
     async addTorrentFile(file: Blob, options?: AddTorrentOptions): Promise<void> {
         await this.ensureSession();
 
-        const form = new FormData();
-        form.append('api', 'SYNO.DownloadStation.Task');
-        form.append('version', '1');
-        form.append('method', 'create');
-        form.append('_sid', this.sid!);
-        form.append('file', file, 'torrent.torrent');
+        return this.withSessionRecovery(async () => {
+            // Use DownloadStation2.Task v2 for proper destination support (DSM 7+)
+            const form = new FormData();
+            form.append('api', 'SYNO.DownloadStation2.Task');
+            form.append('version', '2');
+            form.append('method', 'create');
+            form.append('type', 'file');
+            form.append('_sid', this.sid!);
+            form.append('file', file, 'torrent.torrent');
 
-        if (options?.path) {
-            form.append('destination', options.path);
-        }
+            // CSRF protection (mandatory for DSM 7 write operations)
+            if (this.synotoken) {
+                form.append('SynoToken', this.synotoken);
+            }
 
-        const response = await this.client.post<any>(this.getPath('entry'), form);
+            if (options?.path) {
+                form.append('destination', options.path);
+            }
 
-        if (!response?.success) {
-            const code = response?.error?.code || 0;
-            throw new Error(this.getTaskError(code));
-        }
+            const response = await this.client.post<any>(this.getPath('entry'), form);
+
+            if (!response?.success) {
+                const code = response?.error?.code || 0;
+                throw new Error(this.getTaskError(code));
+            }
+        });
     }
 
     async pauseTorrent(id: string): Promise<void> {
@@ -250,6 +342,11 @@ export class SynologyAdapter implements ITorrentClient {
             id: id,
             _sid: this.sid!,
         });
+
+        // CSRF protection for DSM 7
+        if (this.synotoken) {
+            params.append('SynoToken', this.synotoken);
+        }
 
         await this.client.get(`${this.getPath('entry')}?${params}`);
     }
@@ -265,6 +362,11 @@ export class SynologyAdapter implements ITorrentClient {
             _sid: this.sid!,
         });
 
+        // CSRF protection for DSM 7
+        if (this.synotoken) {
+            params.append('SynoToken', this.synotoken);
+        }
+
         await this.client.get(`${this.getPath('entry')}?${params}`);
     }
 
@@ -279,6 +381,11 @@ export class SynologyAdapter implements ITorrentClient {
             force_complete: deleteData ? 'true' : 'false',
             _sid: this.sid!,
         });
+
+        // CSRF protection for DSM 7
+        if (this.synotoken) {
+            params.append('SynoToken', this.synotoken);
+        }
 
         await this.client.get(`${this.getPath('entry')}?${params}`);
     }
@@ -302,8 +409,40 @@ export class SynologyAdapter implements ITorrentClient {
             return response?.success === true;
         } catch (e) {
             console.error('[Synology] Connection Test Failed:', e);
-            return false;
+
+            // Q4: Detect certificate/network errors and provide actionable guidance
+            if (this.isCertificateOrNetworkError(e)) {
+                throw new Error(
+                    'Connection failed. If using HTTPS with a self-signed certificate, ' +
+                    'open your NAS web UI in a new browser tab and accept the certificate first, ' +
+                    'then try connecting again.'
+                );
+            }
+
+            // Re-throw other errors with context
+            if (e instanceof Error) {
+                throw e;
+            }
+            throw new Error('Connection failed - check hostname and credentials');
         }
+    }
+
+    /**
+     * Q4: Detect SSL certificate or network connectivity errors
+     * These require user action (accept cert in browser) rather than config changes
+     */
+    private isCertificateOrNetworkError(error: unknown): boolean {
+        if (error instanceof Error) {
+            const msg = error.message.toLowerCase();
+            return msg.includes('failed to fetch') ||
+                msg.includes('networkerror') ||
+                msg.includes('network error') ||
+                msg.includes('ssl') ||
+                msg.includes('certificate') ||
+                msg.includes('cert_') ||
+                msg.includes('unable to connect');
+        }
+        return false;
     }
 
     async ping(): Promise<number> {
@@ -321,11 +460,42 @@ export class SynologyAdapter implements ITorrentClient {
         return Date.now() - start;
     }
 
+    /**
+     * Q2: Get available destination folders via FileStation API
+     * Returns writable shared folders as "categories" for destination selection
+     */
     async getCategories(): Promise<string[]> {
-        // Synology uses destination folders, not categories
-        // This would require querying shared folders via SYNO.FileStation.List
-        // For now, return empty array
-        return [];
+        await this.ensureSession();
+
+        return this.withSessionRecovery(async () => {
+            const params = new URLSearchParams({
+                api: 'SYNO.FileStation.List',
+                version: '2',
+                method: 'list_share',
+                onlywritable: 'true',
+                _sid: this.sid!,
+            });
+
+            // CSRF protection
+            if (this.synotoken) {
+                params.append('SynoToken', this.synotoken);
+            }
+
+            try {
+                const response = await this.client.get<any>(`${this.getPath('entry')}?${params}`);
+
+                if (!response?.success || !response?.data?.shares) {
+                    console.warn('[Synology] Failed to get shared folders');
+                    return [];
+                }
+
+                // Return folder paths as category names
+                return response.data.shares.map((share: { path: string; name: string }) => share.path);
+            } catch (error) {
+                console.warn('[Synology] FileStation query failed:', error);
+                return [];
+            }
+        });
     }
 
     async setCategory(hash: string, category: string): Promise<void> {
@@ -353,6 +523,60 @@ export class SynologyAdapter implements ITorrentClient {
         if (!this.sid) {
             await this.login();
         }
+    }
+
+    /**
+     * C3: Session recovery wrapper
+     * Detects session expiry (119/410) and automatically re-authenticates
+     */
+    private async withSessionRecovery<T>(operation: () => Promise<T>): Promise<T> {
+        try {
+            return await operation();
+        } catch (error) {
+            // Check if this is a session expiry error
+            if (this.isSessionExpiredError(error)) {
+                // Prevent infinite recovery loops
+                if (this.isRecovering) {
+                    throw new Error('Session recovery failed - please try again');
+                }
+
+                console.log('[Synology] Session expired, attempting recovery...');
+                this.isRecovering = true;
+
+                try {
+                    // Invalidate current session
+                    this.sid = null;
+                    this.synotoken = null;
+
+                    // Re-authenticate
+                    await this.login();
+
+                    console.log('[Synology] Session recovered, retrying operation');
+
+                    // Retry the original operation
+                    return await operation();
+                } finally {
+                    this.isRecovering = false;
+                }
+            }
+
+            throw error;
+        }
+    }
+
+    /**
+     * Check if an error indicates session expiry (codes 119 or 410)
+     */
+    private isSessionExpiredError(error: unknown): boolean {
+        if (error instanceof Error) {
+            const message = error.message;
+            // Check for our error messages that indicate session expiry
+            if (message.includes('119') || message.includes('410') ||
+                message.includes('Session expired') || message.includes('SID not found')) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -418,17 +642,22 @@ export class SynologyAdapter implements ITorrentClient {
 
     /**
      * Get human-readable error message for task error codes
+     * Includes DownloadStation-specific and universal session codes
      */
     private getTaskError(code: number): string {
         const errors: Record<number, string> = {
-            400: 'File upload failed',
-            401: 'Max number of tasks reached',
-            402: 'Destination denied',
-            403: 'Destination does not exist',
+            // Universal session codes (may occur on any operation)
+            105: 'Insufficient privilege for this operation',
+            119: 'Session expired - please reconnect',
+            // DownloadStation task codes
+            400: 'File upload failed - check file format',
+            401: 'Max number of concurrent tasks reached',
+            402: 'Destination folder not found - create it first',
+            403: 'Destination access denied - check permissions',
             404: 'Invalid task ID',
             405: 'Invalid task action',
-            406: 'No default destination',
-            407: 'Set destination failed',
+            406: 'No default destination configured',
+            407: 'Failed to set destination',
             408: 'File does not exist',
         };
         return errors[code] || `Task operation failed (code: ${code})`;

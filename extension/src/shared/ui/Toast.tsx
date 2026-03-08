@@ -31,28 +31,28 @@ const ToastItem: React.FC<{ toast: Toast; onDismiss: (id: string) => void }> = (
     }, [toast.id, toast.duration, onDismiss]);
 
     const icons = {
-        success: <CheckCircle className="w-5 h-5 text-green-400" aria-hidden="true" />,
-        error: <XCircle className="w-5 h-5 text-red-400" aria-hidden="true" />,
-        info: <Info className="w-5 h-5 text-blue-400" aria-hidden="true" />,
+        success: <CheckCircle className="w-5 h-5 text-support-success" aria-hidden="true" />,
+        error: <XCircle className="w-5 h-5 text-support-error" aria-hidden="true" />,
+        info: <Info className="w-5 h-5 text-support-info" aria-hidden="true" />,
     };
 
     const bgColors = {
-        success: 'bg-green-900/90 border-green-700',
-        error: 'bg-red-900/90 border-red-700',
-        info: 'bg-blue-900/90 border-blue-700',
+        success: 'bg-layer-01 border-support-success',
+        error: 'bg-layer-01 border-support-error',
+        info: 'bg-layer-01 border-support-info',
     };
 
     return (
         <div
             role="alert"
             aria-live="assertive"
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg backdrop-blur-sm ${bgColors[toast.type]} animate-slide-in`}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${bgColors[toast.type]} animate-slide-in`}
         >
             {icons[toast.type]}
-            <span className="text-sm text-white flex-1">{toast.message}</span>
+            <span className="text-sm text-text-primary flex-1">{toast.message}</span>
             <button
                 onClick={() => onDismiss(toast.id)}
-                className="text-white/60 hover:text-white transition-colors"
+                className="text-text-secondary hover:text-text-primary transition-colors"
                 aria-label="Dismiss notification"
             >
                 <X className="w-4 h-4" />

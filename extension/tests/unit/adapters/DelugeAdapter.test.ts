@@ -64,13 +64,15 @@ describe('DelugeAdapter', () => {
                 { ok: true, status: 200, body: rpcResponse(false) },
                 // 3. web.get_hosts - return available host
                 { ok: true, status: 200, body: rpcResponse([['host-id-123', '127.0.0.1', 58846, 'Online']]) },
-                // 4. web.connect - success
+                // 4. web.get_host_status - return Online
+                { ok: true, status: 200, body: rpcResponse(['host-id-123', 'Online', '2.0.3']) },
+                // 5. web.connect - success
                 { ok: true, status: 200, body: rpcResponse(null) },
             ]);
 
             await adapter.login();
 
-            expect(fetchSpy).toHaveBeenCalledTimes(4);
+            expect(fetchSpy).toHaveBeenCalledTimes(5);
         });
 
         it('should skip daemon connection if already connected', async () => {
@@ -102,6 +104,21 @@ describe('DelugeAdapter', () => {
             ]);
 
             await expect(adapter.login()).rejects.toThrow('No Deluge Daemons available');
+        });
+
+        it('should throw if daemon is offline', async () => {
+            createMockFetch([
+                // 1. auth.login - success
+                { ok: true, status: 200, body: rpcResponse(true) },
+                // 2. web.connected - not connected
+                { ok: true, status: 200, body: rpcResponse(false) },
+                // 3. web.get_hosts - return available host
+                { ok: true, status: 200, body: rpcResponse([['host-id-123', '127.0.0.1', 58846, 'Offline']]) },
+                // 4. web.get_host_status - return Offline
+                { ok: true, status: 200, body: rpcResponse(['host-id-123', 'Offline', '']) },
+            ]);
+
+            await expect(adapter.login()).rejects.toThrow('Deluge daemon is offline: 127.0.0.1:58846');
         });
     });
 

@@ -1,10 +1,10 @@
 import React, { Suspense } from 'react';
-console.log('Popup: Script loaded');
+
 import ReactDOM from 'react-dom/client';
 import Popup from './Popup';
 import '../style.css';
 import '@/app/styles/global.css'; // New Global CSS
-import { PrismThemeProvider } from '@/app/providers/ThemeProvider';
+import { Theme } from '@carbon/react';
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
 
 const DebugOverlay = __UI_DEBUG_MODE__
@@ -13,13 +13,13 @@ const DebugOverlay = __UI_DEBUG_MODE__
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
-        <PrismThemeProvider>
+        <Theme theme="g100">
             <Popup />
             {__UI_DEBUG_MODE__ && (
                 <Suspense fallback={null}>
                     <DebugOverlay root={document.body} />
                 </Suspense>
             )}
-        </PrismThemeProvider>
+        </Theme>
     </ErrorBoundary>,
 );
