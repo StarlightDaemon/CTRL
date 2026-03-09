@@ -370,6 +370,11 @@ export class QBittorrentAdapter implements ITorrentClient {
                 await this.login();
                 return await this.makeRequest<T>(endpoint, init);
             }
+            if (error instanceof HttpError) {
+                if (error.status === 409) throw new Error('All torrents failed to add');
+                if (error.status === 415) throw new Error('Invalid torrent file');
+                if (error.status === 405) throw new Error('Method not allowed — update adapter');
+            }
             throw error;
         }
     }
