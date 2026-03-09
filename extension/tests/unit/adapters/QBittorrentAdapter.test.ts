@@ -279,6 +279,36 @@ describe('QBittorrentAdapter', () => {
         });
     });
 
+    describe('error handling for adding torrents (409, 415, 405)', () => {
+        it('should throw semantic error on 409 (all adds fail)', async () => {
+            mockFetchSequence([
+                { response: 'Ok.', ok: true },
+                { response: 'Conflict', ok: false, status: 409 },
+            ]);
+            await adapter.login();
+            await expect(adapter.addTorrentUrl('magnet:?xt=urn:btih:abc123')).rejects.toThrow('All torrents failed to add');
+        });
+
+        it('should throw semantic error on 415 (invalid torrent file)', async () => {
+            mockFetchSequence([
+                { response: 'Ok.', ok: true },
+                { response: 'Unsupported Media Type', ok: false, status: 415 },
+            ]);
+            await adapter.login();
+            const fakeFile = new Blob(['fake content']);
+            await expect(adapter.addTorrentFile(fakeFile)).rejects.toThrow('Invalid torrent file');
+        });
+
+        it('should throw semantic error on 405 (wrong method)', async () => {
+            mockFetchSequence([
+                { response: 'Ok.', ok: true },
+                { response: 'Method Not Allowed', ok: false, status: 405 },
+            ]);
+            await adapter.login();
+            await expect(adapter.addTorrentUrl('magnet:?xt=urn:btih:abc123')).rejects.toThrow('Method not allowed — update adapter');
+        });
+    });
+
     describe('sequential download controls', () => {
         it('should toggle sequential download for torrents', async () => {
             const fetchSpy = mockFetchSequence([
