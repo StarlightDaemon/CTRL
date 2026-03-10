@@ -45,8 +45,9 @@ export const test = base.extend<{
 
         // Launch persistent context with extension
         const context = await chromium.launchPersistentContext(userDataDir, {
-            headless: true,
+            headless: false,
             args: [
+                '--headless=new',
                 `--disable-extensions-except=${EXTENSION_PATH}`,
                 `--load-extension=${EXTENSION_PATH}`,
                 '--no-sandbox',
