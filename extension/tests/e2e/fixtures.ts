@@ -90,6 +90,10 @@ export const expect = test.expect;
  * Wait for service worker to be available
  */
 async function waitForServiceWorker(context: BrowserContext, timeout = 30000): Promise<void> {
+    if (context.serviceWorkers().length > 0) {
+        return;
+    }
+
     const workerPromise = context.waitForEvent('serviceworker', { timeout });
 
     if (context.serviceWorkers().length > 0) {
@@ -104,12 +108,15 @@ async function waitForServiceWorker(context: BrowserContext, timeout = 30000): P
  * Get the extension's service worker
  */
 async function getServiceWorker(context: BrowserContext, timeout = 30000) {
+    if (context.serviceWorkers().length > 0) {
+        return context.serviceWorkers()[0];
+    }
+
     const workerPromise = context.waitForEvent('serviceworker', { timeout });
 
-    let [worker] = context.serviceWorkers();
-    if (worker) {
+    if (context.serviceWorkers().length > 0) {
         workerPromise.catch(() => { }); // Ignore future timeout to prevent unhandled rejection
-        return worker;
+        return context.serviceWorkers()[0];
     }
 
     return await workerPromise;
