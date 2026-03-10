@@ -90,29 +90,29 @@ export const expect = test.expect;
  * Wait for service worker to be available
  */
 async function waitForServiceWorker(context: BrowserContext, timeout = 30000): Promise<void> {
-    const startTime = Date.now();
+    const workerPromise = context.waitForEvent('serviceworker', { timeout });
 
-    while (Date.now() - startTime < timeout) {
-        const workers = context.serviceWorkers();
-        if (workers.length > 0) {
-            return;
-        }
-        await new Promise(resolve => setTimeout(resolve, 100));
+    if (context.serviceWorkers().length > 0) {
+        workerPromise.catch(() => { }); // Ignore future timeout to prevent unhandled rejection
+        return;
     }
 
-    // If no workers yet, wait for the event
-    await context.waitForEvent('serviceworker', { timeout: timeout / 2 });
+    await workerPromise;
 }
 
 /**
  * Get the extension's service worker
  */
 async function getServiceWorker(context: BrowserContext, timeout = 30000) {
+    const workerPromise = context.waitForEvent('serviceworker', { timeout });
+
     let [worker] = context.serviceWorkers();
-    if (!worker) {
-        worker = await context.waitForEvent('serviceworker', { timeout });
+    if (worker) {
+        workerPromise.catch(() => { }); // Ignore future timeout to prevent unhandled rejection
+        return worker;
     }
-    return worker;
+
+    return await workerPromise;
 }
 
 /**
