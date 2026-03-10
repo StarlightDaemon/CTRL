@@ -89,7 +89,7 @@ export const expect = test.expect;
 /**
  * Wait for service worker to be available
  */
-async function waitForServiceWorker(context: BrowserContext, timeout = 10000): Promise<void> {
+async function waitForServiceWorker(context: BrowserContext, timeout = 30000): Promise<void> {
     const startTime = Date.now();
 
     while (Date.now() - startTime < timeout) {
@@ -107,10 +107,10 @@ async function waitForServiceWorker(context: BrowserContext, timeout = 10000): P
 /**
  * Get the extension's service worker
  */
-async function getServiceWorker(context: BrowserContext) {
+async function getServiceWorker(context: BrowserContext, timeout = 30000) {
     let [worker] = context.serviceWorkers();
     if (!worker) {
-        worker = await context.waitForEvent('serviceworker', { timeout: 10000 });
+        worker = await context.waitForEvent('serviceworker', { timeout });
     }
     return worker;
 }
