@@ -90,36 +90,50 @@ export const expect = test.expect;
  * Wait for service worker to be available
  */
 async function waitForServiceWorker(context: BrowserContext, timeout = 30000): Promise<void> {
-    if (context.serviceWorkers().length > 0) {
-        return;
+    const startTime = Date.now();
+
+    let eventFired = false;
+    const listener = () => { eventFired = true; };
+    context.once('serviceworker', listener);
+
+    try {
+        while (Date.now() - startTime < timeout) {
+            if (context.serviceWorkers().length > 0 || eventFired) {
+                return;
+            }
+            await new Promise(resolve => setTimeout(resolve, 100)); // Poll every 100ms
+        }
+        throw new Error(`Timeout ${timeout}ms exceeded while waiting for service worker to initialize.`);
+    } finally {
+        context.off('serviceworker', listener);
     }
-
-    const workerPromise = context.waitForEvent('serviceworker', { timeout });
-
-    if (context.serviceWorkers().length > 0) {
-        workerPromise.catch(() => { }); // Ignore future timeout to prevent unhandled rejection
-        return;
-    }
-
-    await workerPromise;
 }
 
 /**
  * Get the extension's service worker
  */
 async function getServiceWorker(context: BrowserContext, timeout = 30000) {
-    if (context.serviceWorkers().length > 0) {
-        return context.serviceWorkers()[0];
+    const startTime = Date.now();
+
+    let workerFromEvent: any = null;
+    const listener = (worker: any) => { workerFromEvent = worker; };
+    context.once('serviceworker', listener);
+
+    try {
+        while (Date.now() - startTime < timeout) {
+            const workers = context.serviceWorkers();
+            if (workers.length > 0) {
+                return workers[0];
+            }
+            if (workerFromEvent) {
+                return workerFromEvent;
+            }
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        throw new Error(`Timeout ${timeout}ms exceeded while getting service worker.`);
+    } finally {
+        context.off('serviceworker', listener);
     }
-
-    const workerPromise = context.waitForEvent('serviceworker', { timeout });
-
-    if (context.serviceWorkers().length > 0) {
-        workerPromise.catch(() => { }); // Ignore future timeout to prevent unhandled rejection
-        return context.serviceWorkers()[0];
-    }
-
-    return await workerPromise;
 }
 
 /**
