@@ -271,7 +271,7 @@ export class RuTorrentAdapter implements ITorrentClient {
 
     private mapTorrent(t: RTorrentTuple): Torrent {
         // [hash, name, size, bytes_done, up_rate, down_rate, complete, state, is_active, label, hashing, path, up_total, message]
-        const [hash, name, size, done, up, down, complete, state, active, label, hashing, path] = t;
+        const [hash, name, size, done, up, down, complete, state, active, label, hashing, path, up_total, message] = t;
 
         return {
             id: hash,
@@ -285,7 +285,10 @@ export class RuTorrentAdapter implements ITorrentClient {
             savePath: path,
             addedDate: 0,
             category: label,
-            tags: []
+            tags: [],
+            uploadedTotal: Number(up_total),
+            ratio: Number(size) > 0 ? Number(up_total) / Number(size) : 0,
+            errorMessage: message
         };
     }
 
