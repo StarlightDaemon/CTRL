@@ -2,6 +2,8 @@
 
 > **Strategic direction for the CTRL browser extension**
 
+Status note: This roadmap is strategic direction, not the public live-status page. Use [docs/BETA_TESTING.md](docs/BETA_TESTING.md) for the current beta-status and tester-facing state.
+
 ---
 
 ## Vision
@@ -17,7 +19,7 @@ Transform CTRL from a working port into a **Best-in-Class** torrent management s
 
 ### ✅ Current Baseline
 - **Phase 1: Beta Release** shipped in January 2026
-- **357 unit tests** currently pass in the maintained local/CI baseline
+- **Maintained validation baseline** is documented in `docs/CI_BASELINE.md`
 - **Deterministic CI** is restored with tracked lockfile, `npm ci`, and npm caching
 - **Mainline rewrite and normalization** are complete
 - **Privacy Policy** and beta distribution remain in place
@@ -64,7 +66,7 @@ Transform CTRL from a working port into a **Best-in-Class** torrent management s
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
-| VPN Integration Check | Medium | ⏳ Deferred to v0.4.x+ |
+| VPN Integration Check | Medium | ⏳ Deferred to v0.4.x+; prototype archived |
 | Cloud Sync | Low | Encrypted settings sync |
 | Torrent Detail View | Low | Files, Peers, Trackers tabs |
 | RSS Auto-Downloader | Low | Regex filtering |
@@ -99,4 +101,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get involved.
 
 ---
 
-*Last Updated: March 2026*
+*Last Updated: April 2026*
