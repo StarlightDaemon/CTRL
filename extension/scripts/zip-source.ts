@@ -56,7 +56,6 @@ try {
     'extension/CHANGELOG.md',
     'extension/LINUX_SETUP.md',
     'extension/babel.config.js',
-    'extension/e2e',
     'extension/eslint.config.js',
     'extension/package-lock.json',
     'extension/package.json',
