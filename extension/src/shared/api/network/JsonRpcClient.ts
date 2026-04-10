@@ -19,6 +19,22 @@ export interface JsonRpcResponse<T> {
     id: string | number;
 }
 
+/**
+ * Structured JSON-RPC error that carries the original `{ code, message }` fields
+ * as own enumerable properties. This allows Aria2Adapter.wrapError() to detect
+ * the structured-RPC branch (`'code' in error`) rather than falling through to
+ * the plain-Error branch which would misclassify auth failures as NETWORK_ERROR.
+ */
+export class JsonRpcError extends Error {
+    public readonly code: number;
+
+    constructor(rpcCode: number, rpcMessage: string) {
+        super(rpcMessage);
+        this.name = 'JsonRpcError';
+        this.code = rpcCode;
+    }
+}
+
 export class JsonRpcClient {
     private httpClient: FetchHttpClient;
     private idCounter = 0;
@@ -45,7 +61,9 @@ export class JsonRpcClient {
         const response = await this.httpClient.post<JsonRpcResponse<T>>('', request, config);
 
         if (response.error) {
-            throw new Error(`JSON-RPC Error ${response.error.code}: ${response.error.message}`);
+            // Throw a structured error so callers can inspect .code and .message
+            // independently of the formatted message string.
+            throw new JsonRpcError(response.error.code, response.error.message);
         }
 
         if (response.result === undefined) {

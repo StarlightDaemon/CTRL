@@ -4,14 +4,12 @@ import { storage } from 'wxt/storage';
 import { ClientFactory } from '@/entities/client/lib/ClientFactory'; // New Dynamic Factory
 import { ContextMenuService } from '../features/torrent-control/model/services/ContextMenuService';
 import { ITorrentClient } from '@/entities/client/model/ITorrentClient'; // New Interface
-import { ServerConfig, AppSettings } from '@/shared/lib/types';
+import { AppSettings } from '@/shared/lib/types';
 import { LifecycleAdapter } from '../features/torrent-control/services/LifecycleAdapter';
 import { StateHydrator } from '../features/torrent-control/services/StateHydrator';
 import { ViewportManager } from '../features/torrent-control/services/ViewportManager';
 import { Torrent } from '../entities/torrent/model/Torrent';
-import { VaultService, VAULT_DATA_KEY } from '@/shared/api/security/VaultService';
-import { SESSION_KEY_KEY } from '@/shared/api/security/VaultService';
-import { DEFAULT_OPTIONS } from '@/shared/lib/constants';
+import { SESSION_KEY_KEY, VAULT_DATA_KEY } from '@/shared/api/security/VaultService';
 import { ServerResolver, ResolutionState } from '@/shared/api/server/ServerResolver';
 
 // HeaderRewriter import removed (DNR Dependency Elimination)
@@ -62,7 +60,7 @@ export default defineBackground(() => {
             if (!target) return { client: null, state: ResolutionState.INVALID_CONFIG };
             try {
                 return { client: await factory.create(target), state: ResolutionState.OK };
-            } catch (e) {
+            } catch {
                 return { client: null, state: ResolutionState.INVALID_CONFIG };
             }
         }
@@ -271,7 +269,7 @@ export default defineBackground(() => {
     });
 
     // Message Handler
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         const handleMessage = async () => {
             try {
                 // Attempt to resolve target client
@@ -284,7 +282,7 @@ export default defineBackground(() => {
                         }
                     }
 
-                    const { state, servers, activeServer } = await ServerResolver.resolve();
+                    const { state, servers } = await ServerResolver.resolve();
 
                     if (state !== ResolutionState.OK) {
                         if (state === ResolutionState.LOCKED || state === ResolutionState.UNINITIALIZED) {
@@ -387,7 +385,7 @@ export default defineBackground(() => {
                             console.log('[Background] TEST_CONNECTION received. Type:', message.config?.type);
                         }
                         const result = await client.testConnection();
-                        const r = result as any;
+                        const r = result as unknown as Record<string, unknown>;
                         console.info(JSON.stringify({
                             event: 'TEST_CONNECTION_RESULT',
                             messageType: message.type,

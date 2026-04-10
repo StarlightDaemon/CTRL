@@ -7,18 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### 💎 Core Architecture & CI
-- **Mainline Rewrite**: Successfully completed the safe rewrite of the project repository history.
-- **CI Determinism**: Transitioned to a fully deterministic npm workflow using `package-lock.json` validation and `npm ci` caching.
+### 💎 Core Architecture & Release Operations
+- **Firefox Source Packaging**: Added a clean-tree AMO source archive generation step for compliant release packaging.
+- **Build Maintenance**: Cleaned up source archive pathspecs to accommodate test directory removals.
 
 ### ✅ Testing & Reliability
-- **Test Baseline Growth**: Expanded the test suite significantly, growing from 153 to **357 passing tests**.
-- **Adapter Hardening**:
-  - Implemented active status validation guards for Deluge to prevent UI-blocking timeouts.
-  - Enhanced qBittorrent handling for 401 Unauthorized responses with active attempt tracking.
-- **Connection Truthfulness**:
-  - Resolved generic "Authentication Failed" UI masking by ensuring the actual adapter error strings propagate to the UI during Test Connection.
-  - Hardened Chrome and Firefox vault session persistence and active runtime background resolution.
+- **Runtime Carry-Forward**: Restored non-VPN runtime features and their corresponding adapter tests.
+- **Test Optimization**: Cleaned up the test surface by removing stale, duplicate Playwright E2E specs.
+- **Validation Fixes**: Corrected RuTorrent property mappings to unblock the adapter unit tests.
+
+### 📖 Documentation
+- **Product Docs**: Updated and carried forward public product documentation to match the rebuilt branch.
 
 ## [0.2.0-beta.1] - 2026-01-11
 

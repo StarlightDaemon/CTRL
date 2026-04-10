@@ -126,7 +126,7 @@
     <div class="container">
         <h1>Privacy Policy</h1>
         <div class="meta">
-            <strong>Last Updated:</strong> January 2026<br>
+            <strong>Last Updated:</strong> April 2026<br>
             <strong>Effective Date:</strong> January 2026
         </div>
 
@@ -180,22 +180,29 @@
 
         <h2>How CTRL Works</h2>
         
-        <h3>Site Integration (Content Scripts)</h3>
-        <p>CTRL injects user interface components into torrent indexing websites (e.g., TorrentGalaxy, 1337x, Nyaa) to provide one-click "Add to Client" functionality.</p>
+        <h3>User-Initiated Actions</h3>
+        <p>CTRL operates only when you explicitly interact with it. It does not automatically modify web pages or background-monitor your browsing activity.</p>
         
+        <p><strong>How you interact with CTRL:</strong></p>
+        <ol>
+            <li><strong>Context Menus:</strong> You can right-click on a magnet link or a page to send torrents directly to your client.</li>
+            <li><strong>Scan Page:</strong> You can manually trigger a "Scan Page for Magnets" action from the context menu. This generically scans the current page for magnet links (<code>magnet:?xt=...</code>) and adds them to your selected client.</li>
+            <li><strong>Manual Addition:</strong> You can add torrents by pasting URLs or magnet links directly into the extension popup.</li>
+        </ol>
+
         <p><strong>What happens:</strong></p>
         <ol>
-            <li>CTRL detects magnet links on supported pages</li>
-            <li>Adds UI buttons next to those links</li>
-            <li>When you click a button, the magnet link is processed <strong>locally</strong></li>
-            <li>The link is sent directly to <strong>your configured torrent client</strong> (on your local network or remote server)</li>
+            <li>When you initiate an action, CTRL processes the request <strong>locally</strong>.</li>
+            <li>If scanning a page, it identifies links matching the magnet protocol.</li>
+            <li>The link is sent directly to <strong>your configured torrent client</strong> (on your local network or remote server).</li>
         </ol>
 
         <p><strong>What does NOT happen:</strong></p>
         <ul>
-            <li>CTRL does not read page content beyond detecting magnet links</li>
-            <li>CTRL does not track which torrents you view or download</li>
-            <li>CTRL does not send any data about your browsing to external servers</li>
+            <li>CTRL does not automatically inject UI components or buttons into websites.</li>
+            <li>CTRL does not detect magnet links on page load; it only scans when you tell it to.</li>
+            <li>CTRL does not track which torrents you view or download.</li>
+            <li>CTRL does not send any data about your browsing to external servers.</li>
         </ul>
 
         <h3>Protocol Handling</h3>
@@ -234,9 +241,13 @@
         <p><strong>Purpose:</strong> To notify you when downloads complete or errors occur.</p>
         <p><strong>Data Access:</strong> None. Notifications are created locally.</p>
 
-        <h3><code>host_permissions</code> (specific domains)</h3>
-        <p><strong>Purpose:</strong> To inject UI components on supported torrent indexing sites.</p>
-        <p><strong>Data Access:</strong> Only the ability to detect magnet links (href attributes) on these specific sites. No page content is read or transmitted.</p>
+        <h3><code>activeTab</code></h3>
+        <p><strong>Purpose:</strong> To generically scan the current page for magnet links when you manually select the "Scan Page" option from the context menu.</p>
+        <p><strong>Data Access:</strong> Only the ability to identify magnet link URLs (<code>href</code> attributes) on the page you are currently viewing and have interacted with.</p>
+
+        <h3><code>optional_host_permissions</code></h3>
+        <p><strong>Purpose:</strong> To allow communication with your self-hosted torrent client (for example qBittorrent or Transmission).</p>
+        <p><strong>Data Access:</strong> Permissions are only requested for the specific URL of your torrent client. No data from other websites is accessed using these permissions.</p>
 
         <h2>Your Rights</h2>
         <p>Since CTRL does not collect any personal data, there is no data for you to request, correct, or delete from our servers (because we don't have servers).</p>
@@ -257,7 +268,7 @@
 
         <h2>Open Source Transparency</h2>
         <p>CTRL is open-source software. You can inspect the source code to verify our privacy claims:</p>
-        <p><strong>GitHub Repository:</strong> <a href="https://github.com/YOUR_USERNAME/CTRL" target="_blank">https://github.com/YOUR_USERNAME/CTRL</a></p>
+        <p><strong>GitHub Repository:</strong> <a href="https://github.com/StarlightDaemon/CTRL" target="_blank">https://github.com/StarlightDaemon/CTRL</a></p>
         
         <p>The code shows:</p>
         <ul>
@@ -275,8 +286,8 @@
         <h2>Contact</h2>
         <p>If you have questions about this privacy policy or CTRL's data practices:</p>
         <ul>
-            <li><strong>Email:</strong> [your-email@domain.com]</li>
-            <li><strong>GitHub Issues:</strong> <a href="https://github.com/YOUR_USERNAME/CTRL/issues" target="_blank">https://github.com/YOUR_USERNAME/CTRL/issues</a></li>
+            <li><strong>GitHub Discussions:</strong> <a href="https://github.com/StarlightDaemon/CTRL/discussions" target="_blank">https://github.com/StarlightDaemon/CTRL/discussions</a></li>
+            <li><strong>GitHub Issues:</strong> <a href="https://github.com/StarlightDaemon/CTRL/issues" target="_blank">https://github.com/StarlightDaemon/CTRL/issues</a></li>
         </ul>
 
         <hr>

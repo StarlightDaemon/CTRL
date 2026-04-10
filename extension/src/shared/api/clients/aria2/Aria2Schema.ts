@@ -81,8 +81,9 @@ export const Aria2TorrentSchema = z.object({
     errorMessage: z.string().optional(),
 
     // GID tracking for multi-phase downloads (magnet -> torrent)
-    followedBy: z.string().optional(),
-    following: z.string().optional(),
+    // Aria2 wire format: followedBy and following are arrays of GID strings
+    followedBy: z.array(z.string()).optional(),
+    following: z.array(z.string()).optional(),
     belongsTo: z.string().optional(),
 
     // File list

@@ -19,7 +19,6 @@ import {
     FloodCapabilities,
 } from './FloodSchema';
 import { ServerConfig } from '@/shared/lib/types';
-import { blobToBase64 } from '@/shared/lib/helpers';
 
 // ============================================================================
 // Constants
@@ -260,27 +259,25 @@ export class FloodAdapter implements ITorrentClient {
 
     async addTorrentFile(file: Blob, options?: AddTorrentOptions): Promise<void> {
         const headers = this.getHeaders();
-        const base64 = await blobToBase64(file);
+        const formData = new FormData();
 
-        const body: {
-            files: string[];
-            destination?: string;
-            start: boolean;
-            tags: string[];
-            isSequential?: boolean;
-        } = {
-            files: [base64],
-            destination: options?.path,
-            start: !options?.paused,
-            tags: options?.label ? [options.label] : [],
-        };
+        formData.append('files', file);
+
+        if (options?.path) {
+            formData.append('destination', options.path);
+        }
+
+        formData.append('start', String(!options?.paused));
+
+        const tags = options?.label ? [options.label] : [];
+        formData.append('tags', JSON.stringify(tags));
 
         if (options?.sequentialDownload) {
-            body.isSequential = true;
+            formData.append('isSequential', 'true');
         }
 
         await this.requestWithRetry(
-            () => this.httpClient.post('api/torrents/add-files', body, { headers })
+            () => this.httpClient.post('api/torrents/add-files', formData, { headers })
         );
     }
 
