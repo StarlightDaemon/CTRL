@@ -7,7 +7,7 @@ A browser extension for managing BitTorrent clients. Built with WXT, React, and 
 [![Chrome](https://img.shields.io/badge/Chrome-Coming_Soon-lightgrey?logo=googlechrome)](https://github.com/StarlightDaemon/CTRL/releases)
 [![Firefox](https://img.shields.io/badge/Firefox-Coming_Soon-lightgrey?logo=firefox)](https://github.com/StarlightDaemon/CTRL/releases)
 [![CI](https://github.com/StarlightDaemon/CTRL/actions/workflows/ci.yml/badge.svg)](https://github.com/StarlightDaemon/CTRL/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-357%20passing-brightgreen)](extension/tests)
+[![Tests](https://img.shields.io/badge/Tests-See%20CI-blue)](https://github.com/StarlightDaemon/CTRL/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
@@ -36,14 +36,18 @@ A browser extension for managing BitTorrent clients. Built with WXT, React, and 
 | Aria2 | ✅ Basic | RPC Multicall |
 | Synology | ✅ Full | 2FA, Device Token, NAS Integration |
 
+This table is the public support matrix for implemented adapter types. Internal audit or stabilization priorities may temporarily focus on a subset of adapters without implying that the others were removed from the product.
+
 ---
 
 ## 🚧 Project Status
 
-**Current Status**: Beta / Active Development  
-**Target**: v1.0 Store Release (Coming 2026)
+**Current Status**: Beta / Active Stabilization  
+**Target**: v1.0 Store Release
 
-This project is currently in **Beta**. We recommend most users wait for the official release on the Chrome Web Store and Firefox Add-ons site.
+This project is currently in **Beta**. Use [docs/BETA_TESTING.md](docs/BETA_TESTING.md) as the public source of truth for current beta status, tester guidance, and validation-scope notes.
+
+`ROADMAP.md` is strategic direction, not the live status page.
 
 ---
 
@@ -62,9 +66,9 @@ This project is currently in **Beta**. We recommend most users wait for the offi
 
 | Document | Description |
 |----------|-------------|
-| [Beta Guide](docs/BETA_TESTING.md) | **Start Here** - Installation & Testing |
+| [Beta Guide](docs/BETA_TESTING.md) | **Start Here** - Public beta status, installation, and testing guidance |
 | [E2E Troubleshooting](docs/E2E_TROUBLESHOOTING.md) | Diagnose Playwright/Environment issues |
-| [ROADMAP.md](ROADMAP.md) | Future features & strategy |
+| [ROADMAP.md](ROADMAP.md) | Strategic direction, not live status |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Setup build environment |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 

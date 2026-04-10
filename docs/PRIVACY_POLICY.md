@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated**: January 2026  
+**Last Updated**: April 2026  
 **Effective Date**: January 2026
 
 ---
@@ -134,7 +134,7 @@ We may update this privacy policy from time to time. Changes will be posted on t
 
 CTRL is open-source software. You can inspect the source code to verify our privacy claims:
 
-**GitHub Repository**: https://github.com/YOUR_USERNAME/CTRL
+**GitHub Repository**: https://github.com/StarlightDaemon/CTRL
 
 The code shows:
 - No analytics libraries
@@ -152,8 +152,8 @@ BitTorrent is a legitimate protocol used for distributing open-source software, 
 
 If you have questions about this privacy policy or CTRL's data practices:
 
-- **Email**: [your-email@domain.com]
-- **GitHub Issues**: https://github.com/YOUR_USERNAME/CTRL/issues
+- **GitHub Discussions**: https://github.com/StarlightDaemon/CTRL/discussions
+- **GitHub Issues**: https://github.com/StarlightDaemon/CTRL/issues
 
 ---
 
