@@ -6,6 +6,8 @@
 **Release Date**: January 2026  
 **Status**: Public Beta Testing
 
+Authority note: This document is the public source of truth for current beta status, tester guidance, and validation-scope notes. `README.md` is the overview page, and `ROADMAP.md` is strategic direction rather than live status.
+
 ---
 
 ## What is CTRL?
@@ -18,7 +20,7 @@ CTRL (Torrent Control) is a browser extension that provides a **unified interfac
 
 ### ✅ Fully Functional Features
 
-#### Torrent Client Support (9 Clients)
+#### Torrent Client Support (10 Clients)
 - ✅ **qBittorrent** - Full support with categories, tags, and sequential download
 - ✅ **Transmission** - Session management and directory support
 - ✅ **Deluge** - Multi-step authentication and label support
@@ -28,9 +30,13 @@ CTRL (Torrent Control) is a browser extension that provides a **unified interfac
 - ✅ **BiglyBT** - Basic operations
 - ✅ **Vuze** - Basic operations
 - ✅ **Aria2** - JSON-RPC multicall support
+- ✅ **Synology** - NAS integration with device-token and 2FA support
+
+This list mirrors the public adapter matrix in `README.md`. Internal audit or stabilization priorities may focus on a subset of adapters without changing the product-level support matrix shown here.
 
 #### Site Integrations
-- ⛔ **Discontinued** - Use Context Menu (Right-Click) integration instead.
+- ⛔ **Removed from CTRL** - Site-specific integrations were moved to a separate extension to keep CTRL focused and avoid a "kitchen sink" product scope.
+- ✅ **Supported alternative in CTRL** - Use Context Menu (Right-Click) integration instead.
 
 
 #### Core Features
@@ -49,11 +55,11 @@ CTRL (Torrent Control) is a browser extension that provides a **unified interfac
 ## ⚠️ Known Limitations
 
 ### Technical Debt
-- **YTS.mx**: Planned integration via API/Context Menu.
+- **No site-specific integrations in CTRL**: Site-integration work now belongs to the separate extension, not this repository's product scope.
 
 
 ### Not Implemented Yet
-- **E2E Testing**: Playwright test infrastructure designed but not yet implemented
+- **E2E Testing**: Playwright-based end-to-end tests exist under `./tests/e2e`. CI runs non-`@integration` tests only (`npm run test:e2e -- --grep-invert "@integration"`). Full E2E coverage is not yet claimed.
 - **Performance Optimization**: Diffing engine for large torrent lists (>5,000 torrents) not yet implemented
 - **Advanced i18n**: Build-time transformation pipeline planned
 
@@ -70,7 +76,7 @@ CTRL (Torrent Control) is a browser extension that provides a **unified interfac
 ### Method 1: From GitHub Releases (Recommended)
 
 1. **Download the Extension**
-   - Visit [Releases](https://github.com/YOUR_USERNAME/CTRL/releases)
+   - Visit [Releases](https://github.com/StarlightDaemon/CTRL/releases)
    - Download `ctrl-chrome-v0.2.0-beta.1.zip` (for Chrome/Edge)
    - OR download `ctrl-firefox-v0.2.0-beta.1.zip` (for Firefox)
    - Extract the ZIP file
@@ -94,7 +100,7 @@ CTRL (Torrent Control) is a browser extension that provides a **unified interfac
 
 ```bash
 # Clone repository
-git clone https://github.com/YOUR_USERNAME/CTRL.git
+git clone https://github.com/StarlightDaemon/CTRL.git
 cd CTRL/extension
 
 # Install dependencies
@@ -181,10 +187,10 @@ npm run build:firefox
    - Report any authentication issues
    - Verify torrent operations work (add, pause, resume, remove)
 
-2. **Site Integration Stability**
-   - Test on different torrent sites
-   - Report if buttons don't appear
-   - Check for layout conflicts or broken pages
+2. **Context Menu Reliability**
+   - Test adding magnet links through the right-click context menu
+   - Report missing menu entries or wrong client targeting
+   - Check behavior across different sites and link types
 
 3. **Cross-Browser Testing**
    - Test on Chrome, Edge, and Firefox
@@ -197,7 +203,7 @@ npm run build:firefox
 
 ### How to Report Bugs
 
-**GitHub Issues**: https://github.com/YOUR_USERNAME/CTRL/issues
+**GitHub Issues**: https://github.com/StarlightDaemon/CTRL/issues
 
 **Please include**:
 1. **Browser**: Chrome/Edge/Firefox + version
@@ -217,23 +223,22 @@ npm run build:firefox
 
 - [ ] **10+ active beta testers** providing feedback
 - [ ] **<5 critical bugs** discovered
-- [ ] **All 9 clients** verified working
+- [ ] **All 10 clients** verified working
 - [ ] **Positive user feedback** on core functionality
 - [ ] **No data loss** or credential security issues
 
 ### Roadmap to v1.0
 
-**Next Release: v0.3.0** (Estimated: Week 4-7)
-- ✅ Migrate 1337x to Shadow DOM
-- ✅ Integrate YTS.mx (#1 movie site)
-- ✅ Implement E2E testing with Playwright
-- ✅ Performance benchmarking
+**Next Release: v0.3.x** (Timing TBD)
+- ✅ Continue post-beta stabilization and adapter hardening
+- ✅ Maintain Playwright E2E infrastructure (CI runs non-@integration subset)
+- ✅ Continue performance benchmarking and tuning
 
-**Production Release: v1.0** (Estimated: Week 13-16)
+**Production Release: v1.0** (Timing TBD)
 - ✅ Chrome Web Store submission
 - ✅ Firefox AMO submission
 - ✅ Code signing for installers
-- ✅ Full E2E test coverage
+- ⬜ Full E2E test coverage (not yet achieved)
 - ✅ Accessibility score >90
 
 ---
@@ -248,7 +253,7 @@ npm run build:firefox
 - ✅ Credentials encrypted with AES-GCM locally
 - ✅ Open source - code is auditable
 
-**Privacy Policy**: [View Full Policy](https://YOUR_USERNAME.github.io/CTRL/privacy)
+**Privacy Policy**: [View Full Policy](PRIVACY_POLICY.md)
 
 ---
 
@@ -257,24 +262,22 @@ npm run build:firefox
 ### New Features
 - 🎉 First public beta release
 - ✅ Multi-server management
-- ✅ 9 torrent client adapters
+- ✅ 10 torrent client adapters
 - ✅ Encrypted credential vault
 - ✅ 7 language translations
 - ⛔ **Site Integrations**: Removed for stability and store compliance.
 
 ### Testing
-- ✅ 153 unit tests passing
-- ✅ All adapter tests passing
-- ⚠️ E2E tests pending
+- ✅ Unit and adapter test suites are part of the maintained validation baseline
+- ✅ Playwright E2E tests configured (CI runs non-@integration subset)
 
 
 ---
 
 ## 💬 Community & Support
 
-**Questions?** Open a [Discussion](https://github.com/YOUR_USERNAME/CTRL/discussions)  
-**Bugs?** Create an [Issue](https://github.com/YOUR_USERNAME/CTRL/issues)  
-**Email**: [your-email@domain.com]
+**Questions?** Open a [Discussion](https://github.com/StarlightDaemon/CTRL/discussions)  
+**Bugs?** Create an [Issue](https://github.com/StarlightDaemon/CTRL/issues)
 
 ---
 
@@ -283,7 +286,7 @@ npm run build:firefox
 - [Main README](../README.md) - Project overview
 - [ROADMAP](../ROADMAP.md) - Strategic direction
 - [CONTRIBUTING](../CONTRIBUTING.md) - How to contribute
-- [Privacy Policy](https://YOUR_USERNAME.github.io/CTRL/privacy) - Full privacy details
+- [Privacy Policy](PRIVACY_POLICY.md) - Full privacy details
 
 ---
 
@@ -305,4 +308,4 @@ Your feedback is invaluable in making CTRL a production-ready extension. Thank y
 
 *CTRL v0.2.0-beta.1*  
 *Released: January 2026*  
-*Next Release: v0.3.0 (Week 4-7)*
+*Next Release: v0.3.x (Timing TBD)*
