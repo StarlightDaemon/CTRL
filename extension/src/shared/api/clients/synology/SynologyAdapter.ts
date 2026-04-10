@@ -4,15 +4,12 @@ import { Torrent, TorrentStatus } from '@/entities/torrent/model/Torrent';
 import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
 import { ServerConfig } from '@/shared/lib/types';
 import {
-    SynologyAuthData,
     SynologyTask,
     SynologyTaskListSchema,
     SynologyTaskStatus,
-    SynologyResponseSchema,
     SynologyAuthDataSchema,
     SynologyAPIInfoSchema,
 } from './SynologySchema';
-import { z } from 'zod';
 
 /**
  * Synology Download Station Adapter
@@ -81,7 +78,7 @@ export class SynologyAdapter implements ITorrentClient {
                 query: 'SYNO.API.Auth,SYNO.DownloadStation.Task,SYNO.DownloadStation2.Task,SYNO.DownloadStation.Info,SYNO.FileStation.List',
             });
 
-            const response = await this.client.get<any>(`/webapi/query.cgi?${params}`, {
+            const response = await this.client.get<{ success?: boolean; data?: unknown; error?: { code?: number } }>(`/webapi/query.cgi?${params}`, {
                 signal: controller.signal
             });
 
@@ -161,7 +158,7 @@ export class SynologyAdapter implements ITorrentClient {
         }
 
         this.lastLoginAttempt = Date.now();
-        const response = await this.client.get<any>(`${this.getPath('entry')}?${params}`);
+        const response = await this.client.get<{ success?: boolean; data?: unknown; error?: { code?: number } }>(`${this.getPath('entry')}?${params}`);
 
         if (!response?.success) {
             const errorCode = response?.error?.code || 0;
@@ -257,7 +254,7 @@ export class SynologyAdapter implements ITorrentClient {
                 _sid: this.sid!,
             });
 
-            const response = await this.client.get<any>(`${this.getPath('entry')}?${params}`);
+            const response = await this.client.get<{ success?: boolean; data?: unknown; error?: { code?: number } }>(`${this.getPath('entry')}?${params}`);
 
             if (!response?.success) {
                 const code = response?.error?.code || 0;
@@ -292,7 +289,7 @@ export class SynologyAdapter implements ITorrentClient {
                 form.append('destination', options.path);
             }
 
-            const response = await this.client.post<any>(this.getPath('entry'), form);
+            const response = await this.client.post<{ success?: boolean; data?: unknown; error?: { code?: number } }>(this.getPath('entry'), form);
 
             if (!response?.success) {
                 const code = response?.error?.code || 0;
@@ -323,7 +320,7 @@ export class SynologyAdapter implements ITorrentClient {
                 form.append('destination', options.path);
             }
 
-            const response = await this.client.post<any>(this.getPath('entry'), form);
+            const response = await this.client.post<{ success?: boolean; data?: unknown; error?: { code?: number } }>(this.getPath('entry'), form);
 
             if (!response?.success) {
                 const code = response?.error?.code || 0;
@@ -403,7 +400,7 @@ export class SynologyAdapter implements ITorrentClient {
                 _sid: this.sid!,
             });
 
-            const response = await this.client.get<any>(`${this.getPath('entry')}?${params}`);
+            const response = await this.client.get<{ success?: boolean; data?: unknown; error?: { code?: number } }>(`${this.getPath('entry')}?${params}`);
             console.log('[Synology] Info response:', response);
 
             return response?.success === true;
@@ -482,7 +479,7 @@ export class SynologyAdapter implements ITorrentClient {
             }
 
             try {
-                const response = await this.client.get<any>(`${this.getPath('entry')}?${params}`);
+                const response = await this.client.get<{ success?: boolean; data?: { shares?: { path: string; name: string }[] }; error?: { code?: number } }>(`${this.getPath('entry')}?${params}`);
 
                 if (!response?.success || !response?.data?.shares) {
                     console.warn('[Synology] Failed to get shared folders');
@@ -498,7 +495,7 @@ export class SynologyAdapter implements ITorrentClient {
         });
     }
 
-    async setCategory(hash: string, category: string): Promise<void> {
+    async setCategory(_hash: string, _category: string): Promise<void> {
         // Not directly supported - categories are folder-based
         console.warn('[Synology] setCategory not supported (use destination path instead)');
     }
@@ -508,11 +505,11 @@ export class SynologyAdapter implements ITorrentClient {
         return [];
     }
 
-    async addTags(hash: string, tags: string[]): Promise<void> {
+    async addTags(_hash: string, _tags: string[]): Promise<void> {
         console.warn('[Synology] addTags not supported');
     }
 
-    async removeTags(hash: string, tags: string[]): Promise<void> {
+    async removeTags(_hash: string, _tags: string[]): Promise<void> {
         console.warn('[Synology] removeTags not supported');
     }
 

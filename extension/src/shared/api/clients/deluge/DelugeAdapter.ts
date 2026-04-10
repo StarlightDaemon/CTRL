@@ -3,7 +3,7 @@ import { ITorrentClient, AddTorrentOptions } from '@/entities/client/model/ITorr
 import { Torrent, TorrentStatus } from '@/entities/torrent/model/Torrent';
 import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
 import { ServerConfig } from '@/shared/lib/types';
-import { DelugeRpcResponseSchema, DelugeUpdateUiSchema, DelugeHostsListSchema, DelugeTorrent, DelugeWebPlugins, DelugeWebPluginsSchema, DelugeMethodsSchema, DelugeTorrentOptions, DelugeFilePriority, DelugeFile, DelugePeer, DelugeTracker, DelugePeerSchema, DelugeTrackerSchema } from './DelugeSchema';
+import { DelugeUpdateUiSchema, DelugeTorrent, DelugeWebPlugins, DelugeWebPluginsSchema, DelugeMethodsSchema, DelugeTorrentOptions, DelugeFilePriority, DelugeFile, DelugePeer, DelugeTracker, DelugePeerSchema, DelugeTrackerSchema } from './DelugeSchema';
 
 /**
  * Deluge JSON-RPC Error Codes
@@ -71,7 +71,7 @@ export class DelugeAdapter implements ITorrentClient {
         );
 
         try {
-            const response = await this.client.post<any>('', payload, {
+            const response = await this.client.post<{ error?: { code?: number; message?: string }; result?: T }>('', payload, {
                 signal: controller.signal
             });
 
@@ -80,7 +80,7 @@ export class DelugeAdapter implements ITorrentClient {
                 const errorCode = response.error.code as DelugeErrorCode | undefined;
                 const errorMessage = response.error.message || `Error code ${errorCode}`;
                 const error = new Error(`Deluge RPC Error (${errorCode}): ${errorMessage}`);
-                (error as any).code = errorCode;
+                (error as Error & { code?: number }).code = errorCode;
                 throw error;
             }
 
@@ -124,7 +124,7 @@ export class DelugeAdapter implements ITorrentClient {
         if (isConnected) return;
 
         // Get available hosts
-        const hosts = await this.call<any[]>('web.get_hosts');
+        const hosts = await this.call<[string, string, number, string][]>('web.get_hosts');
         if (!hosts || hosts.length === 0) {
             throw new Error('No Deluge Daemons available');
         }
@@ -175,7 +175,7 @@ export class DelugeAdapter implements ITorrentClient {
         try {
             return await action();
         } catch (e: unknown) {
-            const errorCode = (e as any)?.code;
+            const errorCode = (e as { code?: unknown })?.code;
             const message = e instanceof Error ? e.message : String(e);
 
             // Check for authentication errors (code 1 or message patterns)
@@ -220,7 +220,7 @@ export class DelugeAdapter implements ITorrentClient {
                 "time_added", "label" // Extended fields
             ];
 
-            const response = await this.call<any>('web.update_ui', [keys, {}]);
+            const response = await this.call<unknown>('web.update_ui', [keys, {}]);
             const validated = DelugeUpdateUiSchema.parse(response);
 
             if (!validated.torrents) return [];
@@ -250,7 +250,7 @@ export class DelugeAdapter implements ITorrentClient {
             if (filter.label) filterDict.label = filter.label;
             if (filter.tracker_host) filterDict.tracker_host = filter.tracker_host;
 
-            const response = await this.call<any>('web.update_ui', [keys, filterDict]);
+            const response = await this.call<unknown>('web.update_ui', [keys, filterDict]);
             const validated = DelugeUpdateUiSchema.parse(response);
 
             if (!validated.torrents) return [];
@@ -339,7 +339,7 @@ export class DelugeAdapter implements ITorrentClient {
                 // label.get_labels
                 const labels = await this.call<string[]>('label.get_labels');
                 return labels || [];
-            } catch (e) {
+            } catch {
                 // Plugin might not be enabled
                 return [];
             }
@@ -356,11 +356,11 @@ export class DelugeAdapter implements ITorrentClient {
         return []; // Deluge uses Labels, mapped to Categories. Tags are not distinct in v1/v2 core.
     }
 
-    async addTags(hash: string, tags: string[]): Promise<void> {
+    async addTags(_hash: string, _tags: string[]): Promise<void> {
         // No-op
     }
 
-    async removeTags(hash: string, tags: string[]): Promise<void> {
+    async removeTags(_hash: string, _tags: string[]): Promise<void> {
         // No-op
     }
 
@@ -402,7 +402,7 @@ export class DelugeAdapter implements ITorrentClient {
      */
     async getWebPlugins(): Promise<DelugeWebPlugins> {
         return this.ensureAuth(async () => {
-            const result = await this.call<any>('web.get_plugins');
+            const result = await this.call<unknown>('web.get_plugins');
             return DelugeWebPluginsSchema.parse(result);
         });
     }
@@ -535,7 +535,7 @@ export class DelugeAdapter implements ITorrentClient {
         status: string;
     }>> {
         return this.ensureAuth(async () => {
-            const hosts = await this.call<any[]>('web.get_hosts');
+            const hosts = await this.call<[string, string, number, string][]>('web.get_hosts');
             return hosts.map(h => ({
                 id: h[0],
                 hostname: h[1],
@@ -568,7 +568,7 @@ export class DelugeAdapter implements ITorrentClient {
      */
     async getFiles(torrentId: string): Promise<Array<DelugeFile & { progress: number; priority: DelugeFilePriority }>> {
         return this.ensureAuth(async () => {
-            const status = await this.call<any>('core.get_torrent_status', [
+            const status = await this.call<{ files?: { index?: number; path: string; size: number; offset?: number }[]; file_priorities?: number[]; file_progress?: number[] }>('core.get_torrent_status', [
                 torrentId,
                 ['files', 'file_priorities', 'file_progress']
             ]);
@@ -577,7 +577,7 @@ export class DelugeAdapter implements ITorrentClient {
             const priorities = status.file_priorities || [];
             const progress = status.file_progress || [];
 
-            return files.map((f: any, i: number) => ({
+            return files.map((f: { index?: number; path: string; size: number; offset?: number }, i: number) => ({
                 index: f.index ?? i,
                 path: f.path,
                 size: f.size,
@@ -610,12 +610,12 @@ export class DelugeAdapter implements ITorrentClient {
      */
     async getPeers(torrentId: string): Promise<DelugePeer[]> {
         return this.ensureAuth(async () => {
-            const status = await this.call<any>('core.get_torrent_status', [
+            const status = await this.call<{ peers?: unknown[] }>('core.get_torrent_status', [
                 torrentId,
                 ['peers']
             ]);
             const peers = status.peers || [];
-            return peers.map((p: any) => DelugePeerSchema.parse(p));
+            return peers.map((p: unknown) => DelugePeerSchema.parse(p));
         });
     }
 
@@ -624,12 +624,12 @@ export class DelugeAdapter implements ITorrentClient {
      */
     async getTrackers(torrentId: string): Promise<DelugeTracker[]> {
         return this.ensureAuth(async () => {
-            const status = await this.call<any>('core.get_torrent_status', [
+            const status = await this.call<{ trackers?: unknown[] }>('core.get_torrent_status', [
                 torrentId,
                 ['trackers']
             ]);
             const trackers = status.trackers || [];
-            return trackers.map((t: any) => DelugeTrackerSchema.parse(t));
+            return trackers.map((t: unknown) => DelugeTrackerSchema.parse(t));
         });
     }
 

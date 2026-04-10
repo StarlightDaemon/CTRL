@@ -9,10 +9,7 @@ export const VAULT_DATA_KEY = 'local:vaultData';
 export const LEGACY_OPTIONS_KEY = 'local:options';
 export const SESSION_KEY_KEY = 'session:encryptionKey';
 
-interface EncryptedData {
-    iv: number[]; // stored as array for JSON compatibility
-    ciphertext: string; // Base64 or specific encoding
-}
+
 
 export class VaultService {
     static async isInitialized(): Promise<boolean> {
@@ -66,7 +63,7 @@ export class VaultService {
             await this.getServers(key); // Pass key explicitly to test it
             await KeyManager.setSessionKey(key);
             return true;
-        } catch (e) {
+        } catch {
             return false;
         }
     }
@@ -128,12 +125,12 @@ export class VaultService {
      * Checks if there are legacy servers in local:options that need migration.
      */
     static async hasLegacyData(): Promise<boolean> {
-        const settings = await storage.getItem<any>(LEGACY_OPTIONS_KEY);
-        return settings && settings.servers && settings.servers.length > 0;
+        const settings = await storage.getItem<{ servers?: ServerConfig[] }>(LEGACY_OPTIONS_KEY);
+        return !!(settings && settings.servers && settings.servers.length > 0);
     }
 
     static async migrateLegacyData(password: string): Promise<void> {
-        const settings = await storage.getItem<any>(LEGACY_OPTIONS_KEY);
+        const settings = await storage.getItem<{ servers?: ServerConfig[] } & Record<string, unknown>>(LEGACY_OPTIONS_KEY);
         if (!settings || !settings.servers) return;
 
         await this.initialize(password, settings.servers);

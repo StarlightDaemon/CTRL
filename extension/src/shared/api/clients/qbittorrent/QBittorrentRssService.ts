@@ -10,8 +10,6 @@
  */
 import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
 import {
-    QBittorrentRssFeedSchema,
-    QBittorrentRssRuleSchema,
     QBittorrentRssRule
 } from './QBittorrentSchema';
 
@@ -54,7 +52,7 @@ export class QBittorrentRssService {
      * Get all RSS feeds and items
      * Recurses through the tree structure returned by API
      */
-    async getFeeds(): Promise<any> {
+    async getFeeds(): Promise<unknown> {
         return await this.client.get('rss/items', {
             params: { withData: 'true' }
         });

@@ -3,7 +3,7 @@ import { storage } from 'wxt/storage';
 import { ITorrentClient } from '@/entities/client/model/ITorrentClient';
 import { AppSettings, ServerConfig } from '@/shared/lib/types';
 import { DEFAULT_OPTIONS } from '@/shared/lib/constants';
-import { VaultService, SESSION_KEY_KEY, VAULT_DATA_KEY, VAULT_SALT_KEY } from '@/shared/api/security/VaultService';
+import { SESSION_KEY_KEY, VAULT_DATA_KEY, VAULT_SALT_KEY } from '@/shared/api/security/VaultService';
 import { ServerResolver, ResolutionState, ResolvedServers } from '@/shared/api/server/ServerResolver';
 
 const FALLBACK_SESSION_KEY = 'local:session_encryptionKey';
@@ -170,8 +170,8 @@ export class ContextMenuService {
     private determineMenuItems(
         resolution: ResolvedServers,
         mode: number,
-        custom: any,
-        globals: any
+        custom: Partial<Record<string, boolean>> | undefined,
+        globals: AppSettings['globals']
     ): chrome.contextMenus.CreateProperties[] {
         const items: chrome.contextMenus.CreateProperties[] = [];
 
