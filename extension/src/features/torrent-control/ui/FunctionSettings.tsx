@@ -4,7 +4,7 @@ import { SettingsPageLayout } from '@/shared/ui/settings/SettingsPageLayout';
 import { SettingsCard } from '@/shared/ui/settings/SettingsCard';
 import { SettingsToggle } from '@/shared/ui/settings/SettingsToggle';
 import { Settings as SettingsIcon, Download, Info } from 'lucide-react';
-import { InlineNotification, Select, SelectItem, Stack } from '@carbon/react';
+import { Select, SelectItem, Stack } from '@carbon/react';
 import { ContextMenuSettings } from './settings/ContextMenuSettings';
 import { NotificationSettings } from './settings/NotificationSettings';
 
@@ -47,7 +47,7 @@ export const FunctionSettings: React.FC<Props> = ({
     setPreviewNotificationLevel,
     applyNotifications
 }) => {
-    const handleChange = (field: keyof AppOptions['globals'], value: any) => {
+    const handleChange = (field: keyof AppOptions['globals'], value: AppOptions['globals'][keyof AppOptions['globals']]) => {
         updateSettings({
             ...settings,
             globals: {
@@ -97,7 +97,7 @@ export const FunctionSettings: React.FC<Props> = ({
                                 labelText="Badge Information"
                                 hideLabel
                                 value={settings.globals.badgeInfo}
-                                onChange={(e) => handleChange('badgeInfo', e.target.value as any)}
+                                onChange={(e) => handleChange('badgeInfo', e.target.value as AppOptions['globals']['badgeInfo'])}
                                 {...badgeInfoDebug}
                             >
                                 <SelectItem value="none" text="None" />

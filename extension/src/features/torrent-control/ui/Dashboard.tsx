@@ -85,7 +85,7 @@ export const Dashboard = () => {
                 setStatus('Error: ' + response.error);
                 setStatusKind('danger');
             }
-        } catch (e) {
+        } catch {
             setStatus('Connection Failed');
             setStatusKind('danger');
         }
@@ -107,8 +107,8 @@ export const Dashboard = () => {
             setStatus('Torrent Added');
             setStatusKind('success');
             fetchTorrents();
-        } catch (e: any) {
-            setStatus('Add Failed: ' + e.message);
+        } catch (e: unknown) {
+            setStatus('Add Failed: ' + (e instanceof Error ? e.message : String(e)));
             setStatusKind('danger');
         }
     };
@@ -178,8 +178,8 @@ export const Dashboard = () => {
             setStatus('Torrent Added');
             setStatusKind('success');
             fetchTorrents();
-        } catch (e: any) {
-            setStatus('Add Failed: ' + e.message);
+        } catch (e: unknown) {
+            setStatus('Add Failed: ' + (e instanceof Error ? e.message : String(e)));
             setStatusKind('danger');
             throw e;
         }

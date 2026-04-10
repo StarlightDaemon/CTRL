@@ -80,6 +80,77 @@ export class FetchHttpClient {
         return this.request<T>(endpoint, { ...config, method: 'GET' });
     }
 
+    /**
+     * Like get(), but also returns the raw response headers alongside the parsed body.
+     * Use this when you need to inspect response headers (e.g. Set-Cookie) that are
+     * discarded by the standard get() method.
+     */
+    async getRaw<T>(endpoint: string, config: RequestConfig = {}): Promise<{ body: T; headers: Headers }> {
+        const { retry, timeoutMs, ...fetchConfig } = config;
+        const url = new URL(endpoint, this.baseUrl);
+
+        if (fetchConfig.params) {
+            Object.entries(fetchConfig.params).forEach(([key, value]) => {
+                url.searchParams.append(key, value);
+            });
+        }
+
+        const doFetch = async (): Promise<{ body: T; headers: Headers }> => {
+            const headers = new Headers(fetchConfig.headers);
+            const controller = new AbortController();
+            const timeout = timeoutMs ?? 10000;
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+            try {
+                const origin = new URL(this.baseUrl).origin;
+                if (!headers.has('Origin')) headers.set('Origin', origin);
+                if (!headers.has('Referer')) headers.set('Referer', origin + '/');
+            } catch (e) {
+                console.warn('[FetchHttpClient] Failed to derive Origin/Referer from baseUrl:', this.baseUrl);
+            }
+
+            try {
+                const response = await fetch(url.toString(), {
+                    credentials: 'omit',
+                    ...fetchConfig,
+                    method: 'GET',
+                    headers,
+                    signal: controller.signal,
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new HttpError(response.status, response.statusText, response);
+                }
+
+                const text = await response.text();
+                let body: T;
+                if (!text) {
+                    body = {} as T;
+                } else {
+                    try { body = JSON.parse(text) as T; }
+                    catch { body = text as unknown as T; }
+                }
+
+                return { body, headers: response.headers };
+            } catch (error) {
+                clearTimeout(timeoutId);
+                if (error instanceof Error && error.name === 'AbortError') {
+                    throw new Error(`Connection timed out after ${timeout}ms`);
+                }
+                throw error;
+            }
+        };
+
+        if (retry) {
+            const retryOptions = typeof retry === 'boolean' ? {} : retry;
+            return withRetry(doFetch, retryOptions);
+        }
+
+        return doFetch();
+    }
+
     async post<T>(endpoint: string, body?: BodyInit | Record<string, unknown> | null, config: RequestConfig = {}): Promise<T> {
         const isFormData = body instanceof FormData;
         const isSearchParams = body instanceof URLSearchParams;

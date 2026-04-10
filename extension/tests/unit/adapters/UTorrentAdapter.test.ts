@@ -6,6 +6,8 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { UTorrentAdapter } from '@/shared/api/clients/utorrent/UTorrentAdapter';
+import { UTorrentSettingsService } from '@/shared/api/clients/utorrent/UTorrentSettingsService';
+import { UTorrentRssService } from '@/shared/api/clients/utorrent/UTorrentRssService';
 import { ServerConfig } from '@/shared/lib/types';
 import { STATUS_FLAG } from '@/shared/api/clients/utorrent/UTorrentSchema';
 
@@ -50,6 +52,25 @@ const createMockFetch = (responses: Array<{ ok: boolean; status: number; body: a
             status: response.status,
             statusText: response.ok ? 'OK' : 'Error',
             headers: new Headers({}),
+            text: () => Promise.resolve(typeof response.body === 'string' ? response.body : JSON.stringify(response.body)),
+            json: () => Promise.resolve(response.body),
+        } as Response;
+    });
+};
+
+/** Extended mock that supports per-response custom response headers. */
+const createMockFetchWithHeaders = (
+    responses: Array<{ ok: boolean; status: number; body: any; responseHeaders?: Record<string, string> }>
+) => {
+    let callIndex = 0;
+    return vi.spyOn(global, 'fetch').mockImplementation(async () => {
+        const response = responses[callIndex] || responses[responses.length - 1];
+        callIndex++;
+        return {
+            ok: response.ok,
+            status: response.status,
+            statusText: response.ok ? 'OK' : 'Error',
+            headers: new Headers(response.responseHeaders ?? {}),
             text: () => Promise.resolve(typeof response.body === 'string' ? response.body : JSON.stringify(response.body)),
             json: () => Promise.resolve(response.body),
         } as Response;
@@ -134,6 +155,80 @@ describe('UTorrentAdapter', () => {
             ]);
 
             await expect(adapter.login()).rejects.toThrow('Failed to retrieve uTorrent token');
+        });
+
+        it('should capture GUID from Set-Cookie response header', async () => {
+            const mockResponse = createTorrentListResponse([{
+                hash: 'ABC123', status: 201, name: 'Test', size: 100,
+                percent: 500, downSpeed: 100, upSpeed: 0, eta: 100, label: ''
+            }]);
+
+            const fetchSpy = createMockFetchWithHeaders([
+                {
+                    ok: true, status: 200, body: tokenHtml,
+                    responseHeaders: { 'Set-Cookie': 'GUID=TESTGUID123; path=/' }
+                },
+                { ok: true, status: 200, body: mockResponse }
+            ]);
+
+            await adapter.getTorrents(); // triggers auto-login + API call
+
+            // The second fetch (index 1) is the actual API call; it must carry the GUID cookie.
+            const apiCallInit = fetchSpy.mock.calls[1][1] as RequestInit;
+            const cookieHeader = apiCallInit?.headers instanceof Headers
+                ? apiCallInit.headers.get('Cookie')
+                : (apiCallInit?.headers as Record<string, string>)?.['Cookie'];
+            expect(cookieHeader).toBe('GUID=TESTGUID123');
+        });
+
+        it('should not send Cookie header when Set-Cookie is absent', async () => {
+            const mockResponse = createTorrentListResponse([{
+                hash: 'ABC123', status: 201, name: 'Test', size: 100,
+                percent: 500, downSpeed: 100, upSpeed: 0, eta: 100, label: ''
+            }]);
+
+            const fetchSpy = createMockFetchWithHeaders([
+                // No responseHeaders — simulates server that doesn't set GUID
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: mockResponse }
+            ]);
+
+            await expect(adapter.getTorrents()).resolves.toBeDefined();
+
+            const apiCallInit = fetchSpy.mock.calls[1][1] as RequestInit;
+            const cookieHeader = apiCallInit?.headers instanceof Headers
+                ? apiCallInit.headers.get('Cookie')
+                : (apiCallInit?.headers as Record<string, string>)?.['Cookie'];
+            expect(cookieHeader).toBeNull();
+        });
+
+        it('should re-capture GUID on session recovery re-login', async () => {
+            const mockResponse = createTorrentListResponse([{
+                hash: 'ABC123', status: 201, name: 'Test', size: 100,
+                percent: 500, downSpeed: 100, upSpeed: 0, eta: 100, label: ''
+            }]);
+
+            const fetchSpy = createMockFetchWithHeaders([
+                // First login → GUID_A
+                { ok: true, status: 200, body: tokenHtml, responseHeaders: { 'Set-Cookie': 'GUID=GUID_A; path=/' } },
+                // API call fails → triggers re-login
+                { ok: false, status: 400, body: 'Invalid token' },
+                // Re-login → GUID_B
+                { ok: true, status: 200, body: tokenHtml, responseHeaders: { 'Set-Cookie': 'GUID=GUID_B; path=/' } },
+                // Retry succeeds
+                { ok: true, status: 200, body: mockResponse }
+            ]);
+
+            await adapter.getTorrents();
+
+            expect(fetchSpy).toHaveBeenCalledTimes(4);
+
+            // The retry (4th call, index 3) must use the refreshed GUID_B.
+            const retryInit = fetchSpy.mock.calls[3][1] as RequestInit;
+            const cookieHeader = retryInit?.headers instanceof Headers
+                ? retryInit.headers.get('Cookie')
+                : (retryInit?.headers as Record<string, string>)?.['Cookie'];
+            expect(cookieHeader).toBe('GUID=GUID_B');
         });
     });
 
@@ -253,7 +348,7 @@ describe('UTorrentAdapter', () => {
     });
 
     describe('session recovery', () => {
-        it('should retry on 400/401 errors', async () => {
+        it('should retry on 400/401 HTTP status errors regardless of message text', async () => {
             const mockResponse = createTorrentListResponse([{
                 hash: 'ABC123', status: 201, name: 'Test', size: 100,
                 percent: 500, downSpeed: 100, upSpeed: 0, eta: 100, label: ''
@@ -261,15 +356,27 @@ describe('UTorrentAdapter', () => {
 
             const fetchSpy = createMockFetch([
                 { ok: true, status: 200, body: tokenHtml },        // Initial login
-                { ok: false, status: 400, body: 'Invalid token' }, // First call fails
+                { ok: false, status: 400, body: 'Bad request' },   // First call fails (400)
                 { ok: true, status: 200, body: tokenHtml },        // Re-login
-                { ok: true, status: 200, body: mockResponse }      // Retry succeeds
+                { ok: false, status: 401, body: 'Unauthorized text' }, // Retry fails with 401
+                { ok: true, status: 200, body: tokenHtml },        // Re-login again
+                { ok: true, status: 200, body: mockResponse }      // Recovery succeeds
             ]);
 
             const torrents = await adapter.getTorrents();
 
-            expect(fetchSpy).toHaveBeenCalledTimes(4);
+            expect(fetchSpy).toHaveBeenCalledTimes(6);
             expect(torrents).toHaveLength(1);
+        });
+
+        it('should not retry on non-auth HTTP errors (e.g. 500) even if body mentions token', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: false, status: 500, body: 'Internal server error processing token' }
+            ]);
+
+            await expect(adapter.getTorrents()).rejects.toThrow('HTTP Error: 500 Error');
+            expect(fetchSpy).toHaveBeenCalledTimes(2); // Only login + exact failed call
         });
     });
 
@@ -534,6 +641,132 @@ describe('UTorrentAdapter', () => {
             expect(fetchSpy).toHaveBeenCalledTimes(2);
             const url = fetchSpy.mock.calls[1][0] as string;
             expect(url).toContain('s=trackers');
+        });
+    });
+});
+
+describe('UTorrentSettingsService', () => {
+    let service: UTorrentSettingsService;
+
+    beforeEach(() => {
+        service = new UTorrentSettingsService(mockConfig);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    describe('GUID cookie handling', () => {
+        it('should capture GUID from Set-Cookie response header', async () => {
+            const fetchSpy = createMockFetchWithHeaders([
+                {
+                    ok: true, status: 200, body: tokenHtml,
+                    responseHeaders: { 'Set-Cookie': 'GUID=SETTINGSGUID123; path=/' }
+                },
+                { ok: true, status: 200, body: { build: 12345, settings: [] } }
+            ]);
+
+            await service.getSettings();
+
+            const apiCallInit = fetchSpy.mock.calls[1][1] as RequestInit;
+            const cookieHeader = apiCallInit?.headers instanceof Headers
+                ? apiCallInit.headers.get('Cookie')
+                : (apiCallInit?.headers as Record<string, string>)?.['Cookie'];
+            expect(cookieHeader).toBe('GUID=SETTINGSGUID123');
+        });
+
+        it('should not send Cookie header when Set-Cookie is absent', async () => {
+            const fetchSpy = createMockFetchWithHeaders([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: { build: 12345, settings: [] } }
+            ]);
+
+            await service.getSettings();
+
+            const apiCallInit = fetchSpy.mock.calls[1][1] as RequestInit;
+            const cookieHeader = apiCallInit?.headers instanceof Headers
+                ? apiCallInit.headers.get('Cookie')
+                : (apiCallInit?.headers as Record<string, string>)?.['Cookie'];
+            expect(cookieHeader).toBeNull();
+        });
+    });
+});
+
+describe('UTorrentRssService', () => {
+    let service: UTorrentRssService;
+
+    beforeEach(() => {
+        service = new UTorrentRssService(mockConfig);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    describe('GUID cookie handling', () => {
+        it('should capture GUID from Set-Cookie response header', async () => {
+            const fetchSpy = createMockFetchWithHeaders([
+                {
+                    ok: true, status: 200, body: tokenHtml,
+                    responseHeaders: { 'Set-Cookie': 'GUID=RSSGUID123; path=/' }
+                },
+                { ok: true, status: 200, body: { build: 12345, rssfeeds: [] } }
+            ]);
+
+            await service.getFeeds();
+
+            const apiCallInit = fetchSpy.mock.calls[1][1] as RequestInit;
+            const cookieHeader = apiCallInit?.headers instanceof Headers
+                ? apiCallInit.headers.get('Cookie')
+                : (apiCallInit?.headers as Record<string, string>)?.['Cookie'];
+            expect(cookieHeader).toBe('GUID=RSSGUID123');
+        });
+
+        it('should not send Cookie header when Set-Cookie is absent', async () => {
+            const fetchSpy = createMockFetchWithHeaders([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: { build: 12345, rssfeeds: [] } }
+            ]);
+
+            await service.getFeeds();
+
+            const apiCallInit = fetchSpy.mock.calls[1][1] as RequestInit;
+            const cookieHeader = apiCallInit?.headers instanceof Headers
+                ? apiCallInit.headers.get('Cookie')
+                : (apiCallInit?.headers as Record<string, string>)?.['Cookie'];
+            expect(cookieHeader).toBeNull();
+        });
+    });
+
+    describe('feed management', () => {
+        it('should use canonical add-feed action and parameter for new feeds', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: { build: 12345 } }
+            ]);
+
+            await service.addFeed('http://example.com/rss');
+
+            expect(fetchSpy).toHaveBeenCalledTimes(2);
+            const url = fetchSpy.mock.calls[1][0] as string;
+            expect(url).toContain('action=add-feed');
+            expect(url).toContain('url=http%3A%2F%2Fexample.com%2Frss');
+            // Ensure we aren't sending legacy rss-update parameters
+            expect(url).not.toContain('feed-id=-1');
+            expect(url).not.toContain('s=http');
+        });
+
+        it('should include alias when provided', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: tokenHtml },
+                { ok: true, status: 200, body: { build: 12345 } }
+            ]);
+
+            await service.addFeed('http://example.com/rss', 'My Feed Alias');
+
+            expect(fetchSpy).toHaveBeenCalledTimes(2);
+            const url = fetchSpy.mock.calls[1][0] as string;
+            expect(url).toContain('alias=My+Feed+Alias');
         });
     });
 });

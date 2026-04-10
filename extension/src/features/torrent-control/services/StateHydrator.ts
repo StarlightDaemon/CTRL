@@ -1,12 +1,11 @@
-import { storage } from 'wxt/storage';
 import { browser } from 'wxt/browser';
 
 const STORAGE_KEY = 'session:torrent_state';
 
 // Simple debounce utility to avoid external dependency issues
-function debounce<T extends (...args: any[]) => void>(func: T, wait: number): (...args: Parameters<T>) => void {
+function debounce<Args extends unknown[]>(func: (...args: Args) => void, wait: number): (...args: Args) => void {
     let timeout: ReturnType<typeof setTimeout> | null = null;
-    return function (...args: Parameters<T>) {
+    return function (...args: Args) {
         if (timeout) clearTimeout(timeout);
         timeout = setTimeout(() => {
             func(...args);
@@ -37,7 +36,7 @@ export const StateHydrator = {
      * Persists the state to session storage.
      * Debounced to prevent thrashing storage on every single update.
      */
-    persist: debounce((state: any) => {
+    persist: debounce((state: unknown) => {
         try {
             browser.storage.session.set({ [STORAGE_KEY]: state });
             console.debug('[StateHydrator] State persisted to session storage.');
