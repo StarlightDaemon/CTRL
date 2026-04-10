@@ -15,7 +15,7 @@ export const LifecycleAdapter = {
     initKeepAlive: async () => {
         // Feature detection for Firefox-like extensive environments vs Chrome-like restricted environments.
         // 'browser.runtime.getBrowserInfo' is typically Firefox-only and not in the standard WebExtension types.
-        const isFirefox = typeof (browser.runtime as any).getBrowserInfo !== 'undefined';
+        const isFirefox = typeof (browser.runtime as unknown as Record<string, unknown>).getBrowserInfo !== 'undefined';
         // Check Chrome version for WebSocket support in SW (Chrome 116+)
         const chromeVersion = LifecycleAdapter.getChromeVersion();
         const hasWebSocketInSW = chromeVersion >= 116;
@@ -39,7 +39,7 @@ export const LifecycleAdapter = {
     /**
      * Start WebSocket keepalive with a specific URL (for clients that support WS)
      */
-    startWebSocketKeepalive(wsUrl: string, onMessage?: (data: any) => void): void {
+    startWebSocketKeepalive(wsUrl: string, onMessage?: (data: unknown) => void): void {
         if (!WebSocketKeepalive.isSupported()) {
             console.warn('[LifecycleAdapter] WebSocket not supported');
             return;
@@ -88,7 +88,7 @@ export const LifecycleAdapter = {
      * @param html String HTML to parse
      * @returns Parsed document or data (Note: returning actual DOM nodes passes poorly over messages)
      */
-    parseDOM: async (html: string): Promise<any> => {
+    parseDOM: async (html: string): Promise<unknown> => {
         // Check for native DOM support (Firefox Event Pages)
         if (typeof DOMParser !== 'undefined') {
             const parser = new DOMParser();

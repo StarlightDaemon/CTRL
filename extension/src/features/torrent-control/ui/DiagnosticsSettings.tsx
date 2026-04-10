@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AppOptions, ServerConfig } from '@/shared/lib/types';
 import { EXTERNAL_RESOURCES } from '@/shared/lib/resources';
-import { ExternalLink, Info, Activity, Globe } from 'lucide-react';
+import { ExternalLink, Info, Activity } from 'lucide-react';
 import { SettingsPageLayout } from '@/shared/ui/settings/SettingsPageLayout';
 import { SettingsCard } from '@/shared/ui/settings/SettingsCard';
 import {
@@ -9,8 +9,6 @@ import {
     InlineNotification,
     Button,
     Tile,
-    Tag,
-    IconButton,
     Link,
     Toggletip,
     ToggletipButton,
@@ -102,7 +100,7 @@ const ServerDiagnosticRow: React.FC<{ server: ServerConfig; index: number }> = (
     });
 
     const isPrivateIP = (hostname: string) => {
-        let host = hostname.replace(/https?:\/\//, '').split(':')[0];
+        const host = hostname.replace(/https?:\/\//, '').split(':')[0];
         if (host === 'localhost') return true;
         const parts = host.split('.').map(Number);
         if (parts.length !== 4) return false;
@@ -127,7 +125,7 @@ const ServerDiagnosticRow: React.FC<{ server: ServerConfig; index: number }> = (
                     error: true
                 });
             }
-        } catch (e) {
+        } catch {
             setPingStatus({ loading: false, result: 'Error', error: true });
         }
     };
@@ -141,7 +139,7 @@ const ServerDiagnosticRow: React.FC<{ server: ServerConfig; index: number }> = (
             } else {
                 setAuthStatus({ loading: false, result: 'Auth Failed', error: true });
             }
-        } catch (e) {
+        } catch {
             setAuthStatus({ loading: false, result: 'Error', error: true });
         }
     };

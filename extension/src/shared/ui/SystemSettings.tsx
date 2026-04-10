@@ -7,12 +7,10 @@ import {
     Toggle,
     Stack,
     Grid,
-    Column,
-    Tile,
-    Loading
+    Column
 } from '@carbon/react';
 
-import { Download, Wrench, Activity } from 'lucide-react';
+import { Wrench, Activity } from 'lucide-react';
 import { AppOptions } from '@/shared/lib/types';
 
 interface Props {
@@ -22,8 +20,16 @@ interface Props {
     importBackup: (file: File) => Promise<{ success: boolean; message: string }>;
 }
 
+interface SelfTestResult {
+    status: string;
+    version: string;
+    uptime: number;
+    platform: string;
+    userAgent: string;
+}
+
 export const SystemSettings: React.FC<Props> = ({ settings, updateSettings, exportSystemBackup, importBackup }) => {
-    const [selfTest, setSelfTest] = useState<{ loading: boolean; result: any | null; error: boolean }>({ loading: false, result: null, error: false });
+    const [selfTest, setSelfTest] = useState<{ loading: boolean; result: SelfTestResult | null; error: boolean }>({ loading: false, result: null, error: false });
     const [debugEnabled, setDebugEnabled] = useState(false);
 
     const isTCEnabled = settings.globals.showDiagnostics;
@@ -54,8 +60,8 @@ export const SystemSettings: React.FC<Props> = ({ settings, updateSettings, expo
         try {
             const res = await chrome.runtime.sendMessage({ type: 'SELF_TEST' });
             setSelfTest({ loading: false, result: res, error: false });
-        } catch (e) {
-            setSelfTest({ loading: false, result: 'Failed', error: true });
+        } catch {
+            setSelfTest({ loading: false, result: null, error: true });
         }
     };
 

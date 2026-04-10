@@ -18,7 +18,6 @@ type XmlRpcResult = unknown;
 @injectable()
 export class RuTorrentAdapter implements ITorrentClient {
     private client: FetchHttpClient;
-    private rpcEndpoint: string;
 
     constructor(private config: ServerConfig) {
         // rTorrent usually lives at /RPC2 or /rutorrent/plugins/httprpc/action.php
@@ -36,7 +35,6 @@ export class RuTorrentAdapter implements ITorrentClient {
         }
 
         this.client = new FetchHttpClient(url);
-        this.rpcEndpoint = '';
     }
 
     /**
@@ -202,7 +200,7 @@ export class RuTorrentAdapter implements ITorrentClient {
             "main", // View
             "d.hash=", "d.name=", "d.size_bytes=", "d.bytes_done=",
             "d.up.rate=", "d.down.rate=", "d.complete=", "d.state=",
-            "d.is_active=", "d.custom1=", "d.ratio=", "d.hashing=",
+            "d.is_active=", "d.custom1=", "d.hashing=",
             "d.base_path=", "d.up.total=", "d.message="
         ];
 
@@ -226,7 +224,7 @@ export class RuTorrentAdapter implements ITorrentClient {
         }
     }
 
-    async addTorrentFile(file: Blob, options?: AddTorrentOptions): Promise<void> {
+    async addTorrentFile(file: Blob, _options?: AddTorrentOptions): Promise<void> {
         const base64 = await blobToBase64(file);
         // load.raw_start
         await this.call('load.raw_start', ["", { type: 'base64', value: base64 }]);
@@ -240,7 +238,7 @@ export class RuTorrentAdapter implements ITorrentClient {
         await this.call('d.start', [id]);
     }
 
-    async removeTorrent(id: string, deleteData?: boolean): Promise<void> {
+    async removeTorrent(id: string, _deleteData?: boolean): Promise<void> {
         await this.call('d.erase', [id]);
         // deleteData logic requires XMLRPC 'd.delete_tied' or shell commands, 
         // which might be unsafe or disabled. Simple erase is standard.
@@ -267,13 +265,13 @@ export class RuTorrentAdapter implements ITorrentClient {
     }
 
     async getTags(): Promise<string[]> { return []; }
-    async addTags(hash: string, tags: string[]): Promise<void> { }
-    async removeTags(hash: string, tags: string[]): Promise<void> { }
+    async addTags(_hash: string, _tags: string[]): Promise<void> { }
+    async removeTags(_hash: string, _tags: string[]): Promise<void> { }
 
 
     private mapTorrent(t: RTorrentTuple): Torrent {
-        // [hash, name, size, bytes_done, up_rate, down_rate, complete, state, is_active, label, ratio, hashing, path, up_total, message]
-        const [hash, name, size, done, up, down, complete, state, active, label, ratio, hashing, path, up_total, msg] = t;
+        // [hash, name, size, bytes_done, up_rate, down_rate, complete, state, is_active, label, hashing, path, up_total, message]
+        const [hash, name, size, done, up, down, complete, state, active, label, hashing, path] = t;
 
         return {
             id: hash,

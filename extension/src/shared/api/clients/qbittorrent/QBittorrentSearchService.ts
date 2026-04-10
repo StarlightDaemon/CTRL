@@ -13,8 +13,7 @@ import {
     QBittorrentSearchResultSchema,
     QBittorrentSearchStatusSchema,
     QBittorrentSearchPluginSchema,
-    QBittorrentSearchResult,
-    QBittorrentSearchStatusSchema as SearchStatusType
+    QBittorrentSearchResult
 } from './QBittorrentSchema';
 import { z } from 'zod';
 
@@ -52,7 +51,7 @@ export class QBittorrentSearchService {
      * Get status of a search job
      */
     async getStatus(id: number): Promise<z.infer<typeof QBittorrentSearchStatusSchema>> {
-        const data = await this.client.post<any[]>('search/status', new URLSearchParams({ id: String(id) }));
+        const data = await this.client.post<unknown[]>('search/status', new URLSearchParams({ id: String(id) }));
         return QBittorrentSearchStatusSchema.parse(data[0]); // Returns array
     }
 
@@ -67,7 +66,7 @@ export class QBittorrentSearchService {
         limit: number = 20,
         offset: number = 0
     ): Promise<QBittorrentSearchResult[]> {
-        const data = await this.client.post<{ results: any[] }>('search/results', new URLSearchParams({
+        const data = await this.client.post<{ results: unknown[] }>('search/results', new URLSearchParams({
             id: String(id),
             limit: String(limit),
             offset: String(offset)

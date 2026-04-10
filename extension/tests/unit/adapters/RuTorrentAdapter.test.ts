@@ -37,6 +37,9 @@ const createArrayResponse = (items: string[]) => {
 };
 
 // Helper to create torrent list response (multicall)
+// Tuple order: hash, name, size, done, upRate, downRate, complete, state,
+//              active, label, hashing, path, upTotal, message  (14 columns)
+// ratio is NOT requested from daemon; computed client-side.
 const createTorrentListResponse = (torrents: Array<{
     hash: string;
     name: string;
@@ -48,6 +51,7 @@ const createTorrentListResponse = (torrents: Array<{
     state: number;
     active: number;
     label: string;
+    upTotal?: number;
 }>) => {
     const items = torrents.map(t => {
         // Match the order from d.multicall2 in adapter
@@ -63,9 +67,8 @@ const createTorrentListResponse = (torrents: Array<{
             <value><i4>${t.active}</i4></value>
             <value><string>${t.label}</string></value>
             <value><i4>0</i4></value>
-            <value><i4>0</i4></value>
             <value><string>/downloads</string></value>
-            <value><i8>0</i8></value>
+            <value><i8>${t.upTotal ?? 0}</i8></value>
             <value><string></string></value>
         </data></array></value>`;
     }).join('');
@@ -166,6 +169,36 @@ describe('RuTorrentAdapter', () => {
 
             const torrents = await adapter.getTorrents();
             expect(torrents).toEqual([]);
+        });
+
+        it('should compute ratio client-side without a native d.ratio column', async () => {
+            // upTotal = 750_000_000, size = 1_000_000_000 => ratio = 0.75
+            const response = createTorrentListResponse([{
+                hash: 'ratio_test',
+                name: 'Ratio Test',
+                size: 1_000_000_000,
+                done: 1_000_000_000,
+                upRate: 0,
+                downRate: 0,
+                complete: 1,
+                state: 1,
+                active: 1,
+                label: '',
+                upTotal: 750_000_000,
+            }]);
+            createMockFetch([{ ok: true, status: 200, body: response }]);
+
+            const torrents = await adapter.getTorrents();
+
+            // Mapping must succeed (no Zod parse error from missing ratio slot)
+            expect(torrents).toHaveLength(1);
+            expect(torrents[0].id).toBe('ratio_test');
+            expect(torrents[0].status).toBe('seeding');
+            // progress is computed from done/size, not from a ratio column
+            expect(torrents[0].progress).toBe(100);
+            // Verify client-side ratio computation: 750,000,000 / 1,000,000,000 = 0.75
+            expect(torrents[0].ratio).toBe(0.75);
+            expect(torrents[0].uploadedTotal).toBe(750_000_000);
         });
     });
 

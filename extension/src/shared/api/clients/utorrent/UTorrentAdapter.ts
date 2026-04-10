@@ -2,6 +2,7 @@ import { injectable } from 'tsyringe';
 import { ITorrentClient, AddTorrentOptions } from '@/entities/client/model/ITorrentClient';
 import { Torrent, TorrentStatus } from '@/entities/torrent/model/Torrent';
 import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
+import { HttpError } from '@/shared/api/network/HttpError';
 import { extractUTorrentToken } from './UTorrentParsingUtils';
 import { UTorrentResponseSchema, TORRENT_INDEX, STATUS_FLAG } from './UTorrentSchema';
 import { ServerConfig } from '@/shared/lib/types';
@@ -23,6 +24,7 @@ const MAX_RETRY_ATTEMPTS = 2;
 export class UTorrentAdapter implements ITorrentClient {
     private httpClient: FetchHttpClient;
     private token: string | null = null;
+    private guid: string | null = null;
     private cacheId: string | null = null;
     private torrentCache: Map<string, (string | number)[]> = new Map();
     private baseUrl: string;
@@ -34,15 +36,22 @@ export class UTorrentAdapter implements ITorrentClient {
 
     async login(): Promise<void> {
         const headers = this.getAuthHeaders();
-        const response = await this.httpClient.get<string>('gui/token.html', {
+        const { body, headers: respHeaders } = await this.httpClient.getRaw<string>('gui/token.html', {
             headers,
         });
 
-        this.token = extractUTorrentToken(response);
+        this.token = extractUTorrentToken(body);
+
+        // Capture the GUID session cookie required by the uTorrent three-legged handshake.
+        // Without it, all subsequent requests receive HTTP 400 Invalid Request.
+        const setCookie = respHeaders.get('set-cookie') ?? '';
+        const guidMatch = setCookie.match(/GUID=([^;]+)/i);
+        this.guid = guidMatch ? guidMatch[1] : null;
     }
 
     async logout(): Promise<void> {
         this.token = null;
+        this.guid = null;
         this.cacheId = null;
         this.torrentCache.clear();
     }
@@ -368,6 +377,7 @@ export class UTorrentAdapter implements ITorrentClient {
 
         const url = `${this.baseUrl}?${params.toString()}`;
         const headers = this.getAuthHeaders();
+        if (this.guid) headers['Cookie'] = `GUID=${this.guid}`;
 
         try {
             if (method === 'POST') {
@@ -394,11 +404,13 @@ export class UTorrentAdapter implements ITorrentClient {
      * Check if error indicates authentication failure
      */
     private isAuthError(error: unknown): boolean {
+        if (error instanceof HttpError) {
+            return error.status === 400 || error.status === 401;
+        }
+
         if (error instanceof Error) {
             const message = error.message.toLowerCase();
-            return message.includes('400') ||
-                message.includes('401') ||
-                message.includes('unauthorized') ||
+            return message.includes('unauthorized') ||
                 message.includes('token');
         }
         return false;

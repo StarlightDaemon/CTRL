@@ -25,6 +25,8 @@ interface DashboardProps {
     lockVault: () => Promise<void>;
 }
 
+const defaultCustomOptions = { addToClient: true, pauseResume: true, openWebUI: true };
+
 export const Dashboard: React.FC<DashboardProps> = ({
     settings,
     updateSettings,
@@ -39,7 +41,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     // Start polling for torrents
     useTorrentPoller();
 
-    const defaultCustomOptions = { addToClient: true, pauseResume: true, openWebUI: true };
     const [previewContextMenu, setPreviewContextMenu] = useState(1);
     const [previewCustomOptions, setPreviewCustomOptions] = useState(defaultCustomOptions);
     const [previewServers, setPreviewServers] = useState<AppSettings['servers']>([]);
@@ -87,7 +88,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             globals: {
                 ...settings.globals,
                 enableNotifications: previewNotification,
-                notificationLevel: previewNotificationLevel as any
+                notificationLevel: previewNotificationLevel as 'standard' | 'verbose' | 'error'
             }
         });
     };
@@ -142,7 +143,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <div className="flex-1 overflow-y-auto scrollbar-thin">
                             <FunctionSettings
                                 settings={settings}
-                                updateSettings={(s) => updateSettings(s as any)}
+                                updateSettings={(s) => updateSettings(s as AppSettings)}
                                 previewContextMenu={previewContextMenu}
                                 setPreviewContextMenu={setPreviewContextMenu}
                                 previewCustomOptions={previewCustomOptions}
@@ -165,7 +166,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <div className="flex-1 overflow-y-auto scrollbar-thin">
                             <ServerConfigPanel
                                 settings={settings}
-                                updateSettings={(s) => updateSettings(s as any)}
+                                updateSettings={(s) => updateSettings(s as AppSettings)}
                                 exportServerConfig={exportServerConfig}
                                 importBackup={importBackup}
                             />
@@ -178,7 +179,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <div className="flex-1 overflow-y-auto scrollbar-thin">
                             <AppearanceSettings
                                 settings={settings}
-                                updateSettings={(s) => updateSettings(s as any)}
+                                updateSettings={(s) => updateSettings(s as AppSettings)}
                             />
                         </div>
                     </div>
@@ -201,7 +202,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <div className="flex-1 overflow-y-auto scrollbar-thin">
                             <SystemSettings
                                 settings={settings}
-                                updateSettings={(s) => updateSettings(s as any)}
+                                updateSettings={(s) => updateSettings(s as AppSettings)}
                                 exportSystemBackup={exportSystemBackup}
                                 importBackup={importBackup}
                             />
@@ -214,7 +215,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <div className="flex-1 overflow-y-auto scrollbar-thin">
                             <AboutTab
                                 settings={settings}
-                                updateSettings={(s) => updateSettings(s as any)}
+                                updateSettings={(s) => updateSettings(s as AppSettings)}
                             />
                         </div>
                     </div>

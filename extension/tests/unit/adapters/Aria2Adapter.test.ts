@@ -564,6 +564,113 @@ describe('Aria2Adapter', () => {
             expect(fetchSpy).toHaveBeenCalledOnce();
         });
     });
+
+    describe('magnet-session followedBy/following array parsing', () => {
+        it('should parse torrent payload with followedBy array without schema error', async () => {
+            // Real Aria2 magnet-session payload: followedBy is an array of GID strings,
+            // not a scalar string. Prior to the fix this caused a Zod parse failure.
+            const magnetSessionTorrent = {
+                gid: 'magnet001',
+                status: 'active',
+                totalLength: '0',           // unknown until metadata is fetched
+                completedLength: '0',
+                uploadLength: '0',
+                downloadSpeed: '0',
+                uploadSpeed: '0',
+                dir: '/downloads',
+                followedBy: ['torrent002'], // array wire format
+            };
+
+            createMockFetch([
+                { ok: true, status: 200, body: multicallResponse([[magnetSessionTorrent], [], []]) }
+            ]);
+
+            // Should not throw a ZodError
+            const torrents = await adapter.getTorrents();
+            expect(torrents).toHaveLength(1);
+            expect(torrents[0].id).toBe('magnet001');
+        });
+
+        it('should parse torrent payload with both followedBy and following arrays', async () => {
+            const torrentWithBothFields = {
+                gid: 'torrent002',
+                status: 'active',
+                totalLength: '1000000000',
+                completedLength: '200000000',
+                uploadLength: '0',
+                downloadSpeed: '5000000',
+                uploadSpeed: '0',
+                dir: '/downloads',
+                followedBy: ['torrent003'],   // array
+                following: ['magnet001'],      // array
+            };
+
+            createMockFetch([
+                { ok: true, status: 200, body: multicallResponse([[torrentWithBothFields], [], []]) }
+            ]);
+
+            const torrents = await adapter.getTorrents();
+            expect(torrents).toHaveLength(1);
+            expect(torrents[0].id).toBe('torrent002');
+            expect(torrents[0].status).toBe('downloading');
+        });
+    });
+
+    describe('structured RPC error propagation', () => {
+        it('should surface auth failure as UNAUTHORIZED Aria2Error, not NETWORK_ERROR', async () => {
+            // Aria2 returns code 1 with "Unauthorized" message when the RPC secret is wrong.
+            // The fix ensures JsonRpcClient throws JsonRpcError (with .code property) so
+            // Aria2Adapter.wrapError() reaches the structured-RPC branch and calls
+            // Aria2Error.fromRpcError(), yielding UNAUTHORIZED (non-retryable).
+            createMockFetch([
+                { ok: true, status: 200, body: rpcError(1, 'Unauthorized') }
+            ]);
+
+            let caughtError: Aria2Error | undefined;
+            try {
+                await adapter.login();
+            } catch (e) {
+                if (e instanceof Aria2Error) {
+                    caughtError = e;
+                }
+            }
+
+            expect(caughtError).toBeDefined();
+            expect(caughtError?.code).toBe('UNAUTHORIZED');
+            // Must NOT be misclassified as a generic network error
+            expect(caughtError?.code).not.toBe('NETWORK_ERROR');
+            // Auth errors must not be retried
+            expect(caughtError?.retryable).toBe(false);
+        });
+
+        it('should surface structured RPC Aria2Error from getTorrents, not a plain NETWORK_ERROR', async () => {
+            // When system.multicall returns a JSON-RPC error (code 1), the structured
+            // error path via JsonRpcError → wrapError() → fromRpcError() is exercised.
+            // Context is 'system.multicall', which maps to GID_NOT_FOUND for code 1 —
+            // but crucially: it is NOT a plain NETWORK_ERROR and is NOT retryable.
+            // This proves the structured propagation path (not the network-error fallback) is active.
+            createMockFetch([
+                { ok: true, status: 200, body: rpcError(1, 'Unauthorized') }
+            ]);
+
+            let caughtError: unknown;
+            try {
+                await adapter.getTorrents();
+            } catch (e) {
+                caughtError = e;
+            }
+
+            // Must be a typed Aria2Error (structured RPC path), not a generic Error
+            expect(caughtError).toBeInstanceOf(Aria2Error);
+            const aria2Err = caughtError as Aria2Error;
+            // Must carry the original numeric RPC code
+            expect(aria2Err.rpcCode).toBe(1);
+            // Must NOT be classified as a network error
+            expect(aria2Err.code).not.toBe('NETWORK_ERROR');
+            // Must NOT be retryable (RPC errors are not retried)
+            expect(aria2Err.retryable).toBe(false);
+        });
+    });
 });
 
 describe('Aria2Error', () => {
