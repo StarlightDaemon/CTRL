@@ -271,6 +271,61 @@ describe('BiglyBTAdapter', () => {
             expect(body.arguments.tagsRemove).toEqual(['movies']);
         });
 
+        it('should resolve real hash to numeric ID before calling torrent-set', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: biglyBTSessionResponse },
+                // Mock for resolveNumericId
+                {
+                    ok: true,
+                    status: 200,
+                    body: {
+                        result: 'success',
+                        arguments: {
+                            torrents: [{ id: 42 }]
+                        }
+                    }
+                },
+                { ok: true, status: 200, body: { result: 'success' } }
+            ]);
+
+            await adapter.login();
+            await adapter.addTags('abcdef1234567890abcdef1234567890', ['movies', 'action']);
+
+            // Last call is torrent-set 
+            const lastCall = fetchSpy.mock.calls[2];
+            const body = JSON.parse(lastCall[1]?.body as string);
+
+            expect(body.method).toBe('torrent-set');
+            expect(body.arguments.ids).toEqual([42]);
+            expect(body.arguments.tagsAdd).toEqual(['movies', 'action']);
+
+            // The call before that should be torrent-get for resolution
+            const getCall = fetchSpy.mock.calls[1];
+            const getBody = JSON.parse(getCall[1]?.body as string);
+            expect(getBody.method).toBe('torrent-get');
+            expect(getBody.arguments.ids).toEqual(['abcdef1234567890abcdef1234567890']);
+        });
+
+        it('should throw an error if hash resolution fails', async () => {
+            createMockFetch([
+                { ok: true, status: 200, body: biglyBTSessionResponse },
+                // Mock for resolveNumericId failing to find torrent
+                {
+                    ok: true,
+                    status: 200,
+                    body: {
+                        result: 'success',
+                        arguments: {
+                            torrents: []
+                        }
+                    }
+                }
+            ]);
+
+            await adapter.login();
+            await expect(adapter.addTags('deadbeef', ['movies'])).rejects.toThrow('Failed to resolve numeric ID for torrent: deadbeef');
+        });
+
         it('should fallback to labels for standard Transmission', async () => {
             // For non-BiglyBT, addTags needs to fetch current labels first
             const fetchSpy = createMockFetch([

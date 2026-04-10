@@ -640,16 +640,45 @@ export class BiglyBTAdapter implements ITorrentClient {
     }
 
     /**
+     * Resolve a hash-like string or numeric string to the numeric standard ID expected by torrent-set.
+     */
+    private async resolveNumericId(hashOrId: string): Promise<number> {
+        if (/^\d+$/.test(hashOrId)) {
+            return parseInt(hashOrId, 10);
+        }
+
+        const response = await this.call('torrent-get', {
+            ids: [hashOrId],
+            fields: ['id'],
+            mapPerFile: true
+        });
+
+        // We only requested 'id', so extracting directly bypasses full schema validation
+        // which might fail if required fields are missing from the narrow response.
+        const res = response as any;
+        const torrents = res?.arguments?.torrents;
+        const torrent = Array.isArray(torrents) ? torrents[0] : undefined;
+
+        if (!torrent || typeof torrent.id !== 'number') {
+            throw new Error(`Failed to resolve numeric ID for torrent: ${hashOrId}`);
+        }
+
+        return torrent.id;
+    }
+
+    /**
      * Add tags to a torrent (atomic operation for BiglyBT)
      * 
      * BiglyBT supports atomic tagsAdd which avoids race conditions.
      * For standard Transmission, falls back to fetch/merge/set pattern.
      */
     async addTags(hash: string, tags: string[]): Promise<void> {
+        const id = await this.resolveNumericId(hash);
+
         if (this.capabilities.isBiglyBT) {
             // Atomic operation - no fetch/merge/set cycle needed
             await this.call('torrent-set', {
-                ids: [parseInt(hash)],
+                ids: [id],
                 tagsAdd: tags
             });
         } else {
@@ -657,7 +686,7 @@ export class BiglyBTAdapter implements ITorrentClient {
             const current = await this.getTorrentTags(hash);
             const merged = Array.from(new Set([...current, ...tags]));
             await this.call('torrent-set', {
-                ids: [parseInt(hash)],
+                ids: [id],
                 labels: merged
             });
         }
@@ -667,10 +696,12 @@ export class BiglyBTAdapter implements ITorrentClient {
      * Remove tags from a torrent (atomic operation for BiglyBT)
      */
     async removeTags(hash: string, tags: string[]): Promise<void> {
+        const id = await this.resolveNumericId(hash);
+
         if (this.capabilities.isBiglyBT) {
             // Atomic operation
             await this.call('torrent-set', {
-                ids: [parseInt(hash)],
+                ids: [id],
                 tagsRemove: tags
             });
         } else {
@@ -678,7 +709,7 @@ export class BiglyBTAdapter implements ITorrentClient {
             const current = await this.getTorrentTags(hash);
             const filtered = current.filter(t => !tags.includes(t));
             await this.call('torrent-set', {
-                ids: [parseInt(hash)],
+                ids: [id],
                 labels: filtered
             });
         }
@@ -688,8 +719,9 @@ export class BiglyBTAdapter implements ITorrentClient {
      * Get tags for a specific torrent
      */
     private async getTorrentTags(hash: string): Promise<string[]> {
+        const id = await this.resolveNumericId(hash);
         const response = await this.call('torrent-get', {
-            ids: [parseInt(hash)],
+            ids: [id],
             fields: ['labels'],
             mapPerFile: true
         });

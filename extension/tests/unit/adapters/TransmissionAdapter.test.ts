@@ -188,24 +188,26 @@ describe('TransmissionAdapter - Phase 1', () => {
     });
 
     describe('Task 1.3: Enhanced Error Handling', () => {
-        it('should throw Error on 401', async () => {
+        it('should throw AuthenticationError on 401', async () => {
             createMockFetch([{
                 ok: false,
                 status: 401,
                 body: 'Unauthorized'
             }]);
 
-            await expect(adapter.login()).rejects.toThrow('Authentication failed. Verify username/password and Transmission RPC authentication settings.');
+            await expect(adapter.login()).rejects.toThrow(AuthenticationError);
+            await expect(adapter.login()).rejects.toThrow('Authentication failed.');
         });
 
-        it('should throw Error on 403', async () => {
+        it('should throw WhitelistError on 403', async () => {
             createMockFetch([{
                 ok: false,
                 status: 403,
                 body: 'Forbidden'
             }]);
 
-            await expect(adapter.login()).rejects.toThrow('Authentication failed. Verify username/password and Transmission RPC authentication settings.');
+            await expect(adapter.login()).rejects.toThrow(WhitelistError);
+            await expect(adapter.login()).rejects.toThrow('rpc-host-whitelist');
         });
 
         it('should throw DaemonError on 5xx', async () => {

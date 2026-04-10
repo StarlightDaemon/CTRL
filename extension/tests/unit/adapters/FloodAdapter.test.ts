@@ -255,6 +255,76 @@ describe('FloodAdapter', () => {
         });
     });
 
+    describe('addTorrentFile', () => {
+        it('should send FormData with the torrent file appended under the "files" field', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: { success: true } }
+            ]);
+
+            const torrentBlob = new Blob(['fake torrent data'], { type: 'application/x-bittorrent' });
+            await adapter.addTorrentFile(torrentBlob);
+
+            expect(fetchSpy).toHaveBeenCalledOnce();
+            const [, init] = fetchSpy.mock.calls[0];
+            // Body must be FormData, not a plain JSON string
+            expect(init?.body).toBeInstanceOf(FormData);
+            const fd = init!.body as FormData;
+            // The torrent file must be attached under the "files" key.
+            // FormData.get() for a Blob entry returns a File (Blob subclass),
+            // so check instanceof Blob and verify the correct data was attached.
+            const attachedFile = fd.get('files');
+            expect(attachedFile).toBeInstanceOf(Blob);
+            expect((attachedFile as Blob).size).toBe(torrentBlob.size);
+        });
+
+        it('should include optional fields in FormData when options are provided', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: { success: true } }
+            ]);
+
+            const torrentBlob = new Blob(['fake torrent data'], { type: 'application/x-bittorrent' });
+            await adapter.addTorrentFile(torrentBlob, {
+                paused: true,
+                path: '/downloads/movies',
+                label: 'movies',
+                sequentialDownload: true,
+            });
+
+            const [, init] = fetchSpy.mock.calls[0];
+            expect(init?.body).toBeInstanceOf(FormData);
+            const fd = init!.body as FormData;
+            // File is a Blob subclass; verify the correct data was attached
+            const attachedFile = fd.get('files');
+            expect(attachedFile).toBeInstanceOf(Blob);
+            expect((attachedFile as Blob).size).toBe(torrentBlob.size);
+            expect(fd.get('destination')).toBe('/downloads/movies');
+            // paused:true → start should be 'false'
+            expect(fd.get('start')).toBe('false');
+            expect(fd.get('tags')).toBe(JSON.stringify(['movies']));
+            expect(fd.get('isSequential')).toBe('true');
+        });
+
+        it('should omit destination and isSequential when not provided, and default start to true', async () => {
+            const fetchSpy = createMockFetch([
+                { ok: true, status: 200, body: { success: true } }
+            ]);
+
+            const torrentBlob = new Blob(['fake torrent data'], { type: 'application/x-bittorrent' });
+            await adapter.addTorrentFile(torrentBlob);
+
+            const [, init] = fetchSpy.mock.calls[0];
+            const fd = init!.body as FormData;
+            // No options → start defaults to 'true' (paused is undefined/falsy)
+            expect(fd.get('start')).toBe('true');
+            // No label → tags should be serialised empty array
+            expect(fd.get('tags')).toBe(JSON.stringify([]));
+            // No path → destination field should not be present
+            expect(fd.get('destination')).toBeNull();
+            // No sequentialDownload → isSequential field should not be present
+            expect(fd.get('isSequential')).toBeNull();
+        });
+    });
+
     describe('pauseTorrent', () => {
         it('should pause torrent by hash', async () => {
             const fetchSpy = createMockFetch([

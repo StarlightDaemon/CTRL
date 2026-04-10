@@ -17,11 +17,13 @@ import { z } from 'zod';
  * 7: state (number/i4 -> bool)
  * 8: is_active (number/i4 -> bool)
  * 9: label (string)
- * 10: ratio (number/i4)
- * 11: hashing (number/i4 -> bool)
- * 12: save_path (string)
- * 13: up_total (string/i8)
- * 14: message (string)
+ * 10: hashing (number/i4 -> bool)
+ * 11: save_path (string)
+ * 12: up_total (string/i8)
+ * 13: message (string)
+ *
+ * Note: ratio is NOT requested from the daemon. It is computed client-side
+ * from bytes_done / size_bytes with a zero-size guard.
  */
 export const RTorrentMulticallTuple = z.tuple([
     z.string(), // hash
@@ -34,7 +36,6 @@ export const RTorrentMulticallTuple = z.tuple([
     z.number(), // state
     z.number(), // is_active
     z.string(), // label
-    z.number(), // ratio
     z.number(), // hashing
     z.string(), // save_path
     z.union([z.string(), z.number()]), // up_total
