@@ -27,7 +27,6 @@ import { buildCapabilities, getClientDescription } from './TransmissionCapabilit
 import {
     AuthenticationError,
     WhitelistError,
-    SessionExpiredError,
     DaemonError,
     RpcError,
     DuplicateTorrentError,
@@ -261,8 +260,12 @@ export class TransmissionAdapter implements ITorrentClient {
                     return this.call<T>(method, args, retryCount + 1);
                 }
 
-                if (status === 401 || status === 403) {
-                    throw new Error('Authentication failed. Verify username/password and Transmission RPC authentication settings.');
+                if (status === 401) {
+                    throw new AuthenticationError();
+                }
+
+                if (status === 403) {
+                    throw new WhitelistError(this.config.hostname);
                 }
 
                 if (status === 404 || (status >= 300 && status < 400)) {
@@ -830,7 +833,6 @@ export class TransmissionAdapter implements ITorrentClient {
         // Determine enhanced status based on multiple factors
         let status: EnhancedTorrentStatus = 'unknown';
         let label = 'Unknown';
-        let isActive = false;
         let errorSeverity: 'warning' | 'error' | null = null;
         let progress: number | undefined;
 

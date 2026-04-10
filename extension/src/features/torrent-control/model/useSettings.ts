@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { storage } from 'wxt/storage';
 import { AppOptions, ServerConfig } from '@/shared/lib/types';
 import { DEFAULT_OPTIONS } from '@/shared/lib/constants';
@@ -20,7 +20,7 @@ const ServerConfigSchema = z.object({
     username: z.string().optional(),
     password: z.string().optional(),
     directories: z.array(z.string()).default([]),
-    clientOptions: z.record(z.any()).default({}),
+    clientOptions: z.record(z.unknown()).default({}),
     httpAuth: z.object({
         username: z.string(),
         password: z.string().optional()
@@ -72,14 +72,14 @@ const BackupSchema = z.object({
     type: z.enum(['system_backup', 'server_config']).optional(),
     subtype: z.enum(['full', 'settings']).optional(),
     timestamp: z.string().optional(),
-    data: z.record(z.any())
+    data: z.record(z.unknown())
 });
 
 export function useSettings() {
     const [settings, setSettings] = useState<AppOptions | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         const val = await settingsStorage.getValue();
         // Deep merge logic
         const merged = {
@@ -120,7 +120,7 @@ export function useSettings() {
 
         setSettings(merged);
         setLoading(false);
-    };
+    }, []);
 
     useEffect(() => {
         load();
@@ -133,7 +133,7 @@ export function useSettings() {
         // Ideally we'd watch a Vault state but WXT storage watch covers session key if we used storage.
 
         return () => unwatch();
-    }, []);
+    }, [load]);
 
     const updateSettings = async (newSettings: AppOptions) => {
         // 1. Handle Vault (Servers) - write first so if it fails, state remains unchanged
@@ -159,6 +159,7 @@ export function useSettings() {
 
         // 2. Handle Storage (Everything else)
         // Ensure we never write servers to local storage here
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { servers, ...safeSettings } = newSettings;
         await settingsStorage.setValue(safeSettings as AppOptions);
     };
@@ -260,10 +261,19 @@ export function useSettings() {
             reader.onload = async (e) => {
                 try {
                     const content = e.target?.result as string;
-                    let raw: any;
+                    let raw: {
+                        version?: unknown;
+                        type?: unknown;
+                        subtype?: unknown;
+                        globals?: unknown;
+                        appearance?: unknown;
+                        layout?: unknown;
+                        servers?: unknown;
+                        data?: unknown;
+                    };
                     try {
                         raw = JSON.parse(content);
-                    } catch (err) {
+                    } catch {
                         throw new Error('Invalid JSON: The file could not be parsed.');
                     }
 
@@ -277,7 +287,7 @@ export function useSettings() {
 
                     // 2. Full Validation (Zero state changes until this completes)
                     let serversToImport: ServerConfig[] | undefined;
-                    let settingsToImport: any; // Collector for validated settings, using any to handle partial shapes before merge
+                    let settingsToImport: Partial<AppOptions> | undefined; // Collector for validated settings
                     let successMessage = '';
 
                     const isVaultInitialized = await VaultService.isInitialized();
@@ -292,9 +302,9 @@ export function useSettings() {
                         const validatedLayout = raw.layout ? LayoutSchema.parse(raw.layout) : undefined;
 
                         settingsToImport = {
-                            globals: validatedGlobals,
-                            appearance: validatedAppearance,
-                            layout: validatedLayout
+                            globals: validatedGlobals as AppOptions['globals'],
+                            appearance: validatedAppearance as AppOptions['appearance'],
+                            layout: validatedLayout as AppOptions['layout']
                         };
                         serversToImport = validatedServers;
                         successMessage = 'Legacy full backup imported.';
@@ -311,13 +321,14 @@ export function useSettings() {
                         } else if (meta.type === 'system_backup') {
                             const validatedData = AppOptionsSchema.parse(meta.data);
                             if (meta.subtype === 'full') {
-                                settingsToImport = validatedData;
+                                settingsToImport = validatedData as Partial<AppOptions>;
                                 serversToImport = validatedData.servers;
                                 successMessage = 'System backup imported.';
                             } else {
                                 // Settings only - explicitly ensure servers are NOT in the import payload
+                                // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                 const { servers: _, ...rest } = validatedData;
-                                settingsToImport = rest;
+                                settingsToImport = rest as Partial<AppOptions>;
                                 successMessage = 'System settings imported.';
                             }
                         } else {
@@ -353,6 +364,7 @@ export function useSettings() {
                         // B. Update settings in local storage
                         if (settingsToImport) {
                             const current = await settingsStorage.getValue() || DEFAULT_OPTIONS;
+                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                             const { servers: _, ...safeIncoming } = settingsToImport;
 
                             const merged = {
