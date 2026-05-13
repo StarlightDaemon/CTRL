@@ -43,7 +43,7 @@ extension/src/
 └── shared/       # Shared utilities (FSD)
 ```
 
-See [PROJECT_SOP.md](../research/docs/PROJECT_SOP.md) for complete structure.
+See [PROJECT_SOP.md](./PROJECT_SOP.md) for complete structure.
 
 ## Development Workflow
 
