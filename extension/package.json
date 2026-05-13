@@ -67,7 +67,7 @@
     "fs-extra": "11.3.2",
     "globals": "17.0.0",
     "jsdom": "27.3.0",
-    "postcss": "8.4.38",
+    "postcss": "8.5.14",
     "sharp": "0.34.5",
     "tailwindcss": "3.4.3",
     "tsx": "4.21.0",
@@ -75,6 +75,6 @@
     "typescript-eslint": "8.52.0",
     "vite-plugin-react-inspector": "0.3.3",
     "vitest": "4.0.15",
-    "wxt": "0.19.29"
+    "wxt": "0.20.26"
   }
 }
