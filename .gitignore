@@ -80,3 +80,14 @@ old_brain/
 # Generated UI exported data and build logs
 ctrl-servers-full-*.json
 extension/build_log.txt
+
+# RAIDEN audit outputs — operational findings, not framework content
+audit-reports/
+.raiden/state/AUDIT_LOG.md
+.raiden/state/last-audit.md
+
+# Local operational artifacts — not part of CTRL source
+.worktrees/
+agent-ledger/
+reports/
+extension/audit_extension*.txt
