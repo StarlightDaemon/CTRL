@@ -1,16 +1,15 @@
 # Legacy Review
 
-These repo-local agent surfaces predate the current RAIDEN Instance layout.
-Review them before assuming RAIDEN migration is complete.
+## Status: Closed (2026-05-15)
 
-## Detected Legacy Artifacts
+Pre-RAIDEN legacy area `agent-ledger/` has been reviewed and migrated.
 
-- `agent-ledger`
-  Status: `active-legacy`
-  Reason: Legacy continuity/state area should be reviewed for mapping into .raiden/state/
+## What Was Reviewed
 
-## Review Actions
+- `agent-ledger/2026-04-10__next_main_rebuild_post_pr_closeout.md` — mapped to WORK_LOG.md
+- `agent-ledger/2026-04-13__vpn_tooling_removal_audit_closeout.md` — mapped to WORK_LOG.md and OPEN_LOOPS.md OL-002
+- `agent-ledger/2026-04-13__local_artifact_policy.md` — discarded; RAIDEN's `.raiden/state/` and `.raiden/local/` structure makes it redundant
 
-- Map legacy prompts into `.raiden/local/prompts/` where appropriate.
-- Map legacy continuity/state into `.raiden/state/` where appropriate.
-- Retire or archive stale legacy paths only after operator review.
+## Outcome
+
+`agent-ledger/` removed. No further legacy review required.
