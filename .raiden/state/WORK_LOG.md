@@ -1,5 +1,9 @@
 # Work Log
 
+## 2026-06-13 — Hook exec-bit fix, .gitignore e2e noise, Edict v0.6.1 state sync
+
+| 2026-06-13 | Hook exec-bit fixed (chmod +x .git/hooks/commit-msg); .gitignore updated to exclude e2e artifacts (*.db, *.db-journal, *.pma, persistent-data/); CURRENT_STATE synced to Edict v0.6.1 |
+
 ## 2026-05-15 — RAIDEN Instance install and agent-ledger migration
 
 - RAIDEN Edict v0.2.0 install cherry-picked onto `next/main-rebuild` (originally landed on `main` 2026-05-15).
