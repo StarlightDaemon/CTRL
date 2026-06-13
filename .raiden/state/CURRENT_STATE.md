@@ -1,6 +1,7 @@
 # Current State
 
-**Last updated:** 2026-05-15
+**Last updated:** 2026-06-13
+**RAIDEN Edict version:** v0.6.1
 **Active branch:** `next/main-rebuild` (ahead of origin by several commits + RAIDEN install)
 **CI:** passing on `main` (GitHub CI: lint, test, build, e2e)
 
@@ -28,6 +29,7 @@ CTRL is a browser extension for managing BitTorrent clients. Built with WXT, Rea
 
 - Phase 2 — Error Handling: graceful degradation, retry logic, truthful connection reporting (priority: P1).
 - Operator WIP on `next/main-rebuild`: uncommitted changes to extension adapter and config files.
+- 2026-06-13 — hook exec-bit fixed, .gitignore e2e noise cleared, state synced to Edict v0.6.1
 
 ## Non-Blocking Open Items
 
