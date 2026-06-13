@@ -91,3 +91,9 @@ audit-reports/
 agent-ledger/
 reports/
 extension/audit_extension*.txt
+
+# E2E test artifacts and browser profile noise
+persistent-data/
+*.pma
+*.db
+*.db-journal
