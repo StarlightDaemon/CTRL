@@ -1,5 +1,10 @@
 # Work Log
 
+## 2026-06-14 — History rewrite, OL-002 close, upstream tracking repair
+
+| 2026-06-13 | npm audit fix: vite 7.3.3→7.3.5, esbuild 0.27.2→0.27.7, shell-quote 1.8.3→1.8.4; 380 tests pass; 17 alerts remain in wxt transitive chain; committed 257e7e6 (rewritten to 39c869c post-history-rewrite) |
+| 2026-06-14 | History rewrite via git filter-repo: .persistent-data/ scrubbed from all commits; all 4 remote branches force-pushed (main, next/main-rebuild, remove/vpn-tooling, archive/main-2026-03-08); Google API key revoked; secret scanning alert closed as Revoked; OL-002 closed; upstream tracking refs set |
+
 ## 2026-06-13 — Hook exec-bit fix, .gitignore e2e noise, Edict v0.6.1 state sync
 
 | 2026-06-13 | Hook exec-bit fixed (chmod +x .git/hooks/commit-msg); .gitignore updated to exclude e2e artifacts (*.db, *.db-journal, *.pma, persistent-data/); CURRENT_STATE synced to Edict v0.6.1 |
