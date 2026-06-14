@@ -10,13 +10,14 @@
 ## OL-002
 
 - Title: Stale VPN reference docs
-- Status: Open
+- Status: Closed (2026-06-14)
 - Severity: Low
 - Why it matters: two docs still reference the deleted `VPNIndicator.tsx` — not a runtime issue but misleading to future readers.
 - Files:
   - `docs/reference/carbon_ui_scope_manifest.md`
   - `docs/reference/tron_to_ctrl_carbon_runbook.md`
 - Success condition: both files updated to remove the stale `VPNIndicator.tsx` references.
+- Closed by: `VPNIndicator.tsx` removed from Zone B list in both files; commit a663320.
 
 ## OL-003
 
