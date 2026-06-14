@@ -3,6 +3,7 @@
 ## 2026-06-13 — Hook exec-bit fix, .gitignore e2e noise, Edict v0.6.1 state sync
 
 | 2026-06-13 | Hook exec-bit fixed (chmod +x .git/hooks/commit-msg); .gitignore updated to exclude e2e artifacts (*.db, *.db-journal, *.pma, persistent-data/); CURRENT_STATE synced to Edict v0.6.1 |
+| 2026-06-13 | .persistent-data/ untracked and ignored (git rm -r --cached + .gitignore fix); .raiden/ exec bits normalized (100755→100644 across all managed files) |
 
 ## 2026-05-15 — RAIDEN Instance install and agent-ledger migration
 
