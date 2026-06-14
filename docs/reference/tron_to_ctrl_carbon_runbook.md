@@ -20,7 +20,6 @@ All other zones are **FROZEN**.
 
 ### ⚠️ Zone B: Presentation Only (Class/Style Edits Only)
 - `extension/src/shared/ui/SystemSettings.tsx`
-- `extension/src/shared/ui/VPNIndicator.tsx`
 - `extension/src/shared/ui/VersionOverlay.tsx`
 - `extension/src/entrypoints/style.css`
 
