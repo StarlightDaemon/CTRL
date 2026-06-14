@@ -1,7 +1,7 @@
 # Current State
 
-**Last updated:** 2026-06-13
-**RAIDEN Edict version:** v0.6.1
+**Last updated:** 2026-06-14
+**RAIDEN Edict version:** v1.0.0
 **Active branch:** `next/main-rebuild` (ahead of origin by several commits + RAIDEN install)
 **CI:** passing on `main` (GitHub CI: lint, test, build, e2e)
 
@@ -24,19 +24,19 @@ CTRL is a browser extension for managing BitTorrent clients. Built with WXT, Rea
 - Deterministic CI in place: tracked `extension/package-lock.json`, `npm ci`, npm caching.
 - Chrome and Firefox build paths both verified.
 - RAIDEN Instance installed at Edict v0.4.0 (2026-05-15, cherry-picked onto `next/main-rebuild`).
+- VPN removal complete (2026-06-14): source files and tests removed in cherry-pick b09590a; orphaned docs removed in 9c721b9; `git ls-files | grep -i vpn` returns empty.
+- FORK_REVIEW_PROTOCOL.md committed (3321d9c).
+- Edict v0.6.1 → v1.0.0 upgrade (2026-06-14, commit 671bee0): all six writ files updated, OWNERSHIP_BOUNDARY.md retired, MODEL_TIERS.md added, root AGENTS.md refreshed (stale WSL path removed), baseline.json reconciled. Plan validator: no anomalies.
 
 ## In Progress
 
 - Phase 2 — Error Handling: graceful degradation, retry logic, truthful connection reporting (priority: P1).
-- Operator WIP on `next/main-rebuild`: uncommitted changes to extension adapter and config files.
-- 2026-06-13 — hook exec-bit fixed, .gitignore e2e noise cleared, state synced to Edict v0.6.1
+- 2026-06-13 — hook exec-bit fixed, .gitignore e2e noise cleared, state synced to Edict v0.6.1.
+- 2026-06-14 — VPN removal finalized, Edict v1.0.0 installed, working tree clean.
 
 ## Non-Blocking Open Items
 
-- Two stale reference doc paths still mention the deleted `VPNIndicator.tsx`:
-  - `docs/reference/carbon_ui_scope_manifest.md`
-  - `docs/reference/tron_to_ctrl_carbon_runbook.md`
-- Local reproducibility gap in the archived `remove-vpn` worktree (npm lint failed; CI passed; low priority).
+- Secret scanning alert: Google API key revoked and path gitignored (2026-06-14). Blobs remain in packed history; no urgency.
 
 ## Not Yet Done
 
@@ -46,5 +46,5 @@ CTRL is a browser extension for managing BitTorrent clients. Built with WXT, Rea
 
 ## Known Constraints
 
-- `next/main-rebuild` has uncommitted working-tree changes to several extension files; these are operator WIP and must not be discarded.
 - RAIDEN install lives on `next/main-rebuild` only (cherry-picked); `main` also has the install from the original migration pass.
+- `next/main-rebuild` is ahead of origin by several commits; not yet pushed.
