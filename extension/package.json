@@ -3,6 +3,7 @@
   "displayName": "CTRL - Torrent Control",
   "description": "Torrent Control Reloaded - Modern Torrent Management",
   "private": true,
+  "license": "MIT",
   "version": "0.2.0-beta.1",
   "type": "module",
   "scripts": {
@@ -67,7 +68,7 @@
     "fs-extra": "11.3.2",
     "globals": "17.0.0",
     "jsdom": "27.3.0",
-    "postcss": "8.4.38",
+    "postcss": "^8.5.14",
     "sharp": "0.34.5",
     "tailwindcss": "3.4.3",
     "tsx": "4.21.0",

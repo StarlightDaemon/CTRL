@@ -62,7 +62,6 @@ All other paths are FROZEN (Read Only) to prevent compliance regressions, permis
 *You may Edit styling or classNames ONLY. Do NOT change logic, imports, or functional behavior.*
 
 - `extension/src/shared/ui/SystemSettings.tsx`
-- `extension/src/shared/ui/VPNIndicator.tsx`
 - `extension/src/shared/ui/VersionOverlay.tsx`
 - `extension/src/entrypoints/style.css`
 
