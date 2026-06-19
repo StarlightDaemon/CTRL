@@ -31,6 +31,9 @@ import {
     RpcError,
     DuplicateTorrentError,
 } from './TransmissionErrors';
+import { TransmissionAdapterError } from './TransmissionAdapterError';
+import { AdapterConnectionResult } from '@/shared/api/clients/shared/AdapterConnectionResult';
+import { withAdapterRetry, RetryConfig, DEFAULT_RETRY_CONFIG } from '@/shared/lib/retry/withAdapterRetry';
 
 /**
  * Phase 1 Enhanced Transmission RPC Adapter
@@ -56,9 +59,18 @@ export class TransmissionAdapter implements ITorrentClient {
     /** Retry limit for 409 handshake to prevent infinite loops */
     private readonly MAX_SESSION_RETRIES = 2;
 
+    /** Exponential-backoff retry configuration for the connection test */
+    private retryConfig: RetryConfig;
+
     constructor(private config: ServerConfig) {
         this.httpClient = new FetchHttpClient(config.hostname);
         this.rpcUrl = '/transmission/rpc';
+
+        // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
+        this.retryConfig = {
+            ...DEFAULT_RETRY_CONFIG,
+            ...(this.config.clientOptions?.retryConfig as Partial<RetryConfig> || {}),
+        };
     }
 
     /**
@@ -176,10 +188,13 @@ export class TransmissionAdapter implements ITorrentClient {
         });
     }
 
-    async testConnection(): Promise<boolean> {
-        // Let exceptions bubble up for background.ts to catch and return to UI
-        await this.call('session-get');
-        return true;
+    async testConnection(): Promise<AdapterConnectionResult> {
+        try {
+            await withAdapterRetry(() => this.call('session-get'), this.retryConfig);
+            return { connected: true };
+        } catch (error) {
+            return { connected: false, error: TransmissionAdapterError.from(error) };
+        }
     }
 
     async ping(): Promise<number> {

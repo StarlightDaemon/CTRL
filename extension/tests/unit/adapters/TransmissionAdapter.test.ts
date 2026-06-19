@@ -16,7 +16,11 @@ import {
     SessionExpiredError,
     DuplicateTorrentError,
     DaemonError,
+    RpcError,
 } from '@/shared/api/clients/transmission/TransmissionErrors';
+import { TransmissionAdapterError, TransmissionErrorType } from '@/shared/api/clients/transmission/TransmissionAdapterError';
+import { withAdapterRetry, RetryConfig, RetryExhaustedError } from '@/shared/lib/retry/withAdapterRetry';
+import { AdapterError } from '@/shared/api/clients/shared/AdapterError';
 
 // Mock server config
 const mockConfig: ServerConfig = {
@@ -27,7 +31,7 @@ const mockConfig: ServerConfig = {
     username: 'admin',
     password: 'adminadmin',
     directories: [],
-    clientOptions: {},
+    clientOptions: { retryConfig: { maxAttempts: 3, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 } },
 };
 
 // Helper to create mock responses
@@ -464,16 +468,19 @@ describe('TransmissionAdapter - Phase 1', () => {
             ]);
 
             const result = await adapter.testConnection();
-            expect(result).toBe(true);
+            expect(result).toEqual({ connected: true });
         });
 
-        it('should throw on connection failure', async () => {
+        it('should report { connected: false } on connection failure', async () => {
             vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Failed to fetch'));
 
-            await expect(adapter.testConnection()).rejects.toThrow('Cannot reach server. Verify host/port and that remote access allows this device.');
+            const result = await adapter.testConnection();
+            expect(result.connected).toBe(false);
+            expect(result.error?.type).toBe('CONNECTION_REFUSED');
+            expect(result.error?.message).toContain('Cannot reach server');
         });
 
-        it('should enrich timeout error with resolved RPC URL', async () => {
+        it('should classify a timeout and preserve the enriched RPC URL', async () => {
             // Simulate the AbortError that FetchHttpClient converts to 'Connection timed out after 10s'
             vi.spyOn(global, 'fetch').mockImplementation(() => {
                 const err = new Error('Connection timed out after 10s');
@@ -481,10 +488,10 @@ describe('TransmissionAdapter - Phase 1', () => {
                 return Promise.reject(err);
             });
 
-            // The adapter should re-throw with the resolved URL enriched
-            await expect(adapter.testConnection()).rejects.toThrow(
-                'Connection timed out after 14000ms (target: http://localhost:9091/transmission/rpc)'
-            );
+            const result = await adapter.testConnection();
+            expect(result.connected).toBe(false);
+            expect(result.error?.type).toBe('TIMEOUT');
+            expect(result.error?.message).toContain('target: http://localhost:9091/transmission/rpc');
         });
 
         it('should measure ping latency', async () => {
@@ -1342,4 +1349,160 @@ describe('TransmissionAdapter - Phase 3', () => {
             expect(torrent).toBeNull();
         });
     });
+});
+
+
+
+describe('TransmissionAdapter — AdapterError & withAdapterRetry (parity)', () => {
+const FAST_RETRY: RetryConfig = { maxAttempts: 3, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+const NO_RETRY: RetryConfig = { maxAttempts: 1, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+
+const ALL_TYPES: TransmissionErrorType[] = [
+    'CONNECTION_REFUSED', 'TIMEOUT', 'AUTH_FAILED', 'WHITELIST_BLOCKED', 'HANDSHAKE_FAILED',
+    'ENDPOINT_NOT_FOUND', 'DAEMON_ERROR', 'RPC_ERROR', 'DUPLICATE_TORRENT', 'NETWORK_ERROR', 'UNKNOWN',
+];
+
+function makeConfig(retryConfig: RetryConfig = NO_RETRY): ServerConfig {
+    return {
+        name: 'Test',
+        application: 'transmission',
+        type: 'transmission',
+        hostname: 'http://localhost:9091',
+        directories: [],
+        clientOptions: { retryConfig },
+    };
+}
+
+describe('TransmissionAdapterError', () => {
+    it('constructs with type and message and is an AdapterError', () => {
+        const e = new TransmissionAdapterError('AUTH_FAILED', 'nope');
+        expect(e).toBeInstanceOf(AdapterError);
+        expect(e).toBeInstanceOf(TransmissionAdapterError);
+        expect(e).toBeInstanceOf(Error);
+        expect(e.type).toBe('AUTH_FAILED');
+        expect(e.message).toBe('nope');
+        expect(e.name).toBe('TransmissionAdapterError');
+    });
+
+    it('returns a non-empty user message for every error type', () => {
+        for (const t of ALL_TYPES) {
+            const msg = new TransmissionAdapterError(t, 'x').toUserMessage();
+            expect(typeof msg).toBe('string');
+            expect(msg.length).toBeGreaterThan(0);
+        }
+    });
+
+    it('returns a distinct user message per error type', () => {
+        const msgs = ALL_TYPES.map(t => new TransmissionAdapterError(t, 'x').toUserMessage());
+        expect(new Set(msgs).size).toBe(ALL_TYPES.length);
+    });
+
+    describe('from() classification', () => {
+        it('maps AuthenticationError → AUTH_FAILED', () => {
+            expect(TransmissionAdapterError.from(new AuthenticationError()).type).toBe('AUTH_FAILED');
+        });
+        it('maps WhitelistError → WHITELIST_BLOCKED', () => {
+            expect(TransmissionAdapterError.from(new WhitelistError('host')).type).toBe('WHITELIST_BLOCKED');
+        });
+        it('maps DaemonError → DAEMON_ERROR', () => {
+            expect(TransmissionAdapterError.from(new DaemonError(503)).type).toBe('DAEMON_ERROR');
+        });
+        it('maps RpcError → RPC_ERROR', () => {
+            expect(TransmissionAdapterError.from(new RpcError('bad', 'session-get')).type).toBe('RPC_ERROR');
+        });
+        it('maps DuplicateTorrentError → DUPLICATE_TORRENT', () => {
+            expect(TransmissionAdapterError.from(new DuplicateTorrentError('x')).type).toBe('DUPLICATE_TORRENT');
+        });
+        it('maps a handshake message → HANDSHAKE_FAILED', () => {
+            expect(TransmissionAdapterError.from(new Error('Transmission handshake failed')).type).toBe('HANDSHAKE_FAILED');
+        });
+        it('maps a fetch TypeError → CONNECTION_REFUSED', () => {
+            expect(TransmissionAdapterError.from(new TypeError('Failed to fetch')).type).toBe('CONNECTION_REFUSED');
+        });
+        it('maps a timeout message → TIMEOUT', () => {
+            expect(TransmissionAdapterError.from(new Error('Connection timed out after 14000ms')).type).toBe('TIMEOUT');
+        });
+        it('passes an existing TransmissionAdapterError through unchanged', () => {
+            const original = new TransmissionAdapterError('RPC_ERROR', 'x');
+            expect(TransmissionAdapterError.from(original)).toBe(original);
+        });
+        it('unwraps RetryExhaustedError to classify the underlying cause', () => {
+            const wrapped = new RetryExhaustedError(new AuthenticationError());
+            expect(TransmissionAdapterError.from(wrapped).type).toBe('AUTH_FAILED');
+        });
+        it('falls back to UNKNOWN for unrecognized values', () => {
+            expect(TransmissionAdapterError.from('weird').type).toBe('UNKNOWN');
+        });
+    });
+});
+
+describe('withAdapterRetry (Transmission)', () => {
+    it('retries on transient failure and then resolves', async () => {
+        let calls = 0;
+        const fn = vi.fn(async () => {
+            calls++;
+            if (calls < 2) throw new Error('transient');
+            return 'ok';
+        });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).resolves.toBe('ok');
+        expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('rethrows an AdapterError unchanged on exhaustion', async () => {
+        const err = new TransmissionAdapterError('DAEMON_ERROR', 'down');
+        const fn = vi.fn(async () => { throw err; });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBe(err);
+        expect(fn).toHaveBeenCalledTimes(FAST_RETRY.maxAttempts);
+    });
+
+    it('wraps a non-AdapterError as RetryExhaustedError on exhaustion', async () => {
+        const fn = vi.fn(async () => { throw new TypeError('Failed to fetch'); });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBeInstanceOf(RetryExhaustedError);
+    });
+});
+
+describe('TransmissionAdapter.testConnection', () => {
+    it('returns { connected: true } on success', async () => {
+        const adapter = new TransmissionAdapter(makeConfig());
+        const spy = vi.spyOn(adapter as unknown as { call: () => Promise<unknown> }, 'call')
+            .mockResolvedValue({ result: 'success', arguments: {} });
+        await expect(adapter.testConnection()).resolves.toEqual({ connected: true });
+        expect(spy).toHaveBeenCalledWith('session-get');
+    });
+
+    it('returns { connected: false, error } with a classified AdapterError on auth failure', async () => {
+        const adapter = new TransmissionAdapter(makeConfig());
+        vi.spyOn(adapter as unknown as { call: () => Promise<unknown> }, 'call')
+            .mockRejectedValue(new AuthenticationError());
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error).toBeInstanceOf(TransmissionAdapterError);
+        expect(result.error?.type).toBe('AUTH_FAILED');
+        expect(typeof result.error?.toUserMessage()).toBe('string');
+    });
+
+    it('classifies a 5xx daemon failure as DAEMON_ERROR', async () => {
+        const adapter = new TransmissionAdapter(makeConfig());
+        vi.spyOn(adapter as unknown as { call: () => Promise<unknown> }, 'call')
+            .mockRejectedValue(new DaemonError(503));
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error?.type).toBe('DAEMON_ERROR');
+    });
+
+    it('retries a transient failure before reporting connected', async () => {
+        const adapter = new TransmissionAdapter(makeConfig(FAST_RETRY));
+        let calls = 0;
+        vi.spyOn(adapter as unknown as { call: () => Promise<unknown> }, 'call')
+            .mockImplementation(async () => {
+                calls++;
+                if (calls < 2) throw new TypeError('Failed to fetch');
+                return { result: 'success' };
+            });
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(true);
+        expect(calls).toBe(2);
+    });
+});
+
 });
