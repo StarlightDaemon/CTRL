@@ -360,7 +360,7 @@ export const Dashboard = () => {
                                         setStatus('Testing...');
                                         setStatusKind('info');
                                         const res = await chrome.runtime.sendMessage({ type: 'TEST_CONNECTION' });
-                                        if (res) {
+                                        if (res?.connected) {
                                             setStatus('Online');
                                             setStatusKind('success');
                                         } else {

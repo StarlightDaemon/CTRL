@@ -460,6 +460,11 @@ export function classifyError(error: unknown): BiglyBTErrorType {
         }
 
         // Plugin issues
+        // PLUGIN_MISSING: the xmwebui (or Simple API) plugin is not installed, so the
+        // RPC endpoint itself is absent — typically a 404 on /transmission/rpc.
+        if (msg.includes('plugin') || msg.includes('xmwebui') || msg.includes('404')) {
+            return 'PLUGIN_MISSING';
+        }
         if (msg.includes('method not found') || msg.includes('not supported')) {
             return 'METHOD_NOT_FOUND';
         }
@@ -508,42 +513,13 @@ export function getErrorMessage(type: BiglyBTErrorType): string {
 // Retry Utilities
 // =============================================================================
 
-/**
- * Configuration for exponential backoff retry
- */
-export interface RetryConfig {
-    /** Maximum number of retry attempts */
-    maxAttempts: number;
-    /** Initial delay in milliseconds */
-    initialDelayMs: number;
-    /** Maximum delay in milliseconds */
-    maxDelayMs: number;
-    /** Multiplier for each subsequent delay */
-    backoffMultiplier: number;
-}
-
-/**
- * Default retry configuration for startup/connection
- */
-export const DEFAULT_RETRY_CONFIG: RetryConfig = {
-    maxAttempts: 5,
-    initialDelayMs: 1000,   // 1s, then 2s, 4s, 8s, 16s
-    maxDelayMs: 16000,
-    backoffMultiplier: 2,
-};
-
-/**
- * Calculate delay for a given attempt using exponential backoff
- */
-export function calculateBackoffDelay(attempt: number, config: RetryConfig): number {
-    const delay = config.initialDelayMs * Math.pow(config.backoffMultiplier, attempt);
-    return Math.min(delay, config.maxDelayMs);
-}
-
-/**
- * Sleep for a given number of milliseconds
- */
-export function sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+// RetryConfig, DEFAULT_RETRY_CONFIG, calculateBackoffDelay, and sleep now live in
+// the shared adapter infrastructure as the canonical definitions. They are
+// re-exported here so existing BiglyBT importers keep their import paths unchanged.
+export type { RetryConfig } from '@/shared/lib/retry/withAdapterRetry';
+export {
+    DEFAULT_RETRY_CONFIG,
+    calculateBackoffDelay,
+    sleep,
+} from '@/shared/lib/retry/withAdapterRetry';
 

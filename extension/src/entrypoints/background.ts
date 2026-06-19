@@ -385,17 +385,24 @@ export default defineBackground(() => {
                             console.log('[Background] TEST_CONNECTION received. Type:', message.config?.type);
                         }
                         const result = await client.testConnection();
-                        const r = result as unknown as Record<string, unknown>;
+                        // AdapterError instances cannot cross the message channel with
+                        // their methods intact, so serialize to a wire-safe shape:
+                        // { connected, error? } where error is the user-facing string.
+                        const response = {
+                            connected: result.connected,
+                            error: result.error?.toUserMessage(),
+                        };
                         console.info(JSON.stringify({
                             event: 'TEST_CONNECTION_RESULT',
                             messageType: message.type,
                             hostnameTested: message.config?.hostname || 'unknown_persisted',
                             configSource: message.config ? 'message.config' : 'ServerResolver',
                             adapterType: client.constructor.name,
-                            resultShape: result === true ? 'true' : result === false ? 'false' : (r && typeof r === 'object' && r.error ? '{error}' : 'unknown'),
-                            errorMessage: r && typeof r === 'object' && r.error ? r.error : null
+                            connected: result.connected,
+                            errorType: result.error?.type ?? null,
+                            errorMessage: response.error ?? null
                         }));
-                        return result;
+                        return response;
                     }
 
                     case 'PING':

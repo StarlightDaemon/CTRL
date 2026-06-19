@@ -134,7 +134,7 @@ const ServerDiagnosticRow: React.FC<{ server: ServerConfig; index: number }> = (
         setAuthStatus({ loading: true, result: null, error: false });
         try {
             const res = await chrome.runtime.sendMessage({ type: 'TEST_CONNECTION_SERVER', serverIndex: index });
-            if (res === true) {
+            if (res?.connected) {
                 setAuthStatus({ loading: false, result: 'OK', error: false });
             } else {
                 setAuthStatus({ loading: false, result: 'Auth Failed', error: true });

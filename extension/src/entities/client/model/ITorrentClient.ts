@@ -1,4 +1,5 @@
 import { Torrent } from '@/entities/torrent/model/Torrent';
+import { AdapterConnectionResult } from '@/shared/api/clients/shared/AdapterConnectionResult';
 
 export interface AddTorrentOptions {
     paused?: boolean;
@@ -52,9 +53,11 @@ export interface ITorrentClient {
 
     /**
      * Tests the connection to the client.
-     * Returns true if successful. Throws a descriptive Error if the connection fails.
+     * Resolves to an AdapterConnectionResult: `connected` reports whether the client
+     * is reachable and authenticated, and `error` carries the adapter-specific
+     * AdapterError describing the failure when `connected` is false.
      */
-    testConnection(): Promise<boolean>;
+    testConnection(): Promise<AdapterConnectionResult>;
 
     /**
      * Pings the client to measure latency.

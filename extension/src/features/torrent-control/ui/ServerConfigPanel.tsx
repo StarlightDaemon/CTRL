@@ -160,14 +160,12 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
             // Pass the raw config to background for testing
             const res = await chrome.runtime.sendMessage({ type: 'TEST_CONNECTION', config: tempServer });
 
-            if (res === true) {
+            if (res && typeof res === 'object' && res.connected) {
                 setTestStatus({ loading: false, success: true, message: 'Connection Successful!' });
             } else if (res && typeof res === 'object' && typeof res.error === 'string' && res.error) {
                 setTestStatus({ loading: false, success: false, message: res.error });
-            } else if (res === false) {
-                setTestStatus({ loading: false, success: false, message: 'Connection failed' });
             } else {
-                setTestStatus({ loading: false, success: false, message: 'Connection Error' });
+                setTestStatus({ loading: false, success: false, message: 'Connection failed' });
             }
         } catch (e: unknown) {
             const errMsg = e instanceof Error ? e.message : 'Connection Error';
