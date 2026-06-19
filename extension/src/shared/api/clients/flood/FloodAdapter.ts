@@ -19,6 +19,9 @@ import {
     FloodCapabilities,
 } from './FloodSchema';
 import { ServerConfig } from '@/shared/lib/types';
+import { FloodAdapterError } from './FloodAdapterError';
+import { AdapterConnectionResult } from '@/shared/api/clients/shared/AdapterConnectionResult';
+import { withAdapterRetry, RetryConfig, DEFAULT_RETRY_CONFIG } from '@/shared/lib/retry/withAdapterRetry';
 
 // ============================================================================
 // Constants
@@ -112,9 +115,15 @@ export class FloodAdapter implements ITorrentClient {
     private rateLimitInfo: FloodRateLimitInfo | null = null;
     private sessionVerified: boolean = false;
     private cachedBackendType: 'rtorrent' | 'qbittorrent' | 'transmission' | 'unknown' | null = null;
+    private retryConfig: RetryConfig;
 
     constructor(private config: ServerConfig) {
         this.httpClient = new FetchHttpClient(config.hostname);
+        // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
+        this.retryConfig = {
+            ...DEFAULT_RETRY_CONFIG,
+            ...(config.clientOptions?.retryConfig as Partial<RetryConfig> || {}),
+        };
     }
 
     // ========================================================================
@@ -190,11 +199,18 @@ export class FloodAdapter implements ITorrentClient {
         }
     }
 
-    async testConnection(): Promise<boolean> {
-        await this.login();
-        // Also verify session to check backend connectivity
-        await this.verifySession();
-        return true;
+    async testConnection(): Promise<AdapterConnectionResult> {
+        try {
+            // Retry the connection probe; login + verifySession also confirm the
+            // Flood backend (torrent daemon) is reachable, not just the Flood server.
+            await withAdapterRetry(async () => {
+                await this.login();
+                await this.verifySession();
+            }, this.retryConfig);
+            return { connected: true };
+        } catch (error) {
+            return { connected: false, error: FloodAdapterError.from(error) };
+        }
     }
 
     async ping(): Promise<number> {

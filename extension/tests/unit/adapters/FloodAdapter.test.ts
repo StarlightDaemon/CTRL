@@ -9,8 +9,19 @@
  * - Backend connection testing
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { FloodAdapter } from '@/shared/api/clients/flood/FloodAdapter';
+import {
+    FloodAdapter,
+    FloodAuthError,
+    FloodRateLimitError,
+    FloodValidationError,
+    FloodTimeoutError,
+    FloodBackendDisconnectedError,
+} from '@/shared/api/clients/flood/FloodAdapter';
 import { ServerConfig } from '@/shared/lib/types';
+import { FloodAdapterError, FloodErrorType } from '@/shared/api/clients/flood/FloodAdapterError';
+import { withAdapterRetry, RetryConfig, RetryExhaustedError } from '@/shared/lib/retry/withAdapterRetry';
+import { AdapterError } from '@/shared/api/clients/shared/AdapterError';
+import { FloodRateLimitInfo, FloodSessionVerify } from '@/shared/api/clients/flood/FloodSchema';
 
 // Mock server config
 const mockConfig: ServerConfig = {
@@ -21,7 +32,7 @@ const mockConfig: ServerConfig = {
     username: 'admin',
     password: 'adminpass',
     directories: [],
-    clientOptions: {},
+    clientOptions: { retryConfig: { maxAttempts: 1, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 } },
 };
 
 // Helper to create mock responses
@@ -175,16 +186,18 @@ describe('FloodAdapter', () => {
             ]);
 
             const result = await adapter.testConnection();
-            expect(result).toBe(true);
+            expect(result).toEqual({ connected: true });
         });
 
-        it('should throw when backend disconnected', async () => {
+        it('should report { connected: false } when backend disconnected', async () => {
             createMockFetch([
                 { ok: true, status: 200, body: { success: true, token: 'jwt' } },
                 { ok: true, status: 200, body: { username: 'admin', clientConnected: false } }
             ]);
 
-            await expect(adapter.testConnection()).rejects.toThrow('Torrent client backend is not connected');
+            const result = await adapter.testConnection();
+            expect(result.connected).toBe(false);
+            expect(result.error?.type).toBe('BACKEND_DISCONNECTED');
         });
     });
 
@@ -546,4 +559,140 @@ describe('FloodAdapter', () => {
             await expect(promise).rejects.toThrow('timeout');
         }, 10000);
     });
+});
+
+
+
+describe('FloodAdapter — AdapterError & withAdapterRetry (parity)', () => {
+const FAST_RETRY: RetryConfig = { maxAttempts: 3, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+const NO_RETRY: RetryConfig = { maxAttempts: 1, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+
+const ALL_TYPES: FloodErrorType[] = [
+    'CONNECTION_REFUSED', 'TIMEOUT', 'AUTH_FAILED', 'RATE_LIMITED',
+    'BACKEND_DISCONNECTED', 'VALIDATION_ERROR', 'NETWORK_ERROR', 'UNKNOWN',
+];
+
+function makeConfig(retryConfig: RetryConfig = NO_RETRY): ServerConfig {
+    return {
+        name: 'Test',
+        application: 'flood',
+        type: 'flood',
+        hostname: 'http://localhost:3000',
+        username: 'admin',
+        password: 'admin',
+        directories: [],
+        clientOptions: { retryConfig },
+    };
+}
+
+describe('FloodAdapterError', () => {
+    it('constructs with type and message and is an AdapterError', () => {
+        const e = new FloodAdapterError('AUTH_FAILED', 'nope');
+        expect(e).toBeInstanceOf(AdapterError);
+        expect(e).toBeInstanceOf(FloodAdapterError);
+        expect(e.type).toBe('AUTH_FAILED');
+        expect(e.message).toBe('nope');
+        expect(e.name).toBe('FloodAdapterError');
+    });
+
+    it('returns a non-empty user message for every error type', () => {
+        for (const t of ALL_TYPES) {
+            const msg = new FloodAdapterError(t, 'x').toUserMessage();
+            expect(typeof msg).toBe('string');
+            expect(msg.length).toBeGreaterThan(0);
+        }
+    });
+
+    it('returns a distinct user message per error type', () => {
+        const msgs = ALL_TYPES.map(t => new FloodAdapterError(t, 'x').toUserMessage());
+        expect(new Set(msgs).size).toBe(ALL_TYPES.length);
+    });
+
+    describe('from() classification', () => {
+        it('maps FloodAuthError → AUTH_FAILED', () => {
+            expect(FloodAdapterError.from(new FloodAuthError('bad creds')).type).toBe('AUTH_FAILED');
+        });
+        it('maps FloodBackendDisconnectedError → BACKEND_DISCONNECTED', () => {
+            expect(FloodAdapterError.from(new FloodBackendDisconnectedError()).type).toBe('BACKEND_DISCONNECTED');
+        });
+        it('maps FloodRateLimitError → RATE_LIMITED', () => {
+            const err = new FloodRateLimitError('slow down', {} as FloodRateLimitInfo);
+            expect(FloodAdapterError.from(err).type).toBe('RATE_LIMITED');
+        });
+        it('maps FloodValidationError → VALIDATION_ERROR', () => {
+            expect(FloodAdapterError.from(new FloodValidationError('bad', [])).type).toBe('VALIDATION_ERROR');
+        });
+        it('maps FloodTimeoutError → TIMEOUT', () => {
+            expect(FloodAdapterError.from(new FloodTimeoutError()).type).toBe('TIMEOUT');
+        });
+        it('maps a fetch TypeError → CONNECTION_REFUSED', () => {
+            expect(FloodAdapterError.from(new TypeError('Failed to fetch')).type).toBe('CONNECTION_REFUSED');
+        });
+        it('passes an existing FloodAdapterError through unchanged', () => {
+            const original = new FloodAdapterError('VALIDATION_ERROR', 'x');
+            expect(FloodAdapterError.from(original)).toBe(original);
+        });
+        it('unwraps RetryExhaustedError to classify the underlying cause', () => {
+            const wrapped = new RetryExhaustedError(new FloodBackendDisconnectedError());
+            expect(FloodAdapterError.from(wrapped).type).toBe('BACKEND_DISCONNECTED');
+        });
+        it('falls back to UNKNOWN for unrecognized values', () => {
+            expect(FloodAdapterError.from(null).type).toBe('UNKNOWN');
+        });
+    });
+});
+
+describe('withAdapterRetry (Flood)', () => {
+    it('retries on transient failure and then resolves', async () => {
+        let calls = 0;
+        const fn = vi.fn(async () => {
+            calls++;
+            if (calls < 2) throw new Error('transient');
+            return 'ok';
+        });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).resolves.toBe('ok');
+        expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('rethrows an AdapterError unchanged on exhaustion', async () => {
+        const err = new FloodAdapterError('CONNECTION_REFUSED', 'down');
+        const fn = vi.fn(async () => { throw err; });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBe(err);
+        expect(fn).toHaveBeenCalledTimes(FAST_RETRY.maxAttempts);
+    });
+
+    it('wraps a non-AdapterError as RetryExhaustedError on exhaustion', async () => {
+        const fn = vi.fn(async () => { throw new FloodTimeoutError(); });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBeInstanceOf(RetryExhaustedError);
+    });
+});
+
+describe('FloodAdapter.testConnection', () => {
+    it('returns { connected: true } on success', async () => {
+        const adapter = new FloodAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockResolvedValue(undefined);
+        vi.spyOn(adapter, 'verifySession').mockResolvedValue({ clientConnected: true } as FloodSessionVerify);
+        await expect(adapter.testConnection()).resolves.toEqual({ connected: true });
+    });
+
+    it('returns { connected: false, error } with a classified AdapterError on auth failure', async () => {
+        const adapter = new FloodAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockRejectedValue(new FloodAuthError('Flood authentication failed'));
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error).toBeInstanceOf(FloodAdapterError);
+        expect(result.error?.type).toBe('AUTH_FAILED');
+        expect(typeof result.error?.toUserMessage()).toBe('string');
+    });
+
+    it('classifies a disconnected backend as BACKEND_DISCONNECTED', async () => {
+        const adapter = new FloodAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockResolvedValue(undefined);
+        vi.spyOn(adapter, 'verifySession').mockRejectedValue(new FloodBackendDisconnectedError());
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error?.type).toBe('BACKEND_DISCONNECTED');
+    });
+});
+
 });
