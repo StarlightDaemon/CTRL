@@ -7,6 +7,9 @@ import { Aria2Error } from './Aria2Error';
 import { ServerConfig } from '@/shared/lib/types';
 import { z } from 'zod';
 import { blobToBase64 } from '@/shared/lib/helpers';
+import { Aria2AdapterError } from './Aria2AdapterError';
+import { AdapterConnectionResult } from '@/shared/api/clients/shared/AdapterConnectionResult';
+import { withAdapterRetry, RetryConfig, RetryExhaustedError, DEFAULT_RETRY_CONFIG } from '@/shared/lib/retry/withAdapterRetry';
 
 /** Version information from aria2.getVersion */
 interface Aria2VersionInfo {
@@ -14,21 +17,8 @@ interface Aria2VersionInfo {
     enabledFeatures: string[];
 }
 
-/** Retry configuration */
-const RETRY_CONFIG = {
-    maxRetries: 3,
-    baseDelayMs: 1000,
-    maxDelayMs: 8000,
-};
-
 /** Request timeout in milliseconds */
 const REQUEST_TIMEOUT_MS = 30000;
-
-/**
- * Sleep helper for retry delays
- */
-const sleep = (ms: number): Promise<void> =>
-    new Promise(resolve => setTimeout(resolve, ms));
 
 @injectable()
 export class Aria2Adapter implements ITorrentClient {
@@ -36,12 +26,18 @@ export class Aria2Adapter implements ITorrentClient {
     private secret: string;
     private daemonVersion: string | null = null;
     private enabledFeatures: string[] = [];
+    private retryConfig: RetryConfig;
 
     constructor(config: ServerConfig) {
         // Aria2 usually runs on /jsonrpc
         this.rpcClient = new JsonRpcClient(config.hostname);
         // Aria2 uses 'token:secret' as the first param in methods if using --rpc-secret
         this.secret = config.password || '';
+        // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
+        this.retryConfig = {
+            ...DEFAULT_RETRY_CONFIG,
+            ...(config.clientOptions?.retryConfig as Partial<RetryConfig> || {}),
+        };
     }
 
     /**
@@ -149,9 +145,13 @@ export class Aria2Adapter implements ITorrentClient {
      * Test connection with diagnostic information.
      * Returns true if connection successful, false otherwise.
      */
-    async testConnection(): Promise<boolean> {
-        await this.getVersionInfo();
-        return true;
+    async testConnection(): Promise<AdapterConnectionResult> {
+        try {
+            await this.getVersionInfo();
+            return { connected: true };
+        } catch (error) {
+            return { connected: false, error: Aria2AdapterError.from(error) };
+        }
     }
 
     async ping(): Promise<number> {
@@ -467,29 +467,40 @@ export class Aria2Adapter implements ITorrentClient {
     }
 
     /**
-     * Execute a call with exponential backoff retry on retryable errors
+     * Execute a call with exponential-backoff retry on retryable (network) errors.
+     *
+     * Backoff is delegated to the shared withAdapterRetry utility. The retryable
+     * gate is preserved: non-retryable errors (auth, parse, GID-not-found, …) fail
+     * fast without retrying, and the typed Aria2Error is preserved on exhaustion so
+     * callers that branch on `instanceof Aria2Error` keep working.
      */
     private async callWithRetry(
         fn: () => Promise<unknown>,
-        context: string,
-        attempt: number = 0
+        context: string
     ): Promise<unknown> {
-        try {
-            return await this.withTimeout(fn(), REQUEST_TIMEOUT_MS);
-        } catch (error) {
-            const aria2Error = this.wrapError(error, context);
-
-            // Only retry on network errors, not auth or logic errors
-            if (aria2Error.retryable && attempt < RETRY_CONFIG.maxRetries) {
-                const delay = Math.min(
-                    RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt),
-                    RETRY_CONFIG.maxDelayMs
-                );
-                await sleep(delay);
-                return this.callWithRetry(fn, context, attempt + 1);
+        const run = async () => {
+            try {
+                return await this.withTimeout(fn(), REQUEST_TIMEOUT_MS);
+            } catch (error) {
+                throw this.wrapError(error, context);
             }
+        };
 
-            throw aria2Error;
+        try {
+            return await run();
+        } catch (error) {
+            if (!(error instanceof Aria2Error) || !error.retryable) {
+                throw error;
+            }
+            try {
+                return await withAdapterRetry(run, this.retryConfig);
+            } catch (retryError) {
+                // Unwrap the shared retry wrapper to preserve the typed Aria2Error.
+                if (retryError instanceof RetryExhaustedError && retryError.lastError instanceof Aria2Error) {
+                    throw retryError.lastError;
+                }
+                throw retryError;
+            }
         }
     }
 

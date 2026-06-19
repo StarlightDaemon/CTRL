@@ -12,6 +12,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Aria2Adapter } from '@/shared/api/clients/aria2/Aria2Adapter';
 import { Aria2Error } from '@/shared/api/clients/aria2/Aria2Error';
 import { ServerConfig } from '@/shared/lib/types';
+import { Aria2AdapterError, Aria2ErrorType } from '@/shared/api/clients/aria2/Aria2AdapterError';
+import { withAdapterRetry, RetryConfig, RetryExhaustedError } from '@/shared/lib/retry/withAdapterRetry';
+import { AdapterError } from '@/shared/api/clients/shared/AdapterError';
 
 // Mock server config
 const mockConfig: ServerConfig = {
@@ -22,7 +25,7 @@ const mockConfig: ServerConfig = {
     username: '',
     password: 'mysecret', // RPC secret
     directories: [],
-    clientOptions: {},
+    clientOptions: { retryConfig: { maxAttempts: 3, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 } },
 };
 
 // Helper to create mock JSON-RPC responses
@@ -300,14 +303,16 @@ describe('Aria2Adapter', () => {
             ]);
 
             const result = await adapter.testConnection();
-            expect(result).toBe(true);
+            expect(result).toEqual({ connected: true });
         });
 
-        it('should throw error on connection failure', async () => {
+        it('should return { connected: false } on connection failure', async () => {
             vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'));
 
-            await expect(adapter.testConnection()).rejects.toThrow();
-        }, 45000); // Extended timeout for retry logic
+            const result = await adapter.testConnection();
+            expect(result.connected).toBe(false);
+            expect(result.error?.type).toBe('NETWORK_ERROR');
+        });
     });
 
     describe('getGlobalStats', () => {
@@ -746,4 +751,149 @@ describe('Aria2Error', () => {
             expect(gidError.isAuthError()).toBe(false);
         });
     });
+});
+
+
+
+describe('Aria2Adapter — AdapterError & withAdapterRetry (parity)', () => {
+const FAST_RETRY: RetryConfig = { maxAttempts: 3, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+const NO_RETRY: RetryConfig = { maxAttempts: 1, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+
+const ALL_TYPES: Aria2ErrorType[] = [
+    'PARSE_ERROR', 'INVALID_REQUEST', 'METHOD_NOT_FOUND', 'INVALID_PARAMS', 'UNAUTHORIZED',
+    'GID_NOT_FOUND', 'FILE_SYSTEM_ERROR', 'NETWORK_ERROR', 'TIMEOUT', 'UNKNOWN',
+];
+
+function makeConfig(retryConfig: RetryConfig = NO_RETRY): ServerConfig {
+    return {
+        name: 'Test',
+        application: 'aria2',
+        type: 'aria2',
+        hostname: 'http://localhost:6800/jsonrpc',
+        password: 'secret',
+        directories: [],
+        clientOptions: { retryConfig },
+    };
+}
+
+function aria2Error(code: Aria2ErrorType, retryable = false): Aria2Error {
+    return new Aria2Error({ code, message: `aria2 ${code}`, context: 'test', retryable });
+}
+
+describe('Aria2AdapterError', () => {
+    it('constructs with type and message and is an AdapterError', () => {
+        const e = new Aria2AdapterError('UNAUTHORIZED', 'nope');
+        expect(e).toBeInstanceOf(AdapterError);
+        expect(e).toBeInstanceOf(Aria2AdapterError);
+        expect(e.type).toBe('UNAUTHORIZED');
+        expect(e.message).toBe('nope');
+        expect(e.name).toBe('Aria2AdapterError');
+    });
+
+    it('returns a non-empty user message for every error type', () => {
+        for (const t of ALL_TYPES) {
+            const msg = new Aria2AdapterError(t, 'x').toUserMessage();
+            expect(typeof msg).toBe('string');
+            expect(msg.length).toBeGreaterThan(0);
+        }
+    });
+
+    it('returns a distinct user message per error type', () => {
+        const msgs = ALL_TYPES.map(t => new Aria2AdapterError(t, 'x').toUserMessage());
+        expect(new Set(msgs).size).toBe(ALL_TYPES.length);
+    });
+
+    describe('from() classification', () => {
+        it('reuses Aria2Error codes directly', () => {
+            for (const t of ['UNAUTHORIZED', 'GID_NOT_FOUND', 'FILE_SYSTEM_ERROR', 'NETWORK_ERROR', 'TIMEOUT'] as Aria2ErrorType[]) {
+                expect(Aria2AdapterError.from(aria2Error(t)).type).toBe(t);
+            }
+        });
+        it('maps a fetch TypeError → NETWORK_ERROR', () => {
+            expect(Aria2AdapterError.from(new TypeError('Failed to fetch')).type).toBe('NETWORK_ERROR');
+        });
+        it('maps a timeout message → TIMEOUT', () => {
+            expect(Aria2AdapterError.from(new Error('Request timeout after 30000ms')).type).toBe('TIMEOUT');
+        });
+        it('passes an existing Aria2AdapterError through unchanged', () => {
+            const original = new Aria2AdapterError('PARSE_ERROR', 'x');
+            expect(Aria2AdapterError.from(original)).toBe(original);
+        });
+        it('unwraps RetryExhaustedError to classify the underlying cause', () => {
+            const wrapped = new RetryExhaustedError(aria2Error('NETWORK_ERROR', true));
+            expect(Aria2AdapterError.from(wrapped).type).toBe('NETWORK_ERROR');
+        });
+        it('falls back to UNKNOWN for unrecognized values', () => {
+            expect(Aria2AdapterError.from(42).type).toBe('UNKNOWN');
+        });
+    });
+});
+
+describe('withAdapterRetry (Aria2)', () => {
+    it('retries on transient failure and then resolves', async () => {
+        let calls = 0;
+        const fn = vi.fn(async () => {
+            calls++;
+            if (calls < 2) throw new Error('transient');
+            return 'ok';
+        });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).resolves.toBe('ok');
+        expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('rethrows an AdapterError unchanged on exhaustion', async () => {
+        const err = new Aria2AdapterError('NETWORK_ERROR', 'down');
+        const fn = vi.fn(async () => { throw err; });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBe(err);
+        expect(fn).toHaveBeenCalledTimes(FAST_RETRY.maxAttempts);
+    });
+
+    it('wraps a non-AdapterError as RetryExhaustedError on exhaustion', async () => {
+        const fn = vi.fn(async () => { throw new TypeError('Failed to fetch'); });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBeInstanceOf(RetryExhaustedError);
+    });
+});
+
+describe('Aria2Adapter.testConnection', () => {
+    it('returns { connected: true } on success', async () => {
+        const adapter = new Aria2Adapter(makeConfig());
+        vi.spyOn(adapter, 'getVersionInfo').mockResolvedValue({ version: '1.36.0', enabledFeatures: ['BitTorrent'] });
+        await expect(adapter.testConnection()).resolves.toEqual({ connected: true });
+    });
+
+    it('returns { connected: false, error } with a classified AdapterError on auth failure', async () => {
+        const adapter = new Aria2Adapter(makeConfig());
+        vi.spyOn(adapter, 'getVersionInfo').mockRejectedValue(aria2Error('UNAUTHORIZED'));
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error).toBeInstanceOf(Aria2AdapterError);
+        expect(result.error?.type).toBe('UNAUTHORIZED');
+        expect(typeof result.error?.toUserMessage()).toBe('string');
+    });
+
+    it('does not retry a non-retryable error (fails fast)', async () => {
+        const adapter = new Aria2Adapter(makeConfig(FAST_RETRY));
+        const rpc = vi.spyOn((adapter as unknown as { rpcClient: { call: () => Promise<unknown> } }).rpcClient, 'call')
+            .mockRejectedValue(aria2Error('UNAUTHORIZED', false));
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error?.type).toBe('UNAUTHORIZED');
+        expect(rpc).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries a transient network failure before reporting connected', async () => {
+        const adapter = new Aria2Adapter(makeConfig(FAST_RETRY));
+        let calls = 0;
+        vi.spyOn((adapter as unknown as { rpcClient: { call: () => Promise<unknown> } }).rpcClient, 'call')
+            .mockImplementation(async () => {
+                calls++;
+                if (calls < 2) throw new TypeError('Failed to fetch');
+                return { version: '1.36.0', enabledFeatures: ['BitTorrent'] };
+            });
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(true);
+        expect(calls).toBe(2);
+    });
+});
+
 });
