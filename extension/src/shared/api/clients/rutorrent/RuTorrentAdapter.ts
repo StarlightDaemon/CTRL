@@ -5,6 +5,9 @@ import { ServerConfig } from '@/shared/lib/types';
 import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
 import { RTorrentResponseSchema, RTorrentTuple } from './RTorrentSchema';
 import { blobToBase64 } from '@/shared/lib/helpers';
+import { RuTorrentAdapterError } from './RuTorrentAdapterError';
+import { AdapterConnectionResult } from '@/shared/api/clients/shared/AdapterConnectionResult';
+import { withAdapterRetry, RetryConfig, DEFAULT_RETRY_CONFIG } from '@/shared/lib/retry/withAdapterRetry';
 // @ts-expect-error - txml has no TypeScript declarations
 import { parse } from 'txml';
 
@@ -18,6 +21,7 @@ type XmlRpcResult = unknown;
 @injectable()
 export class RuTorrentAdapter implements ITorrentClient {
     private client: FetchHttpClient;
+    private retryConfig: RetryConfig;
 
     constructor(private config: ServerConfig) {
         // rTorrent usually lives at /RPC2 or /rutorrent/plugins/httprpc/action.php
@@ -35,6 +39,12 @@ export class RuTorrentAdapter implements ITorrentClient {
         }
 
         this.client = new FetchHttpClient(url);
+
+        // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
+        this.retryConfig = {
+            ...DEFAULT_RETRY_CONFIG,
+            ...(config.clientOptions?.retryConfig as Partial<RetryConfig> || {}),
+        };
     }
 
     /**
@@ -244,9 +254,14 @@ export class RuTorrentAdapter implements ITorrentClient {
         // which might be unsafe or disabled. Simple erase is standard.
     }
 
-    async testConnection(): Promise<boolean> {
-        await this.login();
-        return true;
+    async testConnection(): Promise<AdapterConnectionResult> {
+        try {
+            // Retry the connection probe so transient startup failures don't fail the test.
+            await withAdapterRetry(() => this.login(), this.retryConfig);
+            return { connected: true };
+        } catch (error) {
+            return { connected: false, error: RuTorrentAdapterError.from(error) };
+        }
     }
 
     async ping(): Promise<number> {
