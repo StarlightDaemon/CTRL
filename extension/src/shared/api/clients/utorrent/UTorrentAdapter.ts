@@ -6,6 +6,9 @@ import { HttpError } from '@/shared/api/network/HttpError';
 import { extractUTorrentToken } from './UTorrentParsingUtils';
 import { UTorrentResponseSchema, TORRENT_INDEX, STATUS_FLAG } from './UTorrentSchema';
 import { ServerConfig } from '@/shared/lib/types';
+import { UTorrentAdapterError } from './UTorrentAdapterError';
+import { AdapterConnectionResult } from '@/shared/api/clients/shared/AdapterConnectionResult';
+import { withAdapterRetry, RetryConfig, DEFAULT_RETRY_CONFIG } from '@/shared/lib/retry/withAdapterRetry';
 
 /** File information returned by getFiles */
 export interface TorrentFile {
@@ -28,10 +31,16 @@ export class UTorrentAdapter implements ITorrentClient {
     private cacheId: string | null = null;
     private torrentCache: Map<string, (string | number)[]> = new Map();
     private baseUrl: string;
+    private retryConfig: RetryConfig;
 
     constructor(private config: ServerConfig) {
         this.httpClient = new FetchHttpClient(config.hostname);
         this.baseUrl = 'gui/';
+        // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
+        this.retryConfig = {
+            ...DEFAULT_RETRY_CONFIG,
+            ...(config.clientOptions?.retryConfig as Partial<RetryConfig> || {}),
+        };
     }
 
     async login(): Promise<void> {
@@ -164,9 +173,14 @@ export class UTorrentAdapter implements ITorrentClient {
         // Clear by setting empty label would remove all categorization
     }
 
-    async testConnection(): Promise<boolean> {
-        await this.login();
-        return true;
+    async testConnection(): Promise<AdapterConnectionResult> {
+        try {
+            // Retry the connection probe so transient startup failures don't fail the test.
+            await withAdapterRetry(() => this.login(), this.retryConfig);
+            return { connected: true };
+        } catch (error) {
+            return { connected: false, error: UTorrentAdapterError.from(error) };
+        }
     }
 
     async ping(): Promise<number> {

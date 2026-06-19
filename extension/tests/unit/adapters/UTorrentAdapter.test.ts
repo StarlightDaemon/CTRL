@@ -10,6 +10,10 @@ import { UTorrentSettingsService } from '@/shared/api/clients/utorrent/UTorrentS
 import { UTorrentRssService } from '@/shared/api/clients/utorrent/UTorrentRssService';
 import { ServerConfig } from '@/shared/lib/types';
 import { STATUS_FLAG } from '@/shared/api/clients/utorrent/UTorrentSchema';
+import { UTorrentAdapterError, UTorrentErrorType } from '@/shared/api/clients/utorrent/UTorrentAdapterError';
+import { HttpError } from '@/shared/api/network/HttpError';
+import { withAdapterRetry, RetryConfig, RetryExhaustedError } from '@/shared/lib/retry/withAdapterRetry';
+import { AdapterError } from '@/shared/api/clients/shared/AdapterError';
 
 // Mock server config
 const mockConfig: ServerConfig = {
@@ -20,7 +24,7 @@ const mockConfig: ServerConfig = {
     username: 'admin',
     password: 'adminpass',
     directories: [],
-    clientOptions: {},
+    clientOptions: { retryConfig: { maxAttempts: 3, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 } },
 };
 
 // Mock DOMParser for token parsing
@@ -493,13 +497,15 @@ describe('UTorrentAdapter', () => {
             ]);
 
             const result = await adapter.testConnection();
-            expect(result).toBe(true);
+            expect(result).toEqual({ connected: true });
         });
 
-        it('should throw error on connection failure', async () => {
+        it('should return { connected: false } on connection failure', async () => {
             vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'));
 
-            await expect(adapter.testConnection()).rejects.toThrow('Network error');
+            const result = await adapter.testConnection();
+            expect(result.connected).toBe(false);
+            expect(result.error?.type).toBe('NETWORK_ERROR');
         });
     });
 
@@ -769,4 +775,159 @@ describe('UTorrentRssService', () => {
             expect(url).toContain('alias=My+Feed+Alias');
         });
     });
+});
+
+
+
+describe('UTorrentAdapter — AdapterError & withAdapterRetry (parity)', () => {
+const FAST_RETRY: RetryConfig = { maxAttempts: 3, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+const NO_RETRY: RetryConfig = { maxAttempts: 1, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+
+const ALL_TYPES: UTorrentErrorType[] = [
+    'CONNECTION_REFUSED', 'TIMEOUT', 'AUTH_FAILED', 'TOKEN_ERROR',
+    'ENDPOINT_NOT_FOUND', 'NETWORK_ERROR', 'UNKNOWN',
+];
+
+function makeConfig(retryConfig: RetryConfig = NO_RETRY): ServerConfig {
+    return {
+        name: 'Test',
+        application: 'utorrent',
+        type: 'utorrent',
+        hostname: 'http://localhost:8080/',
+        username: 'admin',
+        password: 'admin',
+        directories: [],
+        clientOptions: { retryConfig },
+    };
+}
+
+function httpError(status: number, statusText = 'Error'): HttpError {
+    return new HttpError(status, statusText, {} as Response);
+}
+
+// A token.html body extractUTorrentToken can parse, plus a GUID set-cookie header.
+const TOKEN_RESPONSE = {
+    body: "<html><div id='token' style='display:none;'>TOKEN123</div></html>",
+    headers: { get: (k: string) => (k.toLowerCase() === 'set-cookie' ? 'GUID=abc123; path=/' : null) },
+};
+
+type GetRawSpy = { httpClient: { getRaw: (...args: unknown[]) => Promise<unknown> } };
+
+describe('UTorrentAdapterError', () => {
+    it('constructs with type and message and is an AdapterError', () => {
+        const e = new UTorrentAdapterError('TOKEN_ERROR', 'nope');
+        expect(e).toBeInstanceOf(AdapterError);
+        expect(e).toBeInstanceOf(UTorrentAdapterError);
+        expect(e.type).toBe('TOKEN_ERROR');
+        expect(e.message).toBe('nope');
+        expect(e.name).toBe('UTorrentAdapterError');
+    });
+
+    it('returns a non-empty user message for every error type', () => {
+        for (const t of ALL_TYPES) {
+            const msg = new UTorrentAdapterError(t, 'x').toUserMessage();
+            expect(typeof msg).toBe('string');
+            expect(msg.length).toBeGreaterThan(0);
+        }
+    });
+
+    it('returns a distinct user message per error type', () => {
+        const msgs = ALL_TYPES.map(t => new UTorrentAdapterError(t, 'x').toUserMessage());
+        expect(new Set(msgs).size).toBe(ALL_TYPES.length);
+    });
+
+    describe('from() classification', () => {
+        it('maps a 400 HttpError → AUTH_FAILED', () => {
+            expect(UTorrentAdapterError.from(httpError(400, 'Invalid Request')).type).toBe('AUTH_FAILED');
+        });
+        it('maps a 404 HttpError → ENDPOINT_NOT_FOUND', () => {
+            expect(UTorrentAdapterError.from(httpError(404, 'Not Found')).type).toBe('ENDPOINT_NOT_FOUND');
+        });
+        it('maps a token-handshake failure → TOKEN_ERROR', () => {
+            expect(UTorrentAdapterError.from(new Error('Failed to retrieve uTorrent token from response')).type).toBe('TOKEN_ERROR');
+        });
+        it('maps a fetch TypeError → CONNECTION_REFUSED', () => {
+            expect(UTorrentAdapterError.from(new TypeError('Failed to fetch')).type).toBe('CONNECTION_REFUSED');
+        });
+        it('maps a timeout message → TIMEOUT', () => {
+            expect(UTorrentAdapterError.from(new Error('Connection timed out')).type).toBe('TIMEOUT');
+        });
+        it('passes an existing UTorrentAdapterError through unchanged', () => {
+            const original = new UTorrentAdapterError('ENDPOINT_NOT_FOUND', 'x');
+            expect(UTorrentAdapterError.from(original)).toBe(original);
+        });
+        it('unwraps RetryExhaustedError to classify the underlying cause', () => {
+            const wrapped = new RetryExhaustedError(httpError(400, 'Invalid Request'));
+            expect(UTorrentAdapterError.from(wrapped).type).toBe('AUTH_FAILED');
+        });
+        it('falls back to UNKNOWN for unrecognized values', () => {
+            expect(UTorrentAdapterError.from(new Error('mystery')).type).toBe('UNKNOWN');
+        });
+    });
+});
+
+describe('withAdapterRetry (uTorrent)', () => {
+    it('retries on transient failure and then resolves', async () => {
+        let calls = 0;
+        const fn = vi.fn(async () => {
+            calls++;
+            if (calls < 2) throw new Error('transient');
+            return 'ok';
+        });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).resolves.toBe('ok');
+        expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('rethrows an AdapterError unchanged on exhaustion', async () => {
+        const err = new UTorrentAdapterError('CONNECTION_REFUSED', 'down');
+        const fn = vi.fn(async () => { throw err; });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBe(err);
+        expect(fn).toHaveBeenCalledTimes(FAST_RETRY.maxAttempts);
+    });
+
+    it('wraps a non-AdapterError as RetryExhaustedError on exhaustion', async () => {
+        const fn = vi.fn(async () => { throw httpError(400, 'Invalid Request'); });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBeInstanceOf(RetryExhaustedError);
+    });
+});
+
+describe('UTorrentAdapter.testConnection', () => {
+    it('returns { connected: true } on success', async () => {
+        const adapter = new UTorrentAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockResolvedValue(undefined);
+        await expect(adapter.testConnection()).resolves.toEqual({ connected: true });
+    });
+
+    it('returns { connected: false, error } with a classified AdapterError on auth failure', async () => {
+        const adapter = new UTorrentAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockRejectedValue(httpError(400, 'Invalid Request'));
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error).toBeInstanceOf(UTorrentAdapterError);
+        expect(result.error?.type).toBe('AUTH_FAILED');
+        expect(typeof result.error?.toUserMessage()).toBe('string');
+    });
+
+    it('classifies a token-handshake failure as TOKEN_ERROR', async () => {
+        const adapter = new UTorrentAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockRejectedValue(new Error('Failed to retrieve uTorrent token from response'));
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error?.type).toBe('TOKEN_ERROR');
+    });
+
+    it('retries a transient handshake failure before reporting connected', async () => {
+        const adapter = new UTorrentAdapter(makeConfig(FAST_RETRY));
+        let calls = 0;
+        vi.spyOn((adapter as unknown as GetRawSpy).httpClient, 'getRaw').mockImplementation(async () => {
+            calls++;
+            if (calls < 2) throw new TypeError('Failed to fetch');
+            return TOKEN_RESPONSE;
+        });
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(true);
+        expect(calls).toBe(2);
+    });
+});
+
 });
