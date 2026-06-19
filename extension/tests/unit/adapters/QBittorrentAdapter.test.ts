@@ -7,6 +7,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { QBittorrentAdapter } from '@/shared/api/clients/qbittorrent/QBittorrentAdapter';
 import { ServerConfig } from '@/shared/lib/types';
+import { QBittorrentAdapterError, QBittorrentErrorType } from '@/shared/api/clients/qbittorrent/QBittorrentAdapterError';
+import { HttpError } from '@/shared/api/network/HttpError';
+import { withAdapterRetry, RetryConfig, RetryExhaustedError } from '@/shared/lib/retry/withAdapterRetry';
+import { AdapterError } from '@/shared/api/clients/shared/AdapterError';
 
 // Mock server config
 const mockConfig: ServerConfig = {
@@ -17,7 +21,7 @@ const mockConfig: ServerConfig = {
     username: 'admin',
     password: 'adminadmin',
     directories: [],
-    clientOptions: {},
+    clientOptions: { retryConfig: { maxAttempts: 3, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 } },
 };
 
 // Mock fetch helper
@@ -410,13 +414,15 @@ describe('QBittorrentAdapter', () => {
 
             const result = await adapter.testConnection();
 
-            expect(result).toBe(true);
+            expect(result).toEqual({ connected: true });
         });
 
-        it('should throw on connection failure', async () => {
+        it('should return { connected: false } on connection failure', async () => {
             vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'));
 
-            await expect(adapter.testConnection()).rejects.toThrow('Network error');
+            const result = await adapter.testConnection();
+            expect(result.connected).toBe(false);
+            expect(result.error?.type).toBe('NETWORK_ERROR');
         });
     });
 
@@ -472,4 +478,152 @@ describe('QBittorrentAdapter', () => {
             expect(result[0].status).toBe('error');
         });
     });
+});
+
+
+
+describe('QBittorrentAdapter — AdapterError & withAdapterRetry (parity)', () => {
+const FAST_RETRY: RetryConfig = { maxAttempts: 3, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+const NO_RETRY: RetryConfig = { maxAttempts: 1, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+
+const ALL_TYPES: QBittorrentErrorType[] = [
+    'CONNECTION_REFUSED', 'TIMEOUT', 'AUTH_FAILED', 'IP_BANNED',
+    'ENDPOINT_NOT_FOUND', 'SERVER_ERROR', 'NETWORK_ERROR', 'UNKNOWN',
+];
+
+function makeConfig(retryConfig: RetryConfig = NO_RETRY): ServerConfig {
+    return {
+        name: 'Test',
+        application: 'qbittorrent',
+        type: 'qbittorrent',
+        hostname: 'http://localhost:8080',
+        username: 'admin',
+        password: 'adminadmin',
+        directories: [],
+        clientOptions: { retryConfig },
+    };
+}
+
+function httpError(status: number, statusText = 'Error'): HttpError {
+    return new HttpError(status, statusText, {} as Response);
+}
+
+describe('QBittorrentAdapterError', () => {
+    it('constructs with type and message and is an AdapterError', () => {
+        const e = new QBittorrentAdapterError('AUTH_FAILED', 'nope');
+        expect(e).toBeInstanceOf(AdapterError);
+        expect(e).toBeInstanceOf(QBittorrentAdapterError);
+        expect(e.type).toBe('AUTH_FAILED');
+        expect(e.message).toBe('nope');
+        expect(e.name).toBe('QBittorrentAdapterError');
+    });
+
+    it('returns a non-empty user message for every error type', () => {
+        for (const t of ALL_TYPES) {
+            const msg = new QBittorrentAdapterError(t, 'x').toUserMessage();
+            expect(typeof msg).toBe('string');
+            expect(msg.length).toBeGreaterThan(0);
+        }
+    });
+
+    it('returns a distinct user message per error type', () => {
+        const msgs = ALL_TYPES.map(t => new QBittorrentAdapterError(t, 'x').toUserMessage());
+        expect(new Set(msgs).size).toBe(ALL_TYPES.length);
+    });
+
+    describe('from() classification', () => {
+        it('maps an IP-ban message → IP_BANNED', () => {
+            expect(QBittorrentAdapterError.from(new Error('IP has been banned by qBittorrent.')).type).toBe('IP_BANNED');
+        });
+        it('maps "Login attempts exhausted" → IP_BANNED', () => {
+            expect(QBittorrentAdapterError.from(new Error('Login attempts exhausted. Wait 30s')).type).toBe('IP_BANNED');
+        });
+        it('maps an authentication-failed message → AUTH_FAILED', () => {
+            expect(QBittorrentAdapterError.from(new Error('Authentication Failed (401 Unauthorized).')).type).toBe('AUTH_FAILED');
+        });
+        it('maps a timeout message → TIMEOUT', () => {
+            expect(QBittorrentAdapterError.from(new Error('Request timeout after 30000ms')).type).toBe('TIMEOUT');
+        });
+        it('maps a 404 HttpError → ENDPOINT_NOT_FOUND', () => {
+            expect(QBittorrentAdapterError.from(httpError(404, 'Not Found')).type).toBe('ENDPOINT_NOT_FOUND');
+        });
+        it('maps a 5xx HttpError → SERVER_ERROR', () => {
+            expect(QBittorrentAdapterError.from(httpError(503, 'Service Unavailable')).type).toBe('SERVER_ERROR');
+        });
+        it('maps a fetch TypeError → CONNECTION_REFUSED', () => {
+            expect(QBittorrentAdapterError.from(new TypeError('Failed to fetch')).type).toBe('CONNECTION_REFUSED');
+        });
+        it('passes an existing QBittorrentAdapterError through unchanged', () => {
+            const original = new QBittorrentAdapterError('SERVER_ERROR', 'x');
+            expect(QBittorrentAdapterError.from(original)).toBe(original);
+        });
+        it('unwraps RetryExhaustedError to classify the underlying cause', () => {
+            const wrapped = new RetryExhaustedError(new Error('IP has been banned'));
+            expect(QBittorrentAdapterError.from(wrapped).type).toBe('IP_BANNED');
+        });
+        it('falls back to UNKNOWN for unrecognized values', () => {
+            expect(QBittorrentAdapterError.from(new Error('some odd failure')).type).toBe('UNKNOWN');
+        });
+    });
+});
+
+describe('withAdapterRetry (qBittorrent)', () => {
+    it('retries on transient failure and then resolves', async () => {
+        let calls = 0;
+        const fn = vi.fn(async () => {
+            calls++;
+            if (calls < 2) throw new Error('transient');
+            return 'ok';
+        });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).resolves.toBe('ok');
+        expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('rethrows an AdapterError unchanged on exhaustion', async () => {
+        const err = new QBittorrentAdapterError('SERVER_ERROR', 'down');
+        const fn = vi.fn(async () => { throw err; });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBe(err);
+        expect(fn).toHaveBeenCalledTimes(FAST_RETRY.maxAttempts);
+    });
+
+    it('wraps a non-AdapterError as RetryExhaustedError on exhaustion', async () => {
+        const fn = vi.fn(async () => { throw httpError(503, 'Service Unavailable'); });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBeInstanceOf(RetryExhaustedError);
+    });
+});
+
+describe('QBittorrentAdapter.testConnection', () => {
+    it('returns { connected: true } on success', async () => {
+        const adapter = new QBittorrentAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockResolvedValue(undefined);
+        vi.spyOn(adapter, 'getAppVersion').mockResolvedValue('v4.6.0');
+        await expect(adapter.testConnection()).resolves.toEqual({ connected: true });
+    });
+
+    it('returns { connected: false, error } with a classified AdapterError on auth failure', async () => {
+        const adapter = new QBittorrentAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockRejectedValue(new Error('Authentication Failed (401 Unauthorized).'));
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error).toBeInstanceOf(QBittorrentAdapterError);
+        expect(result.error?.type).toBe('AUTH_FAILED');
+        expect(typeof result.error?.toUserMessage()).toBe('string');
+    });
+
+    it('classifies an IP ban as IP_BANNED', async () => {
+        const adapter = new QBittorrentAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockRejectedValue(new Error('IP has been banned by qBittorrent.'));
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error?.type).toBe('IP_BANNED');
+    });
+
+    it('does NOT retry login (preserves IP-ban lockout protection)', async () => {
+        const adapter = new QBittorrentAdapter(makeConfig(FAST_RETRY));
+        const loginSpy = vi.spyOn(adapter, 'login').mockRejectedValue(new Error('Authentication Failed (401 Unauthorized).'));
+        await adapter.testConnection();
+        expect(loginSpy).toHaveBeenCalledTimes(1);
+    });
+});
+
 });

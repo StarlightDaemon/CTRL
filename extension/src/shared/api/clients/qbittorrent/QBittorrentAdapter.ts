@@ -5,6 +5,9 @@ import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
 import { HttpError } from '@/shared/api/network/HttpError';
 import { QBittorrentListSchema, QBittorrentTorrent } from './QBittorrentSchema';
 import { ServerConfig } from '@/shared/lib/types';
+import { QBittorrentAdapterError } from './QBittorrentAdapterError';
+import { AdapterConnectionResult } from '@/shared/api/clients/shared/AdapterConnectionResult';
+import { withAdapterRetry, RetryConfig, DEFAULT_RETRY_CONFIG } from '@/shared/lib/retry/withAdapterRetry';
 
 /**
  * Error messages from qBittorrent that require special handling
@@ -42,11 +45,18 @@ export class QBittorrentAdapter implements ITorrentClient {
     private readonly LOGIN_BACKOFF_BASE_MS = 2000;
     private readonly REQUEST_TIMEOUT_MS = 30000;
 
+    private retryConfig: RetryConfig;
+
     constructor(config: ServerConfig) {
         this.config = config;
         // Ensure trailing slash for URL constructor to work as "directory"
         this.baseUrl = `${config.hostname.replace(/\/$/, '')}/api/v2/`;
         this.client = new FetchHttpClient(this.baseUrl);
+        // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
+        this.retryConfig = {
+            ...DEFAULT_RETRY_CONFIG,
+            ...(config.clientOptions?.retryConfig as Partial<RetryConfig> || {}),
+        };
     }
 
     /**
@@ -220,13 +230,20 @@ export class QBittorrentAdapter implements ITorrentClient {
         });
     }
 
-    async testConnection(): Promise<boolean> {
-        console.log('[QBit] Testing Connection...');
-        await this.login();
-        console.log('[QBit] Login passed, checking version...');
-        const v = await this.getAppVersion();
-        console.log(`[QBit] Version response: ${v}`);
-        return true;
+    async testConnection(): Promise<AdapterConnectionResult> {
+        try {
+            console.log('[QBit] Testing Connection...');
+            // login() is intentionally NOT wrapped in retry: qBittorrent bans the IP
+            // after repeated failed logins, and login() already enforces a backoff
+            // cooldown. Only the (idempotent) version probe is retried.
+            await this.login();
+            console.log('[QBit] Login passed, checking version...');
+            const v = await withAdapterRetry(() => this.getAppVersion(), this.retryConfig);
+            console.log(`[QBit] Version response: ${v}`);
+            return { connected: true };
+        } catch (error) {
+            return { connected: false, error: QBittorrentAdapterError.from(error) };
+        }
     }
 
     async ping(): Promise<number> {
