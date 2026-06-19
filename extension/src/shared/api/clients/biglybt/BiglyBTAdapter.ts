@@ -27,11 +27,12 @@ import {
     DEFAULT_RETRY_CONFIG,
     classifyError,
     getErrorMessage,
-    calculateBackoffDelay,
-    sleep,
     inferNetworkFromTrackers,
     getNetworkModeLabel
 } from './BiglyBTSchema';
+import { BiglyBTAdapterError } from './BiglyBTAdapterError';
+import { AdapterConnectionResult } from '@/shared/api/clients/shared/AdapterConnectionResult';
+import { withAdapterRetry } from '@/shared/lib/retry/withAdapterRetry';
 
 /**
  * BiglyBT Adapter
@@ -202,32 +203,27 @@ export class BiglyBTAdapter implements ITorrentClient {
     async loginWithRetry(config?: Partial<RetryConfig>): Promise<boolean> {
         const retryConfig = { ...this.retryConfig, ...config };
 
-        for (let attempt = 0; attempt < retryConfig.maxAttempts; attempt++) {
-            try {
-                await this.login();
-                console.log(`[BiglyBTAdapter] Login succeeded on attempt ${attempt + 1}`);
-                return true;
-            } catch (e) {
-                const errorType = classifyError(e);
-                const delay = calculateBackoffDelay(attempt, retryConfig);
-
-                // Only retry on connection-related errors
-                if (errorType === 'CONNECTION_REFUSED' || errorType === 'TIMEOUT') {
-                    console.log(
-                        `[BiglyBTAdapter] Login attempt ${attempt + 1} failed (${errorType}), ` +
-                        `retrying in ${delay}ms...`
-                    );
-                    await sleep(delay);
-                } else {
-                    // Auth errors, RPC errors etc. should fail immediately
-                    console.error(`[BiglyBTAdapter] Login failed with non-retryable error: ${errorType}`);
-                    throw e;
-                }
+        try {
+            await this.login();
+            return true;
+        } catch (e) {
+            // Only connection-related errors are worth retrying during BiglyBT/xmwebui
+            // startup. Auth/RPC errors should fail immediately.
+            const errorType = classifyError(e);
+            if (errorType !== 'CONNECTION_REFUSED' && errorType !== 'TIMEOUT') {
+                console.error(`[BiglyBTAdapter] Login failed with non-retryable error: ${errorType}`);
+                throw e;
             }
         }
 
-        console.error(`[BiglyBTAdapter] Login failed after ${retryConfig.maxAttempts} attempts`);
-        return false;
+        // Retry the connection via the shared utility (JVM-tuned retryConfig preserved).
+        try {
+            await withAdapterRetry(() => this.login(), retryConfig);
+            return true;
+        } catch {
+            console.error(`[BiglyBTAdapter] Login failed after ${retryConfig.maxAttempts} retries`);
+            return false;
+        }
     }
 
     /**
@@ -240,24 +236,22 @@ export class BiglyBTAdapter implements ITorrentClient {
      */
     async testConnectionWithRetry(config?: Partial<RetryConfig>): Promise<boolean> {
         const retryConfig = { ...this.retryConfig, ...config };
+        const probe = () => this.call('session-get', {});
 
-        for (let attempt = 0; attempt < retryConfig.maxAttempts; attempt++) {
-            try {
-                await this.call('session-get', {});
-                return true;
-            } catch (e) {
-                const errorType = classifyError(e);
-                const delay = calculateBackoffDelay(attempt, retryConfig);
-
-                if (errorType === 'CONNECTION_REFUSED' || errorType === 'TIMEOUT') {
-                    await sleep(delay);
-                } else {
-                    throw e;
-                }
+        try {
+            await probe();
+            return true;
+        } catch (e) {
+            // Only connection-related errors are worth retrying during BiglyBT/xmwebui startup.
+            const errorType = classifyError(e);
+            if (errorType !== 'CONNECTION_REFUSED' && errorType !== 'TIMEOUT') {
+                throw e;
             }
         }
 
-        throw new Error(`BiglyBT connection failed after ${retryConfig.maxAttempts} attempts`);
+        // Retry the connection via the shared utility (JVM-tuned retryConfig preserved).
+        await withAdapterRetry(probe, retryConfig);
+        return true;
     }
 
     /**
@@ -569,9 +563,13 @@ export class BiglyBTAdapter implements ITorrentClient {
     /**
      * Test connection to BiglyBT
      */
-    async testConnection(): Promise<boolean> {
-        await this.call('session-get', {});
-        return true;
+    async testConnection(): Promise<AdapterConnectionResult> {
+        try {
+            await this.testConnectionWithRetry();
+            return { connected: true };
+        } catch (error) {
+            return { connected: false, error: BiglyBTAdapterError.from(error) };
+        }
     }
 
     /**

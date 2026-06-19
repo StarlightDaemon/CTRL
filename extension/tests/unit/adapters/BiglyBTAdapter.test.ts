@@ -12,6 +12,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BiglyBTAdapter } from '@/shared/api/clients/biglybt/BiglyBTAdapter';
 import { ServerConfig } from '@/shared/lib/types';
+import { BiglyBTAdapterError } from '@/shared/api/clients/biglybt/BiglyBTAdapterError';
+import { BiglyBTErrorType, classifyError, getErrorMessage } from '@/shared/api/clients/biglybt/BiglyBTSchema';
+import { withAdapterRetry, RetryConfig, RetryExhaustedError } from '@/shared/lib/retry/withAdapterRetry';
+import { AdapterError } from '@/shared/api/clients/shared/AdapterError';
 
 // Mock server config
 const mockConfig: ServerConfig = {
@@ -964,4 +968,171 @@ describe('BiglyBTAdapter', () => {
             expect(label).toBe('I2P');
         });
     });
+});
+
+
+
+describe('BiglyBTAdapter — AdapterError & withAdapterRetry (parity)', () => {
+const FAST_RETRY: RetryConfig = { maxAttempts: 3, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+const NO_RETRY: RetryConfig = { maxAttempts: 1, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+
+const ALL_TYPES: BiglyBTErrorType[] = [
+    'CONNECTION_REFUSED', 'TIMEOUT', 'AUTH_FAILED', 'SESSION_EXPIRED', 'PLUGIN_MISSING',
+    'METHOD_NOT_FOUND', 'NETWORK_ERROR', 'RPC_ERROR', 'UNKNOWN',
+];
+
+function makeConfig(retryConfig: RetryConfig = NO_RETRY): ServerConfig {
+    return {
+        name: 'Test',
+        application: 'biglybt',
+        type: 'biglybt',
+        hostname: 'http://localhost:9091',
+        directories: [],
+        clientOptions: { retryConfig },
+    };
+}
+
+type CallSpy = { call: (...args: unknown[]) => Promise<unknown> };
+
+describe('BiglyBTAdapterError', () => {
+    it('constructs with type and message and is an AdapterError', () => {
+        const e = new BiglyBTAdapterError('PLUGIN_MISSING', 'no plugin');
+        expect(e).toBeInstanceOf(AdapterError);
+        expect(e).toBeInstanceOf(BiglyBTAdapterError);
+        expect(e.type).toBe('PLUGIN_MISSING');
+        expect(e.message).toBe('no plugin');
+        expect(e.name).toBe('BiglyBTAdapterError');
+    });
+
+    it('returns a non-empty user message for every error type (delegating to getErrorMessage)', () => {
+        for (const t of ALL_TYPES) {
+            const msg = new BiglyBTAdapterError(t, 'x').toUserMessage();
+            expect(typeof msg).toBe('string');
+            expect(msg.length).toBeGreaterThan(0);
+            expect(msg).toBe(getErrorMessage(t));
+        }
+    });
+
+    it('returns a distinct user message per error type', () => {
+        const msgs = ALL_TYPES.map(t => new BiglyBTAdapterError(t, 'x').toUserMessage());
+        expect(new Set(msgs).size).toBe(ALL_TYPES.length);
+    });
+
+    describe('from() classification', () => {
+        it('classifies a connection failure → CONNECTION_REFUSED', () => {
+            expect(BiglyBTAdapterError.from(new Error('Failed to fetch')).type).toBe('CONNECTION_REFUSED');
+        });
+        it('classifies an auth failure → AUTH_FAILED', () => {
+            expect(BiglyBTAdapterError.from(new Error('401 Unauthorized')).type).toBe('AUTH_FAILED');
+        });
+        it('classifies a missing plugin → PLUGIN_MISSING', () => {
+            expect(BiglyBTAdapterError.from(new Error('404 Not Found')).type).toBe('PLUGIN_MISSING');
+        });
+        it('passes an existing BiglyBTAdapterError through unchanged', () => {
+            const original = new BiglyBTAdapterError('RPC_ERROR', 'x');
+            expect(BiglyBTAdapterError.from(original)).toBe(original);
+        });
+        it('unwraps RetryExhaustedError to classify the underlying cause', () => {
+            const wrapped = new RetryExhaustedError(new Error('Failed to fetch'));
+            expect(BiglyBTAdapterError.from(wrapped).type).toBe('CONNECTION_REFUSED');
+        });
+        it('falls back to UNKNOWN for unrecognized values', () => {
+            expect(BiglyBTAdapterError.from(new Error('???')).type).toBe('UNKNOWN');
+        });
+    });
+});
+
+// Regression coverage for the pre-existing PLUGIN_MISSING gap: the type was defined in
+// BiglyBTErrorType and handled in getErrorMessage but had no branch in classifyError,
+// making it unreachable. It is now reachable via a string-match condition.
+describe('classifyError PLUGIN_MISSING reachability (bug fix)', () => {
+    it('classifies a 404 (missing RPC endpoint) → PLUGIN_MISSING', () => {
+        expect(classifyError(new Error('HTTP Error: 404 Not Found'))).toBe('PLUGIN_MISSING');
+    });
+    it('classifies an xmwebui-plugin message → PLUGIN_MISSING', () => {
+        expect(classifyError(new Error('xmwebui plugin is not installed'))).toBe('PLUGIN_MISSING');
+        expect(classifyError(new Error('Required plugin not found'))).toBe('PLUGIN_MISSING');
+    });
+    it('still classifies an RPC-level "method not found" → METHOD_NOT_FOUND (no regression)', () => {
+        expect(classifyError(new Error('method not found'))).toBe('METHOD_NOT_FOUND');
+    });
+    it('round-trips PLUGIN_MISSING through getErrorMessage', () => {
+        const type = classifyError(new Error('404'));
+        expect(type).toBe('PLUGIN_MISSING');
+        expect(getErrorMessage(type)).toContain('plugin');
+    });
+});
+
+describe('withAdapterRetry (BiglyBT)', () => {
+    it('retries on transient failure and then resolves', async () => {
+        let calls = 0;
+        const fn = vi.fn(async () => {
+            calls++;
+            if (calls < 2) throw new Error('transient');
+            return 'ok';
+        });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).resolves.toBe('ok');
+        expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('rethrows an AdapterError unchanged on exhaustion', async () => {
+        const err = new BiglyBTAdapterError('CONNECTION_REFUSED', 'down');
+        const fn = vi.fn(async () => { throw err; });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBe(err);
+        expect(fn).toHaveBeenCalledTimes(FAST_RETRY.maxAttempts);
+    });
+
+    it('wraps a non-AdapterError as RetryExhaustedError on exhaustion', async () => {
+        const fn = vi.fn(async () => { throw new Error('Failed to fetch'); });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBeInstanceOf(RetryExhaustedError);
+    });
+});
+
+describe('BiglyBTAdapter.testConnection', () => {
+    it('returns { connected: true } on success', async () => {
+        const adapter = new BiglyBTAdapter(makeConfig());
+        const spy = vi.spyOn(adapter as unknown as CallSpy, 'call').mockResolvedValue({ result: 'success', arguments: {} });
+        await expect(adapter.testConnection()).resolves.toEqual({ connected: true });
+        expect(spy).toHaveBeenCalledWith('session-get', {});
+    });
+
+    it('returns { connected: false, error } with a classified AdapterError on auth failure', async () => {
+        const adapter = new BiglyBTAdapter(makeConfig());
+        vi.spyOn(adapter as unknown as CallSpy, 'call').mockRejectedValue(new Error('401 Unauthorized'));
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error).toBeInstanceOf(BiglyBTAdapterError);
+        expect(result.error?.type).toBe('AUTH_FAILED');
+        expect(typeof result.error?.toUserMessage()).toBe('string');
+    });
+
+    it('classifies a missing plugin (404) as PLUGIN_MISSING', async () => {
+        const adapter = new BiglyBTAdapter(makeConfig());
+        vi.spyOn(adapter as unknown as CallSpy, 'call').mockRejectedValue(new Error('HTTP Error: 404 Not Found'));
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error?.type).toBe('PLUGIN_MISSING');
+    });
+
+    it('does NOT retry a non-connection error (auth fails fast)', async () => {
+        const adapter = new BiglyBTAdapter(makeConfig(FAST_RETRY));
+        const spy = vi.spyOn(adapter as unknown as CallSpy, 'call').mockRejectedValue(new Error('401 Unauthorized'));
+        await adapter.testConnection();
+        expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries a transient connection failure before reporting connected', async () => {
+        const adapter = new BiglyBTAdapter(makeConfig(FAST_RETRY));
+        let calls = 0;
+        vi.spyOn(adapter as unknown as CallSpy, 'call').mockImplementation(async () => {
+            calls++;
+            if (calls < 2) throw new Error('Failed to fetch');
+            return { result: 'success' };
+        });
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(true);
+        expect(calls).toBe(2);
+    });
+});
+
 });
