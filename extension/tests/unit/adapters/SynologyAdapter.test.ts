@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SynologyAdapter } from '@/shared/api/clients/synology/SynologyAdapter';
 import { ServerConfig } from '@/shared/lib/types';
+import { SynologyAdapterError, SynologyErrorType } from '@/shared/api/clients/synology/SynologyAdapterError';
+import { withAdapterRetry, RetryConfig, RetryExhaustedError } from '@/shared/lib/retry/withAdapterRetry';
+import { AdapterError } from '@/shared/api/clients/shared/AdapterError';
 
 describe('SynologyAdapter', () => {
     const mockConfig: ServerConfig = {
@@ -158,4 +161,177 @@ describe('SynologyAdapter', () => {
             expect(torrent.eta).toBe(-1);
         });
     });
+});
+
+
+
+describe('SynologyAdapter — AdapterError & withAdapterRetry (parity)', () => {
+const FAST_RETRY: RetryConfig = { maxAttempts: 3, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+const NO_RETRY: RetryConfig = { maxAttempts: 1, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+
+const ALL_TYPES: SynologyErrorType[] = [
+    'CONNECTION_REFUSED', 'TIMEOUT', 'AUTH_FAILED', 'OTP_REQUIRED', 'OTP_FAILED',
+    'IP_BLOCKED', 'PERMISSION_DENIED', 'SESSION_EXPIRED', 'NETWORK_ERROR', 'UNKNOWN',
+];
+
+function makeConfig(retryConfig: RetryConfig = NO_RETRY): ServerConfig {
+    return {
+        name: 'Test',
+        application: 'synology',
+        type: 'synology',
+        hostname: 'http://nas.local:5000',
+        username: 'admin',
+        password: 'pass',
+        directories: [],
+        clientOptions: { retryConfig },
+    };
+}
+
+type GetSpy = { client: { get: (...args: unknown[]) => Promise<unknown> } };
+
+describe('SynologyAdapterError', () => {
+    it('constructs with type and message and is an AdapterError', () => {
+        const e = new SynologyAdapterError('IP_BLOCKED', 'nope');
+        expect(e).toBeInstanceOf(AdapterError);
+        expect(e).toBeInstanceOf(SynologyAdapterError);
+        expect(e.type).toBe('IP_BLOCKED');
+        expect(e.message).toBe('nope');
+        expect(e.name).toBe('SynologyAdapterError');
+    });
+
+    it('returns a non-empty user message for every error type', () => {
+        for (const t of ALL_TYPES) {
+            const msg = new SynologyAdapterError(t, 'x').toUserMessage();
+            expect(typeof msg).toBe('string');
+            expect(msg.length).toBeGreaterThan(0);
+        }
+    });
+
+    it('returns a distinct user message per error type', () => {
+        const msgs = ALL_TYPES.map(t => new SynologyAdapterError(t, 'x').toUserMessage());
+        expect(new Set(msgs).size).toBe(ALL_TYPES.length);
+    });
+
+    describe('from() classification (DSM message codes)', () => {
+        it('maps "No such account or incorrect password" → AUTH_FAILED', () => {
+            expect(SynologyAdapterError.from(new Error('No such account or incorrect password')).type).toBe('AUTH_FAILED');
+        });
+        it('maps a 2FA-required message → OTP_REQUIRED', () => {
+            expect(SynologyAdapterError.from(new Error('2-factor authentication code required')).type).toBe('OTP_REQUIRED');
+        });
+        it('maps a 2FA-failed message → OTP_FAILED', () => {
+            expect(SynologyAdapterError.from(new Error('2-factor authentication failed')).type).toBe('OTP_FAILED');
+        });
+        it('maps a blocked-IP message → IP_BLOCKED', () => {
+            expect(SynologyAdapterError.from(new Error('Blocked IP source - too many failed attempts')).type).toBe('IP_BLOCKED');
+        });
+        it('maps an insufficient-privilege message → PERMISSION_DENIED', () => {
+            expect(SynologyAdapterError.from(new Error('Insufficient privilege for this operation')).type).toBe('PERMISSION_DENIED');
+        });
+        it('maps a session-expiry message → SESSION_EXPIRED', () => {
+            expect(SynologyAdapterError.from(new Error('SID not found (session expired)')).type).toBe('SESSION_EXPIRED');
+        });
+        it('maps "Network failure" → NETWORK_ERROR', () => {
+            expect(SynologyAdapterError.from(new Error('Network failure')).type).toBe('NETWORK_ERROR');
+        });
+        it('maps a self-signed-certificate / fetch failure → CONNECTION_REFUSED', () => {
+            expect(SynologyAdapterError.from(new TypeError('Failed to fetch')).type).toBe('CONNECTION_REFUSED');
+            expect(SynologyAdapterError.from(new Error('self-signed certificate in chain')).type).toBe('CONNECTION_REFUSED');
+        });
+        it('passes an existing SynologyAdapterError through unchanged', () => {
+            const original = new SynologyAdapterError('PERMISSION_DENIED', 'x');
+            expect(SynologyAdapterError.from(original)).toBe(original);
+        });
+        it('unwraps RetryExhaustedError to classify the underlying cause', () => {
+            const wrapped = new RetryExhaustedError(new Error('No such account or incorrect password'));
+            expect(SynologyAdapterError.from(wrapped).type).toBe('AUTH_FAILED');
+        });
+        it('falls back to UNKNOWN for unrecognized values', () => {
+            expect(SynologyAdapterError.from(new Error('weird DSM glitch')).type).toBe('UNKNOWN');
+        });
+    });
+});
+
+describe('withAdapterRetry (Synology)', () => {
+    it('retries on transient failure and then resolves', async () => {
+        let calls = 0;
+        const fn = vi.fn(async () => {
+            calls++;
+            if (calls < 2) throw new Error('transient');
+            return 'ok';
+        });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).resolves.toBe('ok');
+        expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('rethrows an AdapterError unchanged on exhaustion', async () => {
+        const err = new SynologyAdapterError('CONNECTION_REFUSED', 'down');
+        const fn = vi.fn(async () => { throw err; });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBe(err);
+        expect(fn).toHaveBeenCalledTimes(FAST_RETRY.maxAttempts);
+    });
+
+    it('wraps a non-AdapterError as RetryExhaustedError on exhaustion', async () => {
+        const fn = vi.fn(async () => { throw new TypeError('Failed to fetch'); });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBeInstanceOf(RetryExhaustedError);
+    });
+});
+
+describe('SynologyAdapter.testConnection', () => {
+    it('returns { connected: true } on success', async () => {
+        const adapter = new SynologyAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockResolvedValue(undefined);
+        vi.spyOn((adapter as unknown as GetSpy).client, 'get').mockResolvedValue({ success: true, data: {} });
+        await expect(adapter.testConnection()).resolves.toEqual({ connected: true });
+    });
+
+    it('returns { connected: false, error } with a classified AdapterError on auth failure', async () => {
+        const adapter = new SynologyAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockRejectedValue(new Error('No such account or incorrect password'));
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error).toBeInstanceOf(SynologyAdapterError);
+        expect(result.error?.type).toBe('AUTH_FAILED');
+        expect(typeof result.error?.toUserMessage()).toBe('string');
+    });
+
+    it('classifies a 2FA requirement as OTP_REQUIRED', async () => {
+        const adapter = new SynologyAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockRejectedValue(new Error('2-factor authentication code required'));
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error?.type).toBe('OTP_REQUIRED');
+    });
+
+    it('maps an info-probe failure code to PERMISSION_DENIED', async () => {
+        const adapter = new SynologyAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockResolvedValue(undefined);
+        vi.spyOn((adapter as unknown as GetSpy).client, 'get').mockResolvedValue({ success: false, error: { code: 105 } });
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error?.type).toBe('PERMISSION_DENIED');
+    });
+
+    it('does NOT retry login (preserves IP-block protection)', async () => {
+        const adapter = new SynologyAdapter(makeConfig(FAST_RETRY));
+        const loginSpy = vi.spyOn(adapter, 'login').mockRejectedValue(new Error('No such account or incorrect password'));
+        await adapter.testConnection();
+        expect(loginSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries a transient info-probe failure before reporting connected', async () => {
+        const adapter = new SynologyAdapter(makeConfig(FAST_RETRY));
+        vi.spyOn(adapter, 'login').mockResolvedValue(undefined);
+        let calls = 0;
+        vi.spyOn((adapter as unknown as GetSpy).client, 'get').mockImplementation(async () => {
+            calls++;
+            if (calls < 2) throw new TypeError('Failed to fetch');
+            return { success: true, data: {} };
+        });
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(true);
+        expect(calls).toBe(2);
+    });
+});
+
 });

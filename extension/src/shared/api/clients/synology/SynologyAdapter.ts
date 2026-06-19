@@ -10,6 +10,9 @@ import {
     SynologyAuthDataSchema,
     SynologyAPIInfoSchema,
 } from './SynologySchema';
+import { SynologyAdapterError } from './SynologyAdapterError';
+import { AdapterConnectionResult } from '@/shared/api/clients/shared/AdapterConnectionResult';
+import { withAdapterRetry, RetryConfig, DEFAULT_RETRY_CONFIG } from '@/shared/lib/retry/withAdapterRetry';
 
 /**
  * Synology Download Station Adapter
@@ -28,6 +31,7 @@ export class SynologyAdapter implements ITorrentClient {
     private sid: string | null = null;
     private synotoken: string | null = null;
     private apiPaths: Record<string, string> = {};
+    private retryConfig: RetryConfig;
 
     // Session recovery tracking
     private isRecovering: boolean = false;
@@ -54,6 +58,11 @@ export class SynologyAdapter implements ITorrentClient {
         this.config = config;
         this.baseUrl = config.hostname.replace(/\/$/, '');
         this.client = new FetchHttpClient(this.baseUrl);
+        // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
+        this.retryConfig = {
+            ...DEFAULT_RETRY_CONFIG,
+            ...(config.clientOptions?.retryConfig as Partial<RetryConfig> || {}),
+        };
     }
 
     /**
@@ -387,12 +396,14 @@ export class SynologyAdapter implements ITorrentClient {
         await this.client.get(`${this.getPath('entry')}?${params}`);
     }
 
-    async testConnection(): Promise<boolean> {
+    async testConnection(): Promise<AdapterConnectionResult> {
         try {
             console.log('[Synology] Testing Connection...');
+            // login() is intentionally NOT retried: Synology blocks the IP after
+            // repeated failed logins (codes 407/408) and login() enforces a cooldown.
             await this.login();
 
-            // Try to get info to verify API access
+            // Verify API access via a retried (idempotent) info probe.
             const params = new URLSearchParams({
                 api: 'SYNO.DownloadStation.Info',
                 version: '1',
@@ -400,46 +411,22 @@ export class SynologyAdapter implements ITorrentClient {
                 _sid: this.sid!,
             });
 
-            const response = await this.client.get<{ success?: boolean; data?: unknown; error?: { code?: number } }>(`${this.getPath('entry')}?${params}`);
+            const response = await withAdapterRetry(
+                () => this.client.get<{ success?: boolean; data?: unknown; error?: { code?: number } }>(`${this.getPath('entry')}?${params}`),
+                this.retryConfig,
+            );
             console.log('[Synology] Info response:', response);
 
-            return response?.success === true;
+            if (response?.success === true) {
+                return { connected: true };
+            }
+            // Certificate/network failures surface as classifiable errors via
+            // SynologyAdapterError.from (CONNECTION_REFUSED carries the cert guidance).
+            throw new Error(this.getTaskError(response?.error?.code ?? 0));
         } catch (e) {
             console.error('[Synology] Connection Test Failed:', e);
-
-            // Q4: Detect certificate/network errors and provide actionable guidance
-            if (this.isCertificateOrNetworkError(e)) {
-                throw new Error(
-                    'Connection failed. If using HTTPS with a self-signed certificate, ' +
-                    'open your NAS web UI in a new browser tab and accept the certificate first, ' +
-                    'then try connecting again.'
-                );
-            }
-
-            // Re-throw other errors with context
-            if (e instanceof Error) {
-                throw e;
-            }
-            throw new Error('Connection failed - check hostname and credentials');
+            return { connected: false, error: SynologyAdapterError.from(e) };
         }
-    }
-
-    /**
-     * Q4: Detect SSL certificate or network connectivity errors
-     * These require user action (accept cert in browser) rather than config changes
-     */
-    private isCertificateOrNetworkError(error: unknown): boolean {
-        if (error instanceof Error) {
-            const msg = error.message.toLowerCase();
-            return msg.includes('failed to fetch') ||
-                msg.includes('networkerror') ||
-                msg.includes('network error') ||
-                msg.includes('ssl') ||
-                msg.includes('certificate') ||
-                msg.includes('cert_') ||
-                msg.includes('unable to connect');
-        }
-        return false;
     }
 
     async ping(): Promise<number> {
