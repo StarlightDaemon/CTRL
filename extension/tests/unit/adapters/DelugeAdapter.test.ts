@@ -7,6 +7,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DelugeAdapter } from '@/shared/api/clients/deluge/DelugeAdapter';
 import { ServerConfig } from '@/shared/lib/types';
+import { DelugeAdapterError, DelugeErrorType } from '@/shared/api/clients/deluge/DelugeAdapterError';
+import { withAdapterRetry, RetryConfig, RetryExhaustedError } from '@/shared/lib/retry/withAdapterRetry';
+import { AdapterError } from '@/shared/api/clients/shared/AdapterError';
 
 // Mock server config
 const mockConfig: ServerConfig = {
@@ -17,7 +20,7 @@ const mockConfig: ServerConfig = {
     username: '', // Deluge uses password-only auth
     password: 'deluge',
     directories: [],
-    clientOptions: {},
+    clientOptions: { retryConfig: { maxAttempts: 3, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 } },
 };
 
 // Helper to create mock JSON-RPC responses
@@ -262,12 +265,14 @@ describe('DelugeAdapter', () => {
             ]);
 
             const result = await adapter.testConnection();
-            expect(result).toBe(true);
+            expect(result).toEqual({ connected: true });
         });
 
-        it('should throw on connection failure', async () => {
+        it('should return { connected: false } on connection failure', async () => {
             vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'));
-            await expect(adapter.testConnection()).rejects.toThrow('Network error');
+            const result = await adapter.testConnection();
+            expect(result.connected).toBe(false);
+            expect(result.error?.type).toBe('NETWORK_ERROR');
         });
     });
 
@@ -335,4 +340,148 @@ describe('DelugeAdapter', () => {
             expect(categories).toEqual([]);
         });
     });
+});
+
+
+
+describe('DelugeAdapter — AdapterError & withAdapterRetry (parity)', () => {
+const FAST_RETRY: RetryConfig = { maxAttempts: 3, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+const NO_RETRY: RetryConfig = { maxAttempts: 1, initialDelayMs: 0, maxDelayMs: 0, backoffMultiplier: 1 };
+
+const ALL_TYPES: DelugeErrorType[] = [
+    'CONNECTION_REFUSED', 'TIMEOUT', 'AUTH_FAILED', 'AUTH_LEVEL_LOW', 'DAEMON_OFFLINE',
+    'METHOD_NOT_FOUND', 'INTERNAL_ERROR', 'RPC_FAILED', 'NETWORK_ERROR', 'UNKNOWN',
+];
+
+function makeConfig(retryConfig: RetryConfig = NO_RETRY): ServerConfig {
+    return {
+        name: 'Test',
+        application: 'deluge',
+        type: 'deluge',
+        hostname: 'http://localhost:8112',
+        password: 'deluge',
+        directories: [],
+        clientOptions: { retryConfig },
+    };
+}
+
+function codedError(code: number, message: string): Error {
+    const e = new Error(message);
+    (e as Error & { code?: number }).code = code;
+    return e;
+}
+
+describe('DelugeAdapterError', () => {
+    it('constructs with type and message and is an AdapterError', () => {
+        const e = new DelugeAdapterError('AUTH_FAILED', 'nope');
+        expect(e).toBeInstanceOf(AdapterError);
+        expect(e).toBeInstanceOf(DelugeAdapterError);
+        expect(e.type).toBe('AUTH_FAILED');
+        expect(e.message).toBe('nope');
+        expect(e.name).toBe('DelugeAdapterError');
+    });
+
+    it('returns a non-empty user message for every error type', () => {
+        for (const t of ALL_TYPES) {
+            const msg = new DelugeAdapterError(t, 'x').toUserMessage();
+            expect(typeof msg).toBe('string');
+            expect(msg.length).toBeGreaterThan(0);
+        }
+    });
+
+    it('returns a distinct user message per error type', () => {
+        const msgs = ALL_TYPES.map(t => new DelugeAdapterError(t, 'x').toUserMessage());
+        expect(new Set(msgs).size).toBe(ALL_TYPES.length);
+    });
+
+    describe('from() classification', () => {
+        it('maps RPC error code 1 → AUTH_FAILED', () => {
+            expect(DelugeAdapterError.from(codedError(1, 'Not authenticated')).type).toBe('AUTH_FAILED');
+        });
+        it('maps RPC error code 2 → METHOD_NOT_FOUND', () => {
+            expect(DelugeAdapterError.from(codedError(2, 'Unknown method core.x')).type).toBe('METHOD_NOT_FOUND');
+        });
+        it('maps RPC error code 5 → AUTH_LEVEL_LOW', () => {
+            expect(DelugeAdapterError.from(codedError(5, 'Auth level too low')).type).toBe('AUTH_LEVEL_LOW');
+        });
+        it('maps "Authentication Failed" message → AUTH_FAILED', () => {
+            expect(DelugeAdapterError.from(new Error('Authentication Failed')).type).toBe('AUTH_FAILED');
+        });
+        it('maps an offline-daemon message → DAEMON_OFFLINE', () => {
+            expect(DelugeAdapterError.from(new Error('Deluge daemon is offline: 127.0.0.1:58846')).type).toBe('DAEMON_OFFLINE');
+        });
+        it('maps "No Deluge Daemons available" → DAEMON_OFFLINE', () => {
+            expect(DelugeAdapterError.from(new Error('No Deluge Daemons available')).type).toBe('DAEMON_OFFLINE');
+        });
+        it('maps a timeout message → TIMEOUT', () => {
+            expect(DelugeAdapterError.from(new Error('Deluge request timeout after 30000ms')).type).toBe('TIMEOUT');
+        });
+        it('maps a fetch TypeError → CONNECTION_REFUSED', () => {
+            expect(DelugeAdapterError.from(new TypeError('Failed to fetch')).type).toBe('CONNECTION_REFUSED');
+        });
+        it('passes an existing DelugeAdapterError through unchanged', () => {
+            const original = new DelugeAdapterError('RPC_FAILED', 'x');
+            expect(DelugeAdapterError.from(original)).toBe(original);
+        });
+        it('unwraps RetryExhaustedError to classify the underlying cause', () => {
+            const wrapped = new RetryExhaustedError(codedError(1, 'Not authenticated'));
+            expect(DelugeAdapterError.from(wrapped).type).toBe('AUTH_FAILED');
+        });
+        it('falls back to UNKNOWN for unrecognized values', () => {
+            expect(DelugeAdapterError.from({}).type).toBe('UNKNOWN');
+        });
+    });
+});
+
+describe('withAdapterRetry (Deluge)', () => {
+    it('retries on transient failure and then resolves', async () => {
+        let calls = 0;
+        const fn = vi.fn(async () => {
+            calls++;
+            if (calls < 2) throw new Error('transient');
+            return 'ok';
+        });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).resolves.toBe('ok');
+        expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('rethrows an AdapterError unchanged on exhaustion', async () => {
+        const err = new DelugeAdapterError('DAEMON_OFFLINE', 'down');
+        const fn = vi.fn(async () => { throw err; });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBe(err);
+        expect(fn).toHaveBeenCalledTimes(FAST_RETRY.maxAttempts);
+    });
+
+    it('wraps a non-AdapterError as RetryExhaustedError on exhaustion', async () => {
+        const fn = vi.fn(async () => { throw new TypeError('Failed to fetch'); });
+        await expect(withAdapterRetry(fn, FAST_RETRY)).rejects.toBeInstanceOf(RetryExhaustedError);
+    });
+});
+
+describe('DelugeAdapter.testConnection', () => {
+    it('returns { connected: true } on success', async () => {
+        const adapter = new DelugeAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockResolvedValue(undefined);
+        await expect(adapter.testConnection()).resolves.toEqual({ connected: true });
+    });
+
+    it('returns { connected: false, error } with a classified AdapterError on auth failure', async () => {
+        const adapter = new DelugeAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockRejectedValue(codedError(1, 'Not authenticated'));
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error).toBeInstanceOf(DelugeAdapterError);
+        expect(result.error?.type).toBe('AUTH_FAILED');
+        expect(typeof result.error?.toUserMessage()).toBe('string');
+    });
+
+    it('classifies an offline daemon as DAEMON_OFFLINE', async () => {
+        const adapter = new DelugeAdapter(makeConfig());
+        vi.spyOn(adapter, 'login').mockRejectedValue(new Error('Deluge daemon is offline: 127.0.0.1:58846'));
+        const result = await adapter.testConnection();
+        expect(result.connected).toBe(false);
+        expect(result.error?.type).toBe('DAEMON_OFFLINE');
+    });
+});
+
 });

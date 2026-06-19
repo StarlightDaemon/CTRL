@@ -4,6 +4,9 @@ import { Torrent, TorrentStatus } from '@/entities/torrent/model/Torrent';
 import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
 import { ServerConfig } from '@/shared/lib/types';
 import { DelugeUpdateUiSchema, DelugeTorrent, DelugeWebPlugins, DelugeWebPluginsSchema, DelugeMethodsSchema, DelugeTorrentOptions, DelugeFilePriority, DelugeFile, DelugePeer, DelugeTracker, DelugePeerSchema, DelugeTrackerSchema } from './DelugeSchema';
+import { DelugeAdapterError } from './DelugeAdapterError';
+import { AdapterConnectionResult } from '@/shared/api/clients/shared/AdapterConnectionResult';
+import { withAdapterRetry, RetryConfig, DEFAULT_RETRY_CONFIG } from '@/shared/lib/retry/withAdapterRetry';
 
 /**
  * Deluge JSON-RPC Error Codes
@@ -25,6 +28,7 @@ export class DelugeAdapter implements ITorrentClient {
     private baseUrl: string;
     private config: ServerConfig;
     private requestId = 0;
+    private retryConfig: RetryConfig;
 
     /** Request timeout in milliseconds */
     private static readonly REQUEST_TIMEOUT_MS = 30000;
@@ -40,6 +44,11 @@ export class DelugeAdapter implements ITorrentClient {
         this.config = config;
         this.baseUrl = `${config.hostname.replace(/\/$/, '')}/json`;
         this.client = new FetchHttpClient(this.baseUrl);
+        // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
+        this.retryConfig = {
+            ...DEFAULT_RETRY_CONFIG,
+            ...(config.clientOptions?.retryConfig as Partial<RetryConfig> || {}),
+        };
     }
 
     private nextId() {
@@ -320,9 +329,14 @@ export class DelugeAdapter implements ITorrentClient {
         });
     }
 
-    async testConnection(): Promise<boolean> {
-        await this.login();
-        return true;
+    async testConnection(): Promise<AdapterConnectionResult> {
+        try {
+            // Retry the connection probe so transient startup failures don't fail the test.
+            await withAdapterRetry(() => this.login(), this.retryConfig);
+            return { connected: true };
+        } catch (error) {
+            return { connected: false, error: DelugeAdapterError.from(error) };
+        }
     }
 
     async ping(): Promise<number> {
