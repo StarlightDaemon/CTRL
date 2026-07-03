@@ -18,7 +18,7 @@ with `@injectable()`.
 Synology support was removed from the extension on 2026-07-02 (product
 decision — the operator does not intend to support that ecosystem going
 forward). The historical research prompt is retained for reference at
-`docs/reference/adapter__synology__architect_prompt.md`.
+`docs/archive/synology/adapter__synology__architect_prompt.md`.
 
 ## Common interface — `ITorrentClient`
 Canonical: `entities/client/model/ITorrentClient.ts`. (A re-export shim exists at

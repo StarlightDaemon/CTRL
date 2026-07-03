@@ -1,3 +1,7 @@
+> **NOTE (2026-07-02):** Synology support was removed from the CTRL extension
+> on this date. This document is retained for historical reference only and
+> does not describe active or current functionality.
+
 # Torrent Client API Implementation Research
 ## Comprehensive API Specifications for Browser Extension Integration
 
