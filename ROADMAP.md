@@ -32,7 +32,7 @@ Transform CTRL from a working port into a **Best-in-Class** torrent management s
 | Goal | Description | Status |
 |------|-------------|--------|
 | **Stability** | Keep `main`, CI, and release builds operational after beta | ✅ Active |
-| **Error Handling** | Graceful degradation, retry logic, truthful connection reporting | 🟡 In Progress |
+| **Error Handling** | Graceful degradation, retry logic, truthful connection reporting | ✅ Done (OL-001 closed 2026-06-18) |
 | **Performance Tuning** | Profile and optimize 5k+ torrent handling | 📋 Not Started |
 | **Accessibility** | WCAG 2.1 AA compliance | 📋 Not Started |
 

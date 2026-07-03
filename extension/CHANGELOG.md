@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ⚠ BREAKING CHANGES
+- **Synology Download Station Removed**: Synology is no longer a supported torrent client. `SynologyAdapter`, its error/schema classes, unit tests, and its `ClientFactory`/`CLIENT_LIST` registrations have been deleted; existing Synology server configurations will no longer resolve to an adapter and cannot be used. Support-matrix references removed from README.md and docs/BETA_TESTING.md.
+
+### 🛡️ Error Handling (Phase 2 / OL-001)
+- **AdapterError Hierarchy**: Introduced a shared `AdapterError` base with typed `<Client>AdapterError` subclasses for all nine adapters (Transmission, Aria2, Deluge, Flood, qBittorrent, ruTorrent, Synology, uTorrent, BiglyBT; Vuze inherits Transmission's coverage).
+- **withAdapterRetry**: Added a canonical retry/backoff helper (`RetryConfig`, lifted from and re-exported by BiglyBTSchema) wired into each adapter's connection probe.
+- **Truthful `testConnection`**: Changed the `testConnection` contract to return `AdapterConnectionResult` (`{ connected, error? }`) instead of a bare boolean, so connection failures surface real error detail instead of silently reporting false.
+- Fixed a BiglyBT `classifyError` gap where a `PLUGIN_MISSING` condition wasn't classified correctly.
+- Roughly ten commits implementing the above; full unit suite passed at the time (539 tests).
+
+### 🔒 Security Hardening (2026-07-02 audit remediation)
+- **Dependency Fixes**: Upgraded `wxt` (0.19.29 → 0.20.27) and `vitest` (4.0.15 → 4.1.9); pinned `esbuild`/`fx-runner`/`tmp`/`uuid` via npm overrides to close remaining transitive advisories. Migrated `wxt` 0.20 import paths (`wxt/sandbox` → `wxt/utils/define-background`, `wxt/storage` → `wxt/utils/storage`) and pinned `publicDir` in `wxt.config.ts`.
+- **Sender Validation**: Added `isTrustedSender` checks (against `chrome.runtime.id`) to the background script's `onConnect`/`onMessage` listeners, rejecting untrusted senders before any privileged action (client creation, vault access, network requests) can run.
+- **CSP Tightening**: Removed the unused `declarativeNetRequest` permission (dead since DNR removal) and dropped `data:`/`blob:` from the CSP `connect-src`.
+- **CI Action Pinning**: Aligned `auto-localize.yml` to Node 22 (matching `ci.yml`/`.nvmrc`) and pinned `stefanzweifel/git-auto-commit-action` to a commit SHA instead of the mutable `v5` tag.
+- **License Year Correction**: Corrected the LICENSE copyright year to match the repo's actual first commit.
+
+### 🔧 Bug Fixes
+- **LifecycleAdapter.parseDOM**: Replaced a stub that returned a non-structured-clone-safe raw `Document` with a serializable `ParsedDOMResult`/`ParsedDOMNode` tree, following the existing extract-to-serializable convention. Also fixed a defect where per-node text capture dropped nested inline markup (e.g. `<mark>`-wrapped highlighted terms), now using full descendant text.
+
 ### 💎 Core Architecture & Release Operations
 - **Firefox Source Packaging**: Added a clean-tree AMO source archive generation step for compliant release packaging.
 - **Build Maintenance**: Cleaned up source archive pathspecs to accommodate test directory removals.
