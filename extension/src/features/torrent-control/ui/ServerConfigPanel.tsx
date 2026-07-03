@@ -236,7 +236,7 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
                                     value={tempServer.hostname.startsWith('https') ? 'https://' : 'http://'}
                                     onChange={(e) => {
                                         const protocol = e.target.value;
-                                        let cleanHost = tempServer.hostname.replace(/^https?:\/\//, '');
+                                        const cleanHost = tempServer.hostname.replace(/^https?:\/\//, '');
                                         handleTempChange('hostname', `${protocol}${cleanHost}`);
                                     }}
                                 >
