@@ -125,9 +125,9 @@ initial_prompt: |
     - features/torrent-control/  the torrent-control feature — hooks (useSettings,
       useTorrentPoller, useVault), services (LifecycleAdapter, StateHydrator,
       ViewportManager), and UI (dashboard, dialogs, settings panels)
-    - shared/       cross-cutting layer. shared/api/clients/ holds the 10 torrent
+    - shared/       cross-cutting layer. shared/api/clients/ holds the 9 torrent
       client adapters (qBittorrent, Transmission, Deluge, Flood, ruTorrent,
-      uTorrent, BiglyBT, Vuze, Aria2, Synology) plus shared error infra
+      uTorrent, BiglyBT, Vuze, Aria2) plus shared error infra
       (AdapterError, AdapterConnectionResult); also UI primitives and utilities
     - stores/       Zustand state (useTorrentStore)
   Tests live in extension/tests/ (Vitest unit + Playwright E2E).

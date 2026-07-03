@@ -1,10 +1,10 @@
 # Torrent Client Adapters
 
-CTRL supports **10 torrent clients**. Each adapter lives under
+CTRL supports **9 torrent clients**. Each adapter lives under
 `extension/src/shared/api/clients/<client>/` and is registered for tsyringe DI
 with `@injectable()`.
 
-## The 10 adapters (class — dir)
+## The 9 adapters (class — dir)
 1. qBittorrent — `QBittorrentAdapter` (`qbittorrent/`)
 2. Transmission — `TransmissionAdapter` (`transmission/`)
 3. Deluge — `DelugeAdapter` (`deluge/`)
@@ -14,12 +14,16 @@ with `@injectable()`.
 7. BiglyBT — `BiglyBTAdapter` (`biglybt/`)
 8. Vuze — `VuzeAdapter` (`vuze/`)
 9. Aria2 — `Aria2Adapter` (`aria2/`)
-10. Synology (Download Station) — `SynologyAdapter` (`synology/`)
+
+Synology support was removed from the extension on 2026-07-02 (product
+decision — the operator does not intend to support that ecosystem going
+forward). The historical research prompt is retained for reference at
+`docs/reference/adapter__synology__architect_prompt.md`.
 
 ## Common interface — `ITorrentClient`
 Canonical: `entities/client/model/ITorrentClient.ts`. (A re-export shim exists at
 `features/torrent-control/model/types/ITorrentClient.ts` for FSD migration — not a
-second source; all 9 direct adapters import from the `entities` path.) `ClientFactory`
+second source; all 8 direct adapters import from the `entities` path.) `ClientFactory`
 (`entities/client/lib/ClientFactory.ts`) instantiates the right adapter from a
 `ServerConfig` at runtime.
 
@@ -39,7 +43,7 @@ covered by Transmission's tests.
   `shared/api/clients/shared/AdapterError.ts`. Fields: `readonly type: TType`
   (discriminant). `constructor(type, message)`. Abstract `toUserMessage(): string`.
   There is **no `retryable`/`isRetryable` field** — retry is attempt-count-driven.
-- Each of the 9 non-Vuze adapters has a typed subclass
+- Each of the 8 non-Vuze adapters has a typed subclass
   `<Client>AdapterError extends AdapterError<<Client>ErrorType>` with a
   `toUserMessage()` and a static `from(unknown)` classifier mapping raw errors into
   the typed union.

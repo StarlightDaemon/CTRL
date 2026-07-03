@@ -76,10 +76,6 @@ export class ClientFactory {
                 const { VuzeAdapter } = await import('@/shared/api/clients/vuze/VuzeAdapter');
                 return new VuzeAdapter(config);
             }
-            case 'synology': {
-                const { SynologyAdapter } = await import('@/shared/api/clients/synology/SynologyAdapter');
-                return new SynologyAdapter(config);
-            }
             default:
                 throw new Error(`Unsupported client type: ${config.type}`);
         }

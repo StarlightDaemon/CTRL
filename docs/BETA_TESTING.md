@@ -20,7 +20,7 @@ CTRL (Torrent Control) is a browser extension that provides a **unified interfac
 
 ### ✅ Fully Functional Features
 
-#### Torrent Client Support (10 Clients)
+#### Torrent Client Support (9 Clients)
 - ✅ **qBittorrent** - Full support with categories, tags, and sequential download
 - ✅ **Transmission** - Session management and directory support
 - ✅ **Deluge** - Multi-step authentication and label support
@@ -30,7 +30,6 @@ CTRL (Torrent Control) is a browser extension that provides a **unified interfac
 - ✅ **BiglyBT** - Basic operations
 - ✅ **Vuze** - Basic operations
 - ✅ **Aria2** - JSON-RPC multicall support
-- ✅ **Synology** - NAS integration with device-token and 2FA support
 
 This list mirrors the public adapter matrix in `README.md`. Internal audit or stabilization priorities may focus on a subset of adapters without changing the product-level support matrix shown here.
 
@@ -223,7 +222,7 @@ npm run build:firefox
 
 - [ ] **10+ active beta testers** providing feedback
 - [ ] **<5 critical bugs** discovered
-- [ ] **All 10 clients** verified working
+- [ ] **All 9 clients** verified working
 - [ ] **Positive user feedback** on core functionality
 - [ ] **No data loss** or credential security issues
 
@@ -262,7 +261,7 @@ npm run build:firefox
 ### New Features
 - 🎉 First public beta release
 - ✅ Multi-server management
-- ✅ 10 torrent client adapters
+- ✅ 9 torrent client adapters
 - ✅ Encrypted credential vault
 - ✅ 7 language translations
 - ⛔ **Site Integrations**: Removed for stability and store compliance.

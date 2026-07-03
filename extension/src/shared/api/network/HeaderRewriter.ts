@@ -9,7 +9,7 @@ export class HeaderRewriter {
      * 
      * JUSTIFICATION:
      * This extension acts as a remote control for a specific, user-owned BitTorrent server.
-     * Many of these servers (e.g. qBittorrent, Synology) enforce strict CSRF protection that checks
+     * Many of these servers (e.g. qBittorrent, Deluge) enforce strict CSRF protection that checks
      * Origin/Referer against their own host.
      * 
      * SAFETY MECHANISM:

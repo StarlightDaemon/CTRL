@@ -26,7 +26,7 @@ storage (the "vault").
   primitives/utils. See `mem:adapters`.
 - `stores/` — Zustand state (`useTorrentStore`). See `mem:architecture`.
 
-**IMPORTANT:** the 10 adapters live under `shared/api/clients/`, NOT under
+**IMPORTANT:** the 9 adapters live under `shared/api/clients/`, NOT under
 `features/torrent-control/`. `features/torrent-control/` is the feature layer
 (hooks + services + UI) that consumes them.
 

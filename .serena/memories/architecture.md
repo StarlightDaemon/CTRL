@@ -13,7 +13,7 @@
     + `TorrentRow` (memoized virtualized-list row).
 - `entrypoints/` — WXT entrypoints (below).
 - `features/torrent-control/` — the feature: `model/` hooks, `services/`, `ui/`.
-- `shared/` — cross-cutting: `api/clients/` (10 adapters, see `mem:adapters`),
+- `shared/` — cross-cutting: `api/clients/` (9 adapters, see `mem:adapters`),
   `api/{network,security,server,storage}`, `lib/retry/`, UI primitives, utils.
 - `stores/` — Zustand `useTorrentStore`.
 

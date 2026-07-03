@@ -12,7 +12,7 @@
 
 ## Dependency injection (tsyringe)
 - `experimentalDecorators: true` + `emitDecoratorMetadata: true`; `reflect-metadata`
-  is imported at entry. Adapters and services are `@injectable()` (all 10 adapters
+  is imported at entry. Adapters and services are `@injectable()` (all 9 adapters
   carry it). Vite uses Babel decorator support so decorators work through the
   WXT/Vite build.
 
@@ -39,8 +39,8 @@ typed `<Client>AdapterError` via a static `from()`; wrap the connection probe in
   shapes on success, `rejects.toThrow(<Client>AdapterError)` on failure paths, and
   inspect the outgoing RPC body via `JSON.parse(fetchSpy.mock.calls[N][1].body)`.
   `vi.restoreAllMocks()` in `afterEach`. Adapter test files: Aria2, BiglyBT, Deluge,
-  Flood, QBittorrent (+ services), RuTorrent, Synology, Transmission, UTorrent
-  (9 clients — Vuze covered by Transmission's tests).
+  Flood, QBittorrent (+ services), RuTorrent, Transmission, UTorrent
+  (8 clients — Vuze covered by Transmission's tests).
 - **E2E:** Playwright (`@playwright/test 1.57.0`), `extension/playwright.config.ts`,
   `testDir: tests/e2e`, Chromium only, 60s timeout, retries in CI; loads the built
   extension.

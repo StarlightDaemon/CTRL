@@ -9,7 +9,7 @@
 
 ## Project
 
-CTRL is a browser extension for managing BitTorrent clients. Built with WXT, React, and TypeScript. Supports 10 torrent clients (qBittorrent, Transmission, Deluge, Flood, ruTorrent, uTorrent, BiglyBT, Vuze, Aria2, Synology). MIT licensed.
+CTRL is a browser extension for managing BitTorrent clients. Built with WXT, React, and TypeScript. Supports 9 torrent clients (qBittorrent, Transmission, Deluge, Flood, ruTorrent, uTorrent, BiglyBT, Vuze, Aria2). MIT licensed.
 
 **Status:** Beta / Active Stabilization — Phase 2 Technical Excellence in progress.
 **Target:** v1.0 Chrome Web Store and Firefox Add-Ons release.
