@@ -46,7 +46,13 @@ test.describe('Options Page', () => {
             .or(page.locator('[data-tab="about"]'))
             .or(page.getByText('About').first());
 
-        // Only test navigation if the tab is visible
+        // The "About" nav item only exists once the vault is unlocked and
+        // Dashboard.tsx mounts (see src/entrypoints/options/Dashboard.tsx and
+        // OptionsLayout.tsx's secondaryNavItems). On a fresh e2e profile the
+        // vault starts uninitialized/locked, so VaultGuard renders
+        // SetupVault/UnlockVault instead of Dashboard and no nav exists yet -
+        // this is expected, not a UI regression (see the sibling
+        // "should handle unconfigured state gracefully" test above).
         if (await aboutLink.first().isVisible({ timeout: 3000 }).catch(() => false)) {
             await aboutLink.first().click();
 
@@ -57,7 +63,9 @@ test.describe('Options Page', () => {
             const aboutContent = page.getByText(/acknowledgments|license|contributors|version/i);
             await expect(aboutContent.first()).toBeVisible({ timeout: 5000 });
         } else {
-            // Tab not present - skip this assertion (different UI state)
+            // Vault is locked/uninitialized in this run, so Dashboard (and its
+            // nav) never mounted - skip rather than fail, since this is a
+            // valid pre-unlock UI state, not a missing feature.
             test.skip();
         }
     });
@@ -99,6 +107,10 @@ test.describe('Options Page - Theme', () => {
             .or(page.getByRole('button', { name: /appearance|theme/i }))
             .or(page.locator('[data-tab="appearance"]'));
 
+        // Same gating as the "About" tab above: "Appearance" is a
+        // Dashboard.tsx secondaryNavItem, so it only exists post-unlock. A
+        // locked/uninitialized vault on a fresh e2e profile is the expected
+        // reason this is absent, not evidence the theme section was removed.
         if (await appearanceLink.first().isVisible({ timeout: 3000 }).catch(() => false)) {
             await appearanceLink.first().click();
             await page.waitForTimeout(300);
@@ -111,7 +123,9 @@ test.describe('Options Page - Theme', () => {
             const count = await themeControls.count();
             expect(count).toBeGreaterThan(0);
         } else {
-            // Theme section not in current UI state - skip
+            // Vault locked/uninitialized in this run - Dashboard never
+            // mounted, so the Appearance nav item can't exist yet. Skip
+            // rather than fail; this is a valid pre-unlock state.
             test.skip();
         }
     });
