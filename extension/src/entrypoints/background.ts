@@ -206,8 +206,19 @@ export default defineBackground(() => {
         }
     };
 
+    // Sender validation: only this extension's own contexts (popup/options) may
+    // reach the privileged handlers below. chrome.runtime.id works for both
+    // Chrome and Firefox MV3 (Firefox reports the add-on ID in both places).
+    const isTrustedSender = (sender?: chrome.runtime.MessageSender): boolean =>
+        sender?.id === chrome.runtime.id;
+
     // Port Listener (The "Switch")
     chrome.runtime.onConnect.addListener((port) => {
+        if (!isTrustedSender(port.sender)) {
+            console.warn('[Background] Rejected port connection from untrusted sender:', port.sender?.id);
+            port.disconnect();
+            return;
+        }
         if (port.name === 'ctrl-active-session') {
             activePorts++;
             startFastPolling();
@@ -269,7 +280,11 @@ export default defineBackground(() => {
     });
 
     // Message Handler
-    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (!isTrustedSender(sender)) {
+            console.warn('[Background] Rejected message from untrusted sender:', sender?.id);
+            return false;
+        }
         const handleMessage = async () => {
             try {
                 // Attempt to resolve target client

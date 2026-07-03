@@ -11,7 +11,7 @@ export default defineConfig({
   publicDir: 'src/public',
   outDir: 'builds',
   manifest: (env) => {
-    const permissions = ['storage', 'contextMenus', 'notifications', 'activeTab', 'alarms', 'declarativeNetRequest', 'scripting'];
+    const permissions = ['storage', 'contextMenus', 'notifications', 'activeTab', 'alarms', 'scripting'];
 
     // Normalize version for Chrome compatibility (e.g., "0.2.0-beta.1" -> "0.2.0.1")
     const [baseVersion, preRelease] = packageJson.version.split('-');
@@ -59,7 +59,7 @@ export default defineConfig({
         open_in_tab: true,
       },
       content_security_policy: {
-        extension_pages: "script-src 'self'; object-src 'self'; connect-src http: https: ws: wss: data: blob:;",
+        extension_pages: "script-src 'self'; object-src 'self'; connect-src http: https: ws: wss:;",
       },
 
     };
