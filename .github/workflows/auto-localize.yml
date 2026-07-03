@@ -23,7 +23,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install Translator Dependencies
         run: |
@@ -38,7 +38,7 @@ jobs:
           node extension/scripts/translator/index.js
 
       - name: Commit and Push Changes
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0 (current target of the v5 tag)
         with:
           commit_message: "chore(i18n): Auto-generate translations [skip ci]"
           file_pattern: 'extension/public/_locales/**/messages.json'
