@@ -6,6 +6,9 @@ import Inspector from 'vite-plugin-react-inspector';
 
 export default defineConfig({
   srcDir: 'src',
+  // WXT 0.20 changed the default publicDir from `<srcDir>/public` to
+  // `<rootDir>/public`; pin the old location where _locales lives.
+  publicDir: 'src/public',
   outDir: 'builds',
   manifest: (env) => {
     const permissions = ['storage', 'contextMenus', 'notifications', 'activeTab', 'alarms', 'declarativeNetRequest', 'scripting'];

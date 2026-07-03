@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ContextMenuService } from '@/features/torrent-control/model/services/ContextMenuService';
-import { storage } from 'wxt/storage';
+import { storage } from 'wxt/utils/storage';
 import { VaultService } from '@/shared/api/security/VaultService';
 
 // Mock dependencies
-vi.mock('wxt/storage', () => ({
+vi.mock('wxt/utils/storage', () => ({
     storage: {
         getItem: vi.fn(),
         watch: vi.fn(),

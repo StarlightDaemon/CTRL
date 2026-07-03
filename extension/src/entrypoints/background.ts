@@ -1,6 +1,6 @@
 import 'reflect-metadata';
-import { defineBackground } from 'wxt/sandbox';
-import { storage } from 'wxt/storage';
+import { defineBackground } from 'wxt/utils/define-background';
+import { storage } from 'wxt/utils/storage';
 import { ClientFactory } from '@/entities/client/lib/ClientFactory'; // New Dynamic Factory
 import { ContextMenuService } from '../features/torrent-control/model/services/ContextMenuService';
 import { ITorrentClient } from '@/entities/client/model/ITorrentClient'; // New Interface

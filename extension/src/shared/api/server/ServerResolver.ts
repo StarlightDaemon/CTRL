@@ -1,4 +1,4 @@
-import { storage } from 'wxt/storage';
+import { storage } from 'wxt/utils/storage';
 import { ServerConfig, AppSettings } from '@/shared/lib/types';
 import { VaultService } from '@/shared/api/security/VaultService';
 import { DEFAULT_OPTIONS } from '@/shared/lib/constants';

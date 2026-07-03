@@ -1,5 +1,5 @@
 import { singleton } from 'tsyringe';
-import { storage } from 'wxt/storage';
+import { storage } from 'wxt/utils/storage';
 import { ITorrentClient } from '@/entities/client/model/ITorrentClient';
 import { AppSettings, ServerConfig } from '@/shared/lib/types';
 import { DEFAULT_OPTIONS } from '@/shared/lib/constants';

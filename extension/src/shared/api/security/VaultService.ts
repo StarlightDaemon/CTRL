@@ -1,4 +1,4 @@
-import { storage } from 'wxt/storage';
+import { storage } from 'wxt/utils/storage';
 import { SecurityService } from './SecurityService';
 import { KeyManager } from './KeyManager';
 import { ServerConfig } from '@/shared/lib/types';

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { storage } from 'wxt/storage';
+import { storage } from 'wxt/utils/storage';
 import { AppOptions, ServerConfig } from '@/shared/lib/types';
 import { DEFAULT_OPTIONS } from '@/shared/lib/constants';
 

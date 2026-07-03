@@ -75,7 +75,17 @@
     "typescript": "5.7.2",
     "typescript-eslint": "8.52.0",
     "vite-plugin-react-inspector": "0.3.3",
-    "vitest": "4.0.15",
-    "wxt": "0.19.29"
+    "vitest": "4.1.9",
+    "wxt": "0.20.27"
+  },
+  "overrides": {
+    "esbuild": "0.28.1",
+    "fx-runner": "1.5.0",
+    "web-ext-run": {
+      "tmp": "0.2.7"
+    },
+    "node-notifier": {
+      "uuid": "11.1.1"
+    }
   }
 }

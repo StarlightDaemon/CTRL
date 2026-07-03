@@ -1,4 +1,4 @@
-import { storage } from 'wxt/storage';
+import { storage } from 'wxt/utils/storage';
 import { SecurityService } from './SecurityService';
 
 const KEY_STORAGE_KEY = 'session:encryptionKey';
