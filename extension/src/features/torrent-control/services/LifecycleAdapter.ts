@@ -1,5 +1,48 @@
 import { browser } from 'wxt/browser';
-import { WebSocketKeepalive } from '@/shared/lib/websocket/WebSocketKeepalive';/**
+import { WebSocketKeepalive } from '@/shared/lib/websocket/WebSocketKeepalive';
+
+/**
+ * Serializable representation of a parsed DOM subtree.
+ * DRAFT (unvalidated) — see parseDOM below.
+ */
+export interface ParsedDOMNode {
+    tag: string;
+    id: string;
+    attributes: Record<string, string>;
+    text: string;
+    children: ParsedDOMNode[];
+}
+
+export interface ParsedDOMResult {
+    title: string;
+    text: string;
+    root: ParsedDOMNode | null;
+}
+
+const MAX_SERIALIZE_DEPTH = 25;
+
+function serializeElement(el: Element, depth = 0): ParsedDOMNode {
+    const attributes: Record<string, string> = {};
+    for (const attr of Array.from(el.attributes)) {
+        attributes[attr.name] = attr.value;
+    }
+    return {
+        tag: el.tagName.toLowerCase(),
+        id: el.id,
+        attributes,
+        // Full descendant text (like `textContent`), not just this element's own
+        // direct text nodes — otherwise inline-formatted content (e.g. a
+        // highlighted search term wrapped in <mark>/<b>, common on torrent
+        // index/search pages) is silently dropped from a link or row label.
+        // Matches the semantics already used for `ParsedDOMResult.text`.
+        text: el.textContent?.trim() ?? '',
+        children: depth < MAX_SERIALIZE_DEPTH
+            ? Array.from(el.children).map(child => serializeElement(child, depth + 1))
+            : [],
+    };
+}
+
+/**
  * Service to handle browser-specific lifecycle management.
  * 
  * - Chrome 116+: Uses Native WebSocket Keep-Alive for persistent connections.
@@ -84,19 +127,34 @@ export const LifecycleAdapter = {
      * Abstracted DOM Parser.
      * - Firefox: Uses native DOMParser in background.
      * - Chrome: Delegates to Offscreen Document (if implemented) or throws.
-     * 
+     *
+     * DRAFT: this previously returned the raw `Document`, which is not
+     * structured-clone serializable and cannot cross the extension message
+     * boundary. It now returns a plain-object tree (`ParsedDOMResult`) following
+     * the same extract-to-serializable convention the adapters use
+     * (UTorrentParsingUtils string extraction, XmlRpcHelper txml objects).
+     * The output shape has been exercised in
+     * tests/unit/LifecycleAdapter.parseDOM.test.ts against representative
+     * torrent-client-style HTML (a uTorrent-style token fragment, a
+     * search-result listing with highlighted/nested text and magnet links)
+     * and against structured-clone safety and deep nesting — see that file
+     * for what was and wasn't checked. There are still zero real callers in
+     * this codebase, so it has not been validated against any actual client's
+     * live HTML; verify against the real protocol before relying on it.
+     *
      * @param html String HTML to parse
-     * @returns Parsed document or data (Note: returning actual DOM nodes passes poorly over messages)
+     * @returns Serializable simplified representation of the document
      */
-    parseDOM: async (html: string): Promise<unknown> => {
+    parseDOM: async (html: string): Promise<ParsedDOMResult> => {
         // Check for native DOM support (Firefox Event Pages)
         if (typeof DOMParser !== 'undefined') {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
-            // For cross-browser consistency, we should extract data here rather than returning the DOM node,
-            // as Chrome requires serializable data.
-            // TODO: Implement specific parsing logic here or return a simplified object.
-            return doc;
+            return {
+                title: doc.title,
+                text: doc.body?.textContent?.trim() ?? '',
+                root: doc.body ? serializeElement(doc.body) : null,
+            };
         }
 
         // Chrome Offscreen Fallback would go here.
