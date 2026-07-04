@@ -27,7 +27,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "postinstall": "wxt prepare",
-    "extract-i18n": "formatjs extract 'src/**/*.{ts,tsx}' --out-file public/_locales/en/messages.json --format scripts/chrome-formatter.js"
+    "extract-i18n": "formatjs extract 'src/**/*.{ts,tsx}' --out-file src/public/_locales/en/messages.json --format scripts/chrome-formatter.js"
   },
   "dependencies": {
     "@carbon/icons-react": "^11.74.0",
