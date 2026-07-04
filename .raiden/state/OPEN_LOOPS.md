@@ -43,3 +43,21 @@
   - Routing through Anthropic's own Claude Code GitHub Action using a subscription-tied OAuth token was identified as the one path that would stay inside the existing subscription, but its reliability for this specific unattended CI use case is unproven and was not pursued.
   - The pipeline currently writes a visible bracketed placeholder (`[locale] <English text>`) for any new untranslated key rather than a real translation, by design, until this is revisited.
 - Closed by: `extract-i18n` --out-file corrected to `src/public/_locales/en/messages.json`; `LOCALES_DIR` corrected to `extension/src/public/_locales`; `TARGET_LOCALES` set to `['de', 'es', 'fi', 'fr', 'ru', 'zh_CN']`; zombie-key removal and new-key detection left intact; new-key branch restored to the original placeholder behavior (no OpenAI/Anthropic calls); workflow trigger path, dependency-install step removal, and direct-commit-via-`stefanzweifel/git-auto-commit-action` (pinned `b863ae1933cb653a53c021fe36dbb774e1fb9403`) all corrected to match.
+
+## OL-005
+
+- Title: Babel 8 migration deferred during dependency-currency pass
+- Status: Open
+- Why it matters: during the F4 dependency-currency pass, `@babel/plugin-proposal-decorators` was found six major-ish versions behind. Bumping it straight to `8.0.2` (the current latest) broke `npm install` — that release requires `@babel/core@^8.0.0` as a peer, which is a major migration of the whole Babel toolchain underneath tsyringe's legacy decorator configuration, not a routine bump.
+- Held at: `7.29.7` — the newest release still within the `7.x` line (above the prior `7.28.0` pin, below the `8.0.2` major) — so the package stays current without forcing the toolchain migration.
+- Success condition (future): migrate to Babel 8, including verifying whether legacy-mode decorators (as used by tsyringe) are still supported by the new decorators plugin under `@babel/core@8`, then bump `@babel/plugin-proposal-decorators` to the 8.x line as its own distinct change.
+- Decisions (2026-07-04): treated as a distinct future decision, not part of this dependency-currency pass. No workaround (`--force`/`--legacy-peer-deps`) applied; the version was held back deliberately instead.
+
+## OL-006
+
+- Title: Vite 8 support blocked upstream — @vitejs/plugin-react held back during dependency-currency pass
+- Status: Open
+- Why it matters: during the F4 dependency-currency pass, `@vitejs/plugin-react` was found six major versions behind (current latest `6.0.3`). Bumping it broke `npm install` — that release requires `vite@^8.0.0` as a peer, which conflicts with `@wxt-dev/module-react@1.1.5`'s peer range (`^4.4.1 || ^5.0.0`). The blocker is not this plugin itself but that the WXT ecosystem has not yet moved to support vite 8.
+- Held at: `5.2.0` — the newest `5.x` release, which satisfies both the currently installed vite (4.x) and `@wxt-dev/module-react`'s peer constraint.
+- Success condition (future): once `@wxt-dev/module-react` and the broader WXT ecosystem are updated to support vite 8 (tracked separately as general WXT-adjacent currency debt from the original audit), revisit this package and bump it alongside that change, not independently before it.
+- Decisions (2026-07-04): treated as a blocked-upstream dependency, not a direct version constraint. The hold-back is deliberate pending WXT ecosystem updates, not a workaround.
