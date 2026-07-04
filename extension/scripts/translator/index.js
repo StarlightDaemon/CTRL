@@ -6,9 +6,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configuration
-const LOCALES_DIR = path.join(__dirname, '../../public/_locales');
+const LOCALES_DIR = path.join(__dirname, '../../src/public/_locales');
 const SOURCE_LOCALE = 'en';
-const TARGET_LOCALES = ['fr', 'es', 'de', 'ja', 'ko', 'zh_CN', 'ru', 'pt_BR', 'pt_PT'];
+const TARGET_LOCALES = ['de', 'es', 'fi', 'fr', 'ru', 'zh_CN'];
 
 async function main() {
     console.log('Starting Zero-Touch Localization Pipeline...');
