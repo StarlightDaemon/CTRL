@@ -48,6 +48,7 @@
 
 - Title: Babel 8 migration deferred during dependency-currency pass
 - Status: Open
+- Gate: upstream
 - Why it matters: during the F4 dependency-currency pass, `@babel/plugin-proposal-decorators` was found six major-ish versions behind. Bumping it straight to `8.0.2` (the current latest) broke `npm install` — that release requires `@babel/core@^8.0.0` as a peer, which is a major migration of the whole Babel toolchain underneath tsyringe's legacy decorator configuration, not a routine bump.
 - Held at: `7.29.7` — the newest release still within the `7.x` line (above the prior `7.28.0` pin, below the `8.0.2` major) — so the package stays current without forcing the toolchain migration.
 - Success condition (future): migrate to Babel 8, including verifying whether legacy-mode decorators (as used by tsyringe) are still supported by the new decorators plugin under `@babel/core@8`, then bump `@babel/plugin-proposal-decorators` to the 8.x line as its own distinct change.
@@ -57,6 +58,7 @@
 
 - Title: Vite 8 support blocked upstream — @vitejs/plugin-react held back during dependency-currency pass
 - Status: Open
+- Gate: upstream
 - Why it matters: during the F4 dependency-currency pass, `@vitejs/plugin-react` was found six major versions behind (current latest `6.0.3`). Bumping it broke `npm install` — that release requires `vite@^8.0.0` as a peer, which conflicts with `@wxt-dev/module-react@1.1.5`'s peer range (`^4.4.1 || ^5.0.0`). The blocker is not this plugin itself but that the WXT ecosystem has not yet moved to support vite 8.
 - Held at: `5.2.0` — the newest `5.x` release, which satisfies both the currently installed vite (4.x) and `@wxt-dev/module-react`'s peer constraint.
 - Success condition (future): once `@wxt-dev/module-react` and the broader WXT ecosystem are updated to support vite 8 (tracked separately as general WXT-adjacent currency debt from the original audit), revisit this package and bump it alongside that change, not independently before it.
