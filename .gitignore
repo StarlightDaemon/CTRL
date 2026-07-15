@@ -49,6 +49,7 @@ temp/
 
 # OS files
 Thumbs.db
+._*
 .DS_Store
 
 # Extension-specific
