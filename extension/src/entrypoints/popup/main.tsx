@@ -2,8 +2,7 @@ import React, { Suspense } from 'react';
 
 import ReactDOM from 'react-dom/client';
 import Popup from './Popup';
-import '../style.css';
-import '@/app/styles/global.css'; // New Global CSS
+import '@/app/styles/index.css';
 import { Theme } from '@carbon/react';
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
 

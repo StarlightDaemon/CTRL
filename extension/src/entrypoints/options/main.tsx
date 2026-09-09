@@ -2,8 +2,7 @@ import React, { Suspense } from 'react';
 
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import '../style.css';
-import '@/app/styles/global.css'; // New Global CSS
+import '@/app/styles/index.css';
 import { Theme } from '@carbon/react';
 
 const DebugOverlay = __UI_DEBUG_MODE__

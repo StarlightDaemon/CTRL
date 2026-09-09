@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { useSettings } from '../../features/torrent-control/model/useSettings';
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
-import { VersionOverlay } from '@/shared/ui/VersionOverlay';
 import { VaultGuard } from '@/shared/ui/security/VaultGuard';
 import { Dashboard } from './Dashboard';
 import { AppSettings, ServerConfig } from '@/shared/lib/types';
@@ -94,7 +93,6 @@ const App = () => {
                     />
                 )}
             </VaultGuard>
-            <VersionOverlay />
         </ErrorBoundary>
     );
 };

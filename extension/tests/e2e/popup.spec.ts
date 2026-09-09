@@ -15,10 +15,5 @@ test.describe('Popup UI - First Run', () => {
 
         const statusMessage = page.getByText('Extension not configured.');
         await expect(statusMessage).toBeVisible();
-
-        // 3. Verify Version Overlay (shows app loaded)
-        // Using data-component attribute as per project standards
-        const versionOverlay = page.locator('[data-component="VersionOverlay"]');
-        await expect(versionOverlay).toBeVisible();
     });
 });
