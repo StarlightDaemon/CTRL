@@ -3,311 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CTRL - Privacy Policy</title>
+    <title>CTRL Privacy Policy</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: #f5f5f5;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        h1 {
-            color: #2563eb;
-            margin-bottom: 10px;
-            font-size: 2.5em;
-        }
-        
-        .meta {
-            color: #666;
-            font-size: 0.9em;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid #e5e7eb;
-        }
-        
-        h2 {
-            color: #1e40af;
-            margin-top: 30px;
-            margin-bottom: 15px;
-            font-size: 1.8em;
-        }
-        
-        h3 {
-            color: #1e40af;
-            margin-top: 20px;
-            margin-bottom: 10px;
-            font-size: 1.3em;
-        }
-        
-        p {
-            margin-bottom: 15px;
-        }
-        
-        ul, ol {
-            margin-left: 20px;
-            margin-bottom: 15px;
-        }
-        
-        li {
-            margin-bottom: 8px;
-        }
-        
-        .highlight {
-            background: #dbeafe;
-            padding: 20px;
-            border-left: 4px solid #2563eb;
-            margin: 20px 0;
-            border-radius: 4px;
-        }
-        
-        .summary {
-            background: #f0fdf4;
-            padding: 20px;
-            border-left: 4px solid #10b981;
-            margin: 30px 0;
-            border-radius: 4px;
-        }
-        
-        .summary h2 {
-            color: #059669;
-            margin-top: 0;
-        }
-        
-        strong {
-            color: #1f2937;
-        }
-        
-        code {
-            background: #f3f4f6;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: 'Monaco', 'Courier New', monospace;
-            font-size: 0.9em;
-        }
-        
-        a {
-            color: #2563eb;
-            text-decoration: none;
-        }
-        
-        a:hover {
-            text-decoration: underline;
-        }
-        
-        .emoji {
-            font-size: 1.2em;
-        }
-        
-        hr {
-            border: none;
-            border-top: 2px solid #e5e7eb;
-            margin: 30px 0;
-        }
+        :root { color-scheme: light dark; }
+        body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.6; max-width: 820px; margin: 0 auto; padding: 24px; color: #1a1a1a; background: #fafafa; }
+        @media (prefers-color-scheme: dark) { body { color: #e6e6e6; background: #161616; } a { color: #78a9ff; } table { border-color: #444; } th, td { border-color: #444; } }
+        h1 { font-size: 1.9rem; margin-bottom: 0.2em; }
+        h2 { font-size: 1.3rem; margin-top: 2em; border-bottom: 1px solid #8884; padding-bottom: 0.2em; }
+        h3 { font-size: 1.05rem; margin-top: 1.4em; }
+        table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.95rem; }
+        th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; vertical-align: top; }
+        code { font-family: ui-monospace, Consolas, monospace; font-size: 0.92em; }
+        .meta { color: #666; }
+        .summary { background: #e8f0fe; border-left: 4px solid #0f62fe; padding: 12px 16px; margin: 1.5em 0; }
+        @media (prefers-color-scheme: dark) { .summary { background: #1f2a44; } .meta { color: #aaa; } }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Privacy Policy</h1>
-        <div class="meta">
-            <strong>Last Updated:</strong> April 2026<br>
-            <strong>Effective Date:</strong> January 2026
-        </div>
+    <h1>CTRL Privacy Policy</h1>
+    <p class="meta"><strong>Last updated:</strong> September 2026 (applies to CTRL 0.2.0-beta.1 and later)</p>
 
-        <h2>Introduction</h2>
-        <p>CTRL (Torrent Control) is a browser extension that provides a unified interface for managing BitTorrent clients directly from your browser. This privacy policy explains how CTRL handles your data.</p>
+    <p>CTRL is a browser extension that sends magnet links and torrent URLs to a BitTorrent client you run yourself and shows and controls that client's queue. This policy describes exactly what CTRL stores, what it transmits, to whom, and what it never does. It matches the extension's verified behaviour; the source is public.</p>
 
-        <h2>Data Collection</h2>
-        <div class="highlight">
-            <strong>CTRL does not collect, store, or transmit any personal data to external servers.</strong>
-        </div>
-        <p>We believe in privacy by design. All data processing occurs locally on your device, and nothing is sent to us or any third-party services.</p>
-
-        <h2>What Data is Stored Locally</h2>
-        <p>CTRL stores the following data <strong>locally</strong> on your device using your browser's built-in storage API (<code>chrome.storage.local</code> or <code>browser.storage.local</code>):</p>
-
-        <h3>1. Torrent Client Credentials</h3>
+    <div class="summary">
+        <p><strong>The short version</strong></p>
         <ul>
-            <li><strong>What:</strong> Server URLs, usernames, and passwords for your torrent clients</li>
-            <li><strong>Purpose:</strong> To connect to and manage your torrent clients (qBittorrent, Transmission, Deluge, etc.)</li>
-            <li><strong>Security:</strong> All credentials are encrypted using AES-GCM encryption before being stored locally</li>
-            <li><strong>Location:</strong> Browser's local storage on your device only</li>
-            <li><strong>Transmission:</strong> Credentials are never transmitted outside your device</li>
+            <li>CTRL has <strong>no servers of its own</strong>, no analytics, no telemetry, no crash reporting and no advertising. The CTRL developer receives nothing from the extension.</li>
+            <li>The only network destination is the <strong>torrent client address you configured</strong>. CTRL sends that client your login (to sign in) and the torrent links and commands you issue, and reads the queue back.</li>
+            <li>Your server addresses, usernames and passwords are <strong>encrypted on your device</strong> with a master password before being stored, and are only ever sent to the client they belong to.</li>
         </ul>
-
-        <h3>2. User Preferences</h3>
-        <ul>
-            <li><strong>What:</strong> Your settings and preferences (theme, language, notification settings, etc.)</li>
-            <li><strong>Purpose:</strong> To provide a personalized experience</li>
-            <li><strong>Location:</strong> Browser's local storage on your device only</li>
-        </ul>
-
-        <h3>3. Extension State</h3>
-        <ul>
-            <li><strong>What:</strong> Active server selection, UI state, feature toggles</li>
-            <li><strong>Purpose:</strong> To maintain your workspace across browser sessions</li>
-            <li><strong>Location:</strong> Browser's local storage on your device only</li>
-        </ul>
-
-        <h2>What Data is NOT Collected</h2>
-        <p>CTRL explicitly does <strong>NOT</strong> collect, store, or transmit:</p>
-        <ul>
-            <li>❌ Browsing history</li>
-            <li>❌ Personal information (name, email, address)</li>
-            <li>❌ Torrent content or metadata</li>
-            <li>❌ Magnet links or torrent hashes to external servers</li>
-            <li>❌ Usage analytics or telemetry</li>
-            <li>❌ Crash reports</li>
-            <li>❌ IP addresses</li>
-            <li>❌ Any data to advertising networks</li>
-        </ul>
-
-        <h2>How CTRL Works</h2>
-        
-        <h3>User-Initiated Actions</h3>
-        <p>CTRL operates only when you explicitly interact with it. It does not automatically modify web pages or background-monitor your browsing activity.</p>
-        
-        <p><strong>How you interact with CTRL:</strong></p>
-        <ol>
-            <li><strong>Context Menus:</strong> You can right-click on a magnet link or a page to send torrents directly to your client.</li>
-            <li><strong>Scan Page:</strong> You can manually trigger a "Scan Page for Magnets" action from the context menu. This generically scans the current page for magnet links (<code>magnet:?xt=...</code>) and adds them to your selected client.</li>
-            <li><strong>Manual Addition:</strong> You can add torrents by pasting URLs or magnet links directly into the extension popup.</li>
-        </ol>
-
-        <p><strong>What happens:</strong></p>
-        <ol>
-            <li>When you initiate an action, CTRL processes the request <strong>locally</strong>.</li>
-            <li>If scanning a page, it identifies links matching the magnet protocol.</li>
-            <li>The link is sent directly to <strong>your configured torrent client</strong> (on your local network or remote server).</li>
-        </ol>
-
-        <p><strong>What does NOT happen:</strong></p>
-        <ul>
-            <li>CTRL does not automatically inject UI components or buttons into websites.</li>
-            <li>CTRL does not detect magnet links on page load; it only scans when you tell it to.</li>
-            <li>CTRL does not track which torrents you view or download.</li>
-            <li>CTRL does not send any data about your browsing to external servers.</li>
-        </ul>
-
-        <h3>Protocol Handling</h3>
-        <p>CTRL is <strong>content-agnostic</strong>. It processes magnet URI hashes (strings) without knowledge of what content they represent. The extension does not know if a magnet link points to a Linux ISO, open-source software, or any other type of file.</p>
-
-        <h3>Communication with Torrent Clients</h3>
-        <p>When you initiate a download:</p>
-        <ol>
-            <li>CTRL sends the magnet link to <strong>your configured torrent client</strong> using HTTP/HTTPS requests</li>
-            <li>Communication is <strong>direct</strong> between your browser and your client (localhost or your specified server)</li>
-            <li>No intermediary servers are involved</li>
-            <li>No data is sent to CTRL developers or third parties</li>
-        </ol>
-
-        <h2>Third-Party Services</h2>
-        <p>CTRL does <strong>NOT</strong> use any third-party services for:</p>
-        <ul>
-            <li>Analytics (e.g., Google Analytics)</li>
-            <li>Crash reporting (e.g., Sentry)</li>
-            <li>Advertising networks</li>
-            <li>Cloud storage or sync</li>
-        </ul>
-
-        <h2>Permissions Explained</h2>
-        <p>CTRL requests the following browser permissions:</p>
-
-        <h3><code>storage</code></h3>
-        <p><strong>Purpose:</strong> To store your encrypted credentials and preferences locally on your device.</p>
-        <p><strong>Data Access:</strong> Only data created by CTRL (your settings and server configurations).</p>
-
-        <h3><code>contextMenus</code></h3>
-        <p><strong>Purpose:</strong> To add right-click menu options for sending magnet links to your torrent clients.</p>
-        <p><strong>Data Access:</strong> Only the text/URL you right-clicked on.</p>
-
-        <h3><code>notifications</code></h3>
-        <p><strong>Purpose:</strong> To notify you when downloads complete or errors occur.</p>
-        <p><strong>Data Access:</strong> None. Notifications are created locally.</p>
-
-        <h3><code>activeTab</code></h3>
-        <p><strong>Purpose:</strong> To generically scan the current page for magnet links when you manually select the "Scan Page" option from the context menu.</p>
-        <p><strong>Data Access:</strong> Only the ability to identify magnet link URLs (<code>href</code> attributes) on the page you are currently viewing and have interacted with.</p>
-
-        <h3><code>optional_host_permissions</code></h3>
-        <p><strong>Purpose:</strong> To allow communication with your self-hosted torrent client (for example qBittorrent or Transmission).</p>
-        <p><strong>Data Access:</strong> Permissions are only requested for the specific URL of your torrent client. No data from other websites is accessed using these permissions.</p>
-
-        <h2>Your Rights</h2>
-        <p>Since CTRL does not collect any personal data, there is no data for you to request, correct, or delete from our servers (because we don't have servers).</p>
-        
-        <p>However, you have full control over locally stored data:</p>
-        <ul>
-            <li><strong>View:</strong> Inspect your browser's extension storage using developer tools</li>
-            <li><strong>Delete:</strong> Uninstall the extension to remove all local data</li>
-            <li><strong>Export:</strong> Use CTRL's built-in export feature to backup your settings</li>
-            <li><strong>Modify:</strong> Change settings at any time in the Options page</li>
-        </ul>
-
-        <h2>Children's Privacy</h2>
-        <p>CTRL does not knowingly collect any information from anyone, including children under the age of 13.</p>
-
-        <h2>Changes to This Privacy Policy</h2>
-        <p>We may update this privacy policy from time to time. Changes will be posted on this page with an updated "Last Updated" date. Continued use of CTRL after changes constitutes acceptance of the updated policy.</p>
-
-        <h2>Open Source Transparency</h2>
-        <p>CTRL is open-source software. You can inspect the source code to verify our privacy claims:</p>
-        <p><strong>GitHub Repository:</strong> <a href="https://github.com/StarlightDaemon/CTRL" target="_blank">https://github.com/StarlightDaemon/CTRL</a></p>
-        
-        <p>The code shows:</p>
-        <ul>
-            <li>No analytics libraries</li>
-            <li>No network requests to external servers (except to your configured torrent clients)</li>
-            <li>All storage operations use local browser APIs</li>
-            <li>Encryption implementation for credential storage</li>
-        </ul>
-
-        <h2>Legal Disclaimer</h2>
-        <p>CTRL is a remote control utility for BitTorrent clients. The extension does not provide, host, index, or distribute any files, media, or content. Users are solely responsible for the content they choose to transfer using their local torrent clients.</p>
-        
-        <p>BitTorrent is a legitimate protocol used for distributing open-source software, public domain content, and other legal files. CTRL developers do not endorse or encourage copyright infringement.</p>
-
-        <h2>Contact</h2>
-        <p>If you have questions about this privacy policy or CTRL's data practices:</p>
-        <ul>
-            <li><strong>GitHub Discussions:</strong> <a href="https://github.com/StarlightDaemon/CTRL/discussions" target="_blank">https://github.com/StarlightDaemon/CTRL/discussions</a></li>
-            <li><strong>GitHub Issues:</strong> <a href="https://github.com/StarlightDaemon/CTRL/issues" target="_blank">https://github.com/StarlightDaemon/CTRL/issues</a></li>
-        </ul>
-
-        <hr>
-
-        <div class="summary">
-            <h2>Summary (TL;DR)</h2>
-            <ul>
-                <li>✅ <strong>Zero data collection</strong> - Nothing is sent to external servers</li>
-                <li>✅ <strong>Local encryption</strong> - Credentials encrypted with AES-GCM</li>
-                <li>✅ <strong>No tracking</strong> - No analytics, no telemetry</li>
-                <li>✅ <strong>Open source</strong> - Code is publicly auditable</li>
-                <li>✅ <strong>Content agnostic</strong> - Extension doesn't know what you download</li>
-                <li>✅ <strong>Direct communication</strong> - Browser → Your Client (no middleman)</li>
-            </ul>
-            <p><strong>Your privacy is our priority.</strong></p>
-        </div>
-
-        <p style="text-align: center; color: #666; font-size: 0.9em; margin-top: 40px;">
-            <em>This privacy policy is effective as of January 2026 and applies to CTRL version 0.2.0 and later.</em>
-        </p>
     </div>
+
+    <h2>What CTRL stores on your device</h2>
+    <p>All storage uses the browser's extension storage; nothing leaves the device by being stored.</p>
+    <table>
+        <thead><tr><th>Data</th><th>Where</th><th>Encrypted</th><th>Lifetime</th></tr></thead>
+        <tbody>
+            <tr><td>Server list: name, client type, address, username, password, per-server options</td><td><code>storage.local</code>, key <code>vault</code></td><td>Yes — AES-GCM with a key derived from your master password (PBKDF2-SHA256, 300,000 iterations, random salt). The master password itself is never stored.</td><td>Until you remove the server, reset the vault or uninstall</td></tr>
+            <tr><td>Preferences: context-menu mode, add-paused default, advanced-add dialog, notifications on/off, labels, default server, badge mode</td><td><code>storage.local</code></td><td>No (no secrets)</td><td>Until changed or uninstall</td></tr>
+            <tr><td>Session key (the derived encryption key while the vault is unlocked)</td><td><code>storage.session</code> (memory-backed, cleared when the browser closes)</td><td>Held by the browser in memory</td><td>Until you lock CTRL or the browser closes — after a restart CTRL asks for the master password</td></tr>
+            <tr><td>Queue snapshot: the last torrent list received from your client (names, sizes, progress, speeds, ids)</td><td><code>storage.session</code></td><td>No</td><td>Browser session; discarded when the active server changes</td></tr>
+        </tbody>
+    </table>
+    <p>Locking CTRL discards the session key in every window at once. A damaged vault is never "half-opened": CTRL refuses to unlock and offers a reset that deletes the stored servers.</p>
+
+    <h2>What CTRL transmits, and to whom</h2>
+    <p>CTRL makes network requests <strong>only to the torrent client addresses you configured</strong>, and only after you granted the browser's host permission for that address.</p>
+    <table>
+        <thead><tr><th>What</th><th>When</th><th>To</th></tr></thead>
+        <tbody>
+            <tr><td>Username and password (Transmission: HTTP Basic; qBittorrent: login form; aria2: RPC secret)</td><td>When signing in, testing a connection, or re-authenticating after a session expired</td><td>The configured client only</td></tr>
+            <tr><td>Magnet links / torrent URLs you add, with the options you chose (paused, label, folder)</td><td>When you add a torrent</td><td>The configured client only</td></tr>
+            <tr><td>Queue commands (pause, resume, remove) and queue polling requests</td><td>While a CTRL window is open (every few seconds) and, if the toolbar badge is enabled, about once a minute in the background</td><td>The configured client only</td></tr>
+        </tbody>
+    </table>
+    <p>Nothing is sent to the CTRL developer or to any third party. CTRL does not read web pages, does not inject anything into websites, and does not react to page loads; the right-click menu acts only on the link you right-clicked.</p>
+
+    <h3>Unencrypted connections</h3>
+    <p>If you configure a client with <code>http://</code> rather than <code>https://</code>, the login and the commands travel unencrypted. That is a normal choice on a private network and CTRL allows it, but it warns you when the address is outside loopback and private ranges, because anyone on the network path could read or alter that traffic. Use <code>https://</code> wherever the client or a reverse proxy offers it.</p>
+
+    <h3>qBittorrent and the <code>Origin</code> header</h3>
+    <p>Browsers label every request an extension makes with the extension's own origin, which qBittorrent's default cross-site protection rejects. To work with qBittorrent without asking you to switch that protection off, CTRL installs a browser rule (<code>declarativeNetRequestWithHostAccess</code>) that applies <strong>only to the qBittorrent server address you configured</strong> and sets the <code>Origin</code> and <code>Referer</code> headers of CTRL's own requests to that server's address. The rule touches no other site and reads no traffic. It exists for the current browser session and only for hosts you granted access to.</p>
+
+    <h2>Backups and exports</h2>
+    <ul>
+        <li><strong>Safe export</strong> (default) contains server names, types, addresses and options — never passwords — and is marked <code>containsSecrets: false</code>.</li>
+        <li><strong>Full export</strong> contains passwords in plain text so it can be imported elsewhere. It is marked <code>containsSecrets: true</code> and labelled as such in the interface. Keep such a file private.</li>
+        <li>Exports are files saved by your browser; CTRL does not upload them.</li>
+    </ul>
+
+    <h2>Permissions</h2>
+    <table>
+        <thead><tr><th>Permission</th><th>Purpose</th></tr></thead>
+        <tbody>
+            <tr><td><code>storage</code></td><td>the encrypted vault, preferences, the session key and the queue snapshot</td></tr>
+            <tr><td><code>contextMenus</code></td><td>the right-click entries</td></tr>
+            <tr><td><code>notifications</code></td><td>optional local notifications when a torrent was added or adding failed (switchable in Settings)</td></tr>
+            <tr><td><code>alarms</code></td><td>the one-minute background badge refresh (only while the badge is enabled)</td></tr>
+            <tr><td><code>declarativeNetRequestWithHostAccess</code></td><td>the per-server header rule described above</td></tr>
+            <tr><td>Optional host access (<code>http://*/*</code>, <code>https://*/*</code>)</td><td>granted by you per server address when you add a server; used only to reach that client</td></tr>
+        </tbody>
+    </table>
+    <p>Firefox shows this in the add-on's data-collection consent as <em>authentication information</em>: CTRL sends your client login to the client you configured (Mozilla's taxonomy counts any transmission outside the extension, even to your own server).</p>
+
+    <h2>What CTRL never does</h2>
+    <ul>
+        <li>collect or transmit browsing history, page content, IP addresses or any personal information;</li>
+        <li>send torrent links, hashes or queue contents anywhere other than your configured client;</li>
+        <li>use analytics, telemetry, crash reporting or advertising;</li>
+        <li>load remote code or remote resources (fonts are the system's; the package makes no third-party requests).</li>
+    </ul>
+
+    <h2>Your control</h2>
+    <ul>
+        <li>Change or remove servers at any time in Settings → Servers.</li>
+        <li>Lock CTRL to discard the session key immediately.</li>
+        <li>Reset the vault (Settings → System) to delete every stored server and the master password from the device.</li>
+        <li>Uninstalling the extension removes all its stored data.</li>
+    </ul>
+
+    <h2>Children</h2>
+    <p>CTRL does not knowingly collect any information from anyone.</p>
+
+    <h2>Changes</h2>
+    <p>Changes to this policy are published here with a new "last updated" date.</p>
+
+    <h2>Contact and source</h2>
+    <ul>
+        <li>Source code: <a href="https://github.com/StarlightDaemon/CTRL">https://github.com/StarlightDaemon/CTRL</a></li>
+        <li>Questions: <a href="https://github.com/StarlightDaemon/CTRL/discussions">https://github.com/StarlightDaemon/CTRL/discussions</a></li>
+        <li>Issues: <a href="https://github.com/StarlightDaemon/CTRL/issues">https://github.com/StarlightDaemon/CTRL/issues</a></li>
+    </ul>
+
+    <h2>Legal note</h2>
+    <p>CTRL is a remote control for BitTorrent clients. It does not provide, host, index or distribute files. Users are responsible for the content they transfer with their own clients.</p>
 </body>
 </html>
