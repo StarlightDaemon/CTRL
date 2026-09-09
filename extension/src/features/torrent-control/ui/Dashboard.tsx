@@ -332,7 +332,7 @@ const LiveDashboard: React.FC<{ onLock: () => Promise<void> }> = ({ onLock }) =>
                                                 value={progress}
                                                 max={100}
                                                 size="small"
-                                                status={t.status === 'downloading' ? 'active' : 'finished'}
+                                                status={progress >= 100 ? 'finished' : t.status === 'error' ? 'error' : 'active'}
                                             />
                                         </li>
                                     );
