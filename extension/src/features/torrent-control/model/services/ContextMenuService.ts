@@ -6,8 +6,6 @@ import { DEFAULT_OPTIONS } from '@/shared/lib/constants';
 import { SESSION_KEY_KEY, VAULT_DATA_KEY, VAULT_SALT_KEY } from '@/shared/api/security/VaultService';
 import { ServerResolver, ResolutionState, ResolvedServers } from '@/shared/api/server/ServerResolver';
 
-const FALLBACK_SESSION_KEY = 'local:session_encryptionKey';
-
 /** Debounce window (ms) — absorbs rapid-fire storage events into one rebuild. */
 const REBUILD_DEBOUNCE_MS = navigator.userAgent.includes('Firefox') ? 300 : 200;
 
@@ -57,14 +55,6 @@ export class ContextMenuService {
             console.log('[ContextMenu] Session key changed, scheduling rebuild');
             this.scheduleRebuild('session_key');
         });
-
-        // [FF Fix] Watch for fallback session key in Firefox
-        if (navigator.userAgent.includes('Firefox')) {
-            storage.watch(FALLBACK_SESSION_KEY, () => {
-                console.log('[ContextMenu] FF Fallback session key changed, scheduling rebuild');
-                this.scheduleRebuild('ff_fallback_key');
-            });
-        }
 
         // [Fix] Watch for Vault Initialization
         storage.watch(VAULT_SALT_KEY, () => {

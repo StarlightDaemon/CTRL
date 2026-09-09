@@ -10,6 +10,7 @@ import { StateHydrator } from '../features/torrent-control/services/StateHydrato
 import { ViewportManager } from '../features/torrent-control/services/ViewportManager';
 import { Torrent } from '../entities/torrent/model/Torrent';
 import { SESSION_KEY_KEY, VAULT_DATA_KEY } from '@/shared/api/security/VaultService';
+import { KeyManager } from '@/shared/api/security/KeyManager';
 import { ServerResolver, ResolutionState } from '@/shared/api/server/ServerResolver';
 
 // HeaderRewriter import removed (DNR Dependency Elimination)
@@ -20,13 +21,18 @@ export default defineBackground(() => {
     // 1. Initialize Persistence (Cross-Browser)
     LifecycleAdapter.initKeepAlive();
 
-    // [FF MV3 Fix] Clear session fallback on browser startup to maintain "session" semantics
-    // Also rebuild context menus — Firefox MV3 does not persist them across restarts.
+    // [Security] Scrub the plaintext vault key that older Firefox builds mirrored
+    // into storage.local. This runs on every wake rather than only on startup:
+    // onStartup does not fire on extension update, which is exactly how existing
+    // installs reach this build, and a stale key left on disk is the whole defect.
+    KeyManager.purgeLegacyFallbackKey().catch((err) => {
+        console.warn('[Background] Legacy session key purge failed:', err);
+    });
+
+    // Rebuild context menus on browser startup — Firefox MV3 does not persist
+    // them across restarts.
     chrome.runtime.onStartup.addListener(async () => {
-        if (navigator.userAgent.includes('Firefox')) {
-            await storage.removeItem('local:session_encryptionKey');
-            console.log('[Background] Firefox session fallback cleared on startup.');
-        }
+        await KeyManager.purgeLegacyFallbackKey();
         // Rebuild context menus on every cold start (required for Firefox MV3, harmless on Chrome)
         contextMenuService.ensureMenus();
         console.log('[Background] onStartup: context menus rebuild triggered.');
