@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 try {
   const extensionDir = process.cwd();
@@ -11,7 +11,8 @@ try {
     encoding: 'utf8',
   }).trim();
 
-  if (repoRoot !== join(extensionDir, '..')) {
+  // git prints forward slashes; normalise both sides so the check also holds on Windows.
+  if (resolve(repoRoot) !== resolve(extensionDir, '..')) {
     throw new Error(`Expected to run inside the extension workspace, but repo root resolved to ${repoRoot}`);
   }
 
