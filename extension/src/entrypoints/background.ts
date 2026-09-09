@@ -9,6 +9,7 @@ import { SESSION_KEY_KEY, VAULT_DATA_KEY, VAULT_SALT_KEY } from '@/shared/api/se
 import { KeyManager } from '@/shared/api/security/KeyManager';
 import { ServerResolver } from '@/shared/api/server/ServerResolver';
 import { checkHostPermission } from '@/shared/lib/permissions';
+import { HeaderRewriter } from '@/shared/api/network/HeaderRewriter';
 import { ACTIVE_SESSION_PORT, type RuntimeRequest } from '@/shared/api/messaging/protocol';
 
 const FAST_POLL_INTERVAL_MS = 2000;
@@ -30,6 +31,7 @@ export default defineBackground(() => {
         resolve: () => ServerResolver.resolve(),
         createClient: (config) => factory.create(config),
         hasHostPermission: (url) => checkHostPermission(url),
+        prepareTransport: (config) => HeaderRewriter.prepare(config),
         getSettings: () => storage.getItem<AppSettings>('local:options'),
         persist: (snapshot) => StateHydrator.persist(snapshot),
         log: (message, ...rest) => {

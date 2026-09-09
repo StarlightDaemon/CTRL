@@ -1,114 +1,114 @@
 {
-  "client": "qbittorrent",
-  "clientVersion": "v5.2.3 (web api 2.15.1)",
-  "serverSettings": "qBittorrent Web UI security: CSRF protection ON (default); Host header validation ON; clickjacking protection ON",
-  "browser": "firefox",
-  "browserVersion": "155.0.1",
-  "headless": true,
+  "client": "aria2",
+  "clientVersion": "1.37.0",
+  "serverSettings": "aria2: --rpc-secret token",
+  "browser": "chrome",
+  "browserVersion": "Chrome/152.0.7977.83",
+  "headless": false,
   "extensionVersion": "0.2.0-beta.1",
-  "address": "http://192.168.1.235:18080/",
+  "address": "http://192.168.1.235:16800/jsonrpc",
   "lanAddress": "192.168.1.235",
-  "ranAt": "2026-09-09T23:09:25.563Z",
+  "ranAt": "2026-09-09T23:11:16.725Z",
   "results": [
     {
       "name": "vault-setup",
       "result": "PASS",
       "observed": "master password created; options dashboard shown",
-      "ms": 392
+      "ms": 1041
     },
     {
       "name": "configure-server",
       "result": "PASS",
-      "observed": "form filled (address http://192.168.1.235:18080/); credential disclosure shown; plain-http warning not shown (private host)",
-      "ms": 988
+      "observed": "form filled (address http://192.168.1.235:16800/jsonrpc); credential disclosure shown; plain-http warning not shown (private host)",
+      "ms": 1576
     },
     {
       "name": "grant-permission",
       "result": "PASS",
-      "observed": "granted (prompt disabled by extensions.webextOptionalPermissionPrompts=false)",
-      "ms": 68
+      "observed": "granted (invoked 'Allow' in window 'CTRL Settings - Google Chrome' (pid 15480))",
+      "ms": 1655
     },
     {
       "name": "test-connection",
       "result": "PASS",
       "observed": "Connection successful",
-      "ms": 277
+      "ms": 274
     },
     {
       "name": "save-server",
       "result": "PASS",
       "observed": "saved; list shows stored address verbatim: true",
-      "ms": 72
+      "ms": 265
     },
     {
       "name": "connected",
       "result": "PASS",
       "observed": "dashboard status: LIVE",
-      "ms": 494
+      "ms": 502
     },
     {
       "name": "add-magnet",
       "result": "PASS",
-      "observed": "popup: Torrent added; server has ctrl-live-a.bin (638ceb8d793cd066ae854013514d1f32f95fb752) status=queuedDL",
-      "ms": 692
+      "observed": "popup: Torrent added; server has [METADATA]ctrl-live-a.bin (638ceb8d793cd066ae854013514d1f32f95fb752) status=active",
+      "ms": 1646
     },
     {
       "name": "list-shows-torrent",
       "result": "PASS",
-      "observed": "rows: [\"ctrl-live-a.bin, Queued, 0%\"]",
-      "ms": 505
+      "observed": "rows: [\"[METADATA]ctrl-live-a.bin, Downloading, 0%\"]",
+      "ms": 527
     },
     {
       "name": "add-paused",
       "result": "PASS",
-      "observed": "server shows ctrl-live-b.bin status=stoppedDL (paused)",
-      "ms": 1638
+      "observed": "server shows [METADATA]ctrl-live-b.bin status=paused (paused)",
+      "ms": 2509
     },
     {
       "name": "pause",
       "result": "PASS",
-      "observed": "server: ctrl-live-a.bin status=stoppedDL",
-      "ms": 2081
+      "observed": "server: [METADATA]ctrl-live-a.bin status=paused",
+      "ms": 1234
     },
     {
       "name": "resume",
       "result": "PASS",
-      "observed": "server: ctrl-live-a.bin status=metaDL",
-      "ms": 3185
+      "observed": "server: [METADATA]ctrl-live-a.bin status=active",
+      "ms": 15
     },
     {
       "name": "remove-keep-files",
       "result": "PASS",
       "observed": "removed on server; other torrent untouched: true",
-      "ms": 890
+      "ms": 773
     },
     {
       "name": "bad-credentials",
       "result": "PASS",
-      "observed": "test: Connection failed Authentication failed. Check your qBittorrent username and password.; dashboard: AUTHENTICATION FAILED; restored → LIVE",
-      "ms": 12536
+      "observed": "test: Connection failed Authentication failed. Check the Aria2 RPC secret token.; dashboard: AUTHENTICATION FAILED; restored → LIVE",
+      "ms": 14519
     },
     {
       "name": "server-unavailable",
       "result": "PASS",
       "observed": "dashboard: CONNECTION LOST",
-      "ms": 5770
+      "ms": 24588
     },
     {
       "name": "reconnect-after-restart",
       "result": "PASS",
       "observed": "dashboard: LIVE; server lists 0 torrent(s) after restart",
-      "ms": 533
+      "ms": 537
     },
     {
       "name": "browser-restart-lock",
       "result": "PASS",
-      "observed": "skipped by design: a temporary Firefox add-on does not survive a browser restart",
-      "ms": 0
+      "observed": "locked after restart; unlocked → LIVE; host grant had to be repeated after the harness reloaded the unpacked extension (recovery flow via Servers → Grant access worked)",
+      "ms": 5290
     }
   ],
   "notes": [
-    "controller state after saving wrong credentials: +6ms auth_failed/AUTH_FAILED",
+    "controller state after saving wrong credentials: +3ms connecting/- → +1266ms auth_failed/UNAUTHORIZED",
     "restored password field holds the expected value: true"
   ]
 }

@@ -103,8 +103,10 @@ export class Aria2Error extends Error {
                     retryable: false,
                 };
             case 1:
-                // Context-dependent: auth failure vs GID not found
-                if (context.includes('login') || context.includes('Version')) {
+                // aria2 answers every method with code 1 "Unauthorized" when the RPC
+                // secret is wrong (live-verified: tellActive/tellWaiting/tellStopped),
+                // so the message decides first and the context only afterwards.
+                if (message.toLowerCase().includes('unauthorized') || context.includes('login') || context.includes('Version')) {
                     return {
                         code: 'UNAUTHORIZED',
                         message: 'Authentication failed - check RPC secret',

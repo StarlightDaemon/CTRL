@@ -50,7 +50,11 @@ export default defineConfig({
       version,
       ...(isFirefox ? {} : { version_name: packageJson.version, minimum_chrome_version: MINIMUM_CHROME_VERSION }),
       default_locale: 'en',
-      permissions: ['storage', 'contextMenus', 'notifications', 'alarms'],
+      // declarativeNetRequestWithHostAccess: session rules that set Origin/Referer
+      // on requests to a configured qBittorrent server so its default CSRF check
+      // accepts the extension (see shared/api/network/HeaderRewriter.ts). It
+      // applies only to hosts the user granted and carries no extra warning.
+      permissions: ['storage', 'contextMenus', 'notifications', 'alarms', 'declarativeNetRequestWithHostAccess'],
       optional_host_permissions: ['http://*/*', 'https://*/*'],
       action: {
         default_title: 'CTRL',

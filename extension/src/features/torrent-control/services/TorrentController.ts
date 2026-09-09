@@ -40,6 +40,12 @@ export interface ControllerDeps {
     createClient: (config: ServerConfig) => Promise<ITorrentClient>;
     /** Whether the per-origin host permission for this URL is granted. */
     hasHostPermission: (url: string) => Promise<boolean>;
+    /**
+     * Prepares the transport for a server before a client is created or a
+     * connection is tested (e.g. installs the Origin/Referer rewrite rule a
+     * client with same-origin checks needs). Failures are logged, never fatal.
+     */
+    prepareTransport?: (config: ServerConfig) => Promise<void>;
     /** Reads global settings (add-paused default etc). */
     getSettings: () => Promise<AppSettings | null>;
     /** Persists the latest snapshot for recovery after a background restart. */
@@ -73,6 +79,9 @@ interface Snapshot {
     serverId: string;
     torrents: Torrent[];
 }
+
+/** Outcomes that stay on screen while a retry is in flight. */
+const SETTLED_STATUSES = new Set<ConnectionStatus>(['connected', 'stale', 'auth_failed', 'unavailable']);
 
 const AUTH_ERROR_TYPES = new Set([
     'AUTH_FAILED',
@@ -178,8 +187,9 @@ export class TorrentController {
         this.generation++;
         this.clients.clear();
         this.log(`[Controller] invalidate(${reason}) -> generation ${this.generation}`);
-        if (this.connection.status === 'connected' || this.connection.status === 'stale') {
-            this.setConnection({ status: 'connecting' });
+        // A configuration change re-opens a settled outcome, including a rejected login.
+        if (this.connection.status === 'connected' || this.connection.status === 'stale' || this.connection.status === 'auth_failed') {
+            this.setConnection({ status: 'connecting', lastError: null, lastErrorType: null });
         }
     }
 
@@ -219,7 +229,7 @@ export class TorrentController {
                 subscriber.end = end;
                 this.sendToSubscriber(subscriber);
             } else if (message.type === 'REFRESH') {
-                void this.refresh();
+                void this.refresh({ force: true });
             }
         });
 
@@ -235,8 +245,20 @@ export class TorrentController {
     // Polling
     // ------------------------------------------------------------------
 
-    /** Single-flight refresh. Concurrent callers share the in-flight poll. */
-    refresh(): Promise<void> {
+    /**
+     * Single-flight refresh. Concurrent callers share the in-flight poll.
+     *
+     * After the server rejected the configured credentials, automatic polling
+     * stops: repeating a failing login every few seconds hides the failure
+     * behind "connecting" (live-verified: aria2 takes ~2 s to reject a wrong
+     * secret) and gets the browser banned by clients such as qBittorrent. The
+     * state stays `auth_failed` until the settings change (`invalidate`) or the
+     * user asks explicitly (`force`).
+     */
+    refresh(options: { force?: boolean } = {}): Promise<void> {
+        if (!options.force && this.connection.status === 'auth_failed') {
+            return Promise.resolve();
+        }
         if (this.inFlight) {
             this.refreshRequested = true;
             return this.inFlight;
@@ -338,9 +360,15 @@ export class TorrentController {
         if (generation !== this.generation) return;
 
         const attemptedAt = this.now();
-        if (this.connection.status !== 'connected' && this.connection.status !== 'stale') {
+        // Show "connecting" only while nothing more specific is known. A settled
+        // outcome (live data, stale data, a rejected login, an unreachable server)
+        // stays visible during the retry instead of flickering to "connecting"
+        // whenever the server is slow to answer.
+        if (!SETTLED_STATUSES.has(this.connection.status)) {
             this.setConnection({ status: 'connecting', serverId, serverName: server.name, lastAttemptAt: attemptedAt });
             this.broadcastStatus(false);
+        } else {
+            this.setConnection({ lastAttemptAt: attemptedAt });
         }
 
         let torrents: Torrent[];
@@ -433,9 +461,19 @@ export class TorrentController {
         const fingerprint = serverFingerprint(server);
         const cached = this.clients.get(id);
         if (cached && cached.fingerprint === fingerprint) return cached.client;
+        await this.prepareTransport(server);
         const client = await this.deps.createClient(server);
         this.clients.set(id, { fingerprint, client });
         return client;
+    }
+
+    private async prepareTransport(config: ServerConfig): Promise<void> {
+        if (!this.deps.prepareTransport) return;
+        try {
+            await this.deps.prepareTransport(config);
+        } catch (error) {
+            this.log('[Controller] transport preparation failed', error);
+        }
     }
 
     /**
@@ -463,7 +501,7 @@ export class TorrentController {
             case 'GET_STATE':
                 return this.getState();
             case 'FORCE_REFRESH':
-                await this.refresh();
+                await this.refresh({ force: true });
                 return { ok: true } satisfies CommandResult;
             case 'ADD_TORRENT_URL':
                 return this.addTorrent(request);
@@ -548,6 +586,7 @@ export class TorrentController {
 
     async testConnection(config: ServerConfig): Promise<TestConnectionResponse> {
         try {
+            await this.prepareTransport(config);
             const client = await this.deps.createClient(config);
             const result = await client.testConnection();
             return {

@@ -54,6 +54,14 @@ export class QBittorrentAdapter implements ITorrentClient {
     private isAuthenticated = false;
     private loginAttempts = 0;
     private lastLoginAttempt = 0;
+    /**
+     * Set once qBittorrent has rejected the configured credentials. qBittorrent
+     * bans the client's IP after a handful of failed logins (5 by default, for
+     * an hour), and the background polls every few seconds, so a wrong password
+     * must fail exactly once per configuration. The controller creates a new
+     * adapter instance when the server settings change, which clears this.
+     */
+    private credentialsRejected: Error | null = null;
     private apiVersion: string | null = null;
 
     // Configuration
@@ -82,6 +90,8 @@ export class QBittorrentAdapter implements ITorrentClient {
      * Implements exponential backoff and IP ban detection.
      */
     async login(): Promise<void> {
+        if (this.credentialsRejected) throw this.credentialsRejected;
+
         // Check if we've hit the login attempt limit (prevents IP ban)
         if (this.loginAttempts >= this.MAX_LOGIN_ATTEMPTS) {
             const timeSinceLastAttempt = Date.now() - this.lastLoginAttempt;
@@ -118,11 +128,11 @@ export class QBittorrentAdapter implements ITorrentClient {
                 }
                 if (responseText.includes(QB_ERROR_MESSAGES.AUTH_FAILED)) {
                     this.loginAttempts++;
-                    const remainingAttempts = this.MAX_LOGIN_ATTEMPTS - this.loginAttempts;
-                    throw new Error(
-                        `Authentication Failed (Invalid Credentials). ` +
-                        `${remainingAttempts} attempts remaining before lockout protection.`
+                    this.credentialsRejected = new Error(
+                        'Authentication Failed (Invalid Credentials). ' +
+                        'CTRL will not retry with these settings, so qBittorrent does not ban this browser.'
                     );
+                    throw this.credentialsRejected;
                 }
             }
 
@@ -138,12 +148,12 @@ export class QBittorrentAdapter implements ITorrentClient {
                     throw new Error('IP has been banned by qBittorrent.');
                 }
                 this.loginAttempts++;
-                const remainingAttempts = this.MAX_LOGIN_ATTEMPTS - this.loginAttempts;
                 const statusText = error.status === 401 ? '401 Unauthorized' : '403 Forbidden';
-                throw new Error(
+                this.credentialsRejected = new Error(
                     `Authentication Failed (${statusText}). ` +
-                    `${remainingAttempts} attempts remaining before lockout protection.`
+                    'CTRL will not retry with these settings, so qBittorrent does not ban this browser.'
                 );
+                throw this.credentialsRejected;
             }
             throw error;
         }
@@ -188,7 +198,10 @@ export class QBittorrentAdapter implements ITorrentClient {
         const form = new FormData();
         form.append('urls', url);
 
-        if (options?.paused) form.append('paused', 'true');
+        if (options?.paused) {
+            form.append('paused', 'true');   // Web API < 2.11 (qBittorrent 4.x)
+            form.append('stopped', 'true');  // Web API 2.11+ (qBittorrent 5.x ignores `paused`; live-verified on 5.2.3)
+        }
         if (options?.label) form.append('category', options.label);
         if (options?.path) form.append('savepath', options.path);
 
@@ -206,7 +219,10 @@ export class QBittorrentAdapter implements ITorrentClient {
         const form = new FormData();
         form.append('torrents', file);
 
-        if (options?.paused) form.append('paused', 'true');
+        if (options?.paused) {
+            form.append('paused', 'true');
+            form.append('stopped', 'true');
+        }
         if (options?.label) form.append('category', options.label);
         if (options?.path) form.append('savepath', options.path);
 
@@ -254,6 +270,12 @@ export class QBittorrentAdapter implements ITorrentClient {
 
     async testConnection(): Promise<AdapterConnectionResult> {
         try {
+            // The browser may already hold a valid session cookie for this origin, and
+            // qBittorrent answers auth/login with "Ok." for an authenticated session
+            // without looking at the credentials (live-verified on 5.2.3). End that
+            // session first so the test really validates what the user typed.
+            await this.logout().catch(() => { /* no session to end */ });
+            this.credentialsRejected = null;
             // login() is intentionally NOT wrapped in retry: qBittorrent bans the IP
             // after repeated failed logins, and login() already enforces a backoff
             // cooldown. Only the (idempotent) version probe is retried.

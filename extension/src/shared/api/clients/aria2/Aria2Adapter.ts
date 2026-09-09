@@ -459,10 +459,14 @@ export class Aria2Adapter implements ITorrentClient {
             if (Array.isArray(r)) {
                 return r[0]; // Unwrap the result
             }
-            // Handle per-call errors
-            const error = r as { error?: { code: number; message: string } };
-            if (error.error) {
-                throw Aria2Error.fromRpcError(error.error, calls[i].method);
+            // Handle per-call errors. aria2 reports a failed inner call as a bare
+            // struct { code, message } in place of the wrapped result (live-verified
+            // on 1.37.0: a wrong --rpc-secret fails every inner call with code 1
+            // "Unauthorized"); tolerate the { error: {...} } shape as well.
+            const wrapped = r as { error?: { code: number; message: string } } | null;
+            const fault = wrapped && typeof wrapped === 'object' && wrapped.error ? wrapped.error : (r as { code?: unknown; message?: unknown } | null);
+            if (fault && typeof fault === 'object' && typeof fault.code === 'number') {
+                throw Aria2Error.fromRpcError({ code: fault.code, message: String(fault.message ?? '') }, calls[i].method);
             }
             return r;
         });

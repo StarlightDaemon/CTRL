@@ -44,9 +44,9 @@ evidence of support.
 
 | Client | Adapter | v1 classification | Rationale |
 |---|---|---|---|
-| Transmission (daemon 4.x, RPC 17+) | `transmission` | CANDIDATE — LIVE TEST REQUIRED → see `CLIENT_VERIFICATION.md` | Header-based auth; strongest static candidate |
-| qBittorrent (4.6+, 5.x; Web API 2.9+/2.11+) | `qbittorrent` | CANDIDATE — LIVE TEST REQUIRED → see `CLIENT_VERIFICATION.md` | Cookie session; CSRF behaviour must be established live |
-| aria2 (1.36+) | `aria2` | CANDIDATE — LIVE TEST REQUIRED → see `CLIENT_VERIFICATION.md` | JSON-RPC with token |
+| Transmission (daemon 4.x, RPC 17+) | `transmission` | **VERIFIED FOR V1** (2026-09-09, 4.1.3, Chrome + Firefox) → `CLIENT_VERIFICATION.md` | Header-based auth |
+| qBittorrent (4.6+, 5.x; Web API 2.9+/2.11+) | `qbittorrent` | **VERIFIED FOR V1** (2026-09-09, 5.2.3 with default CSRF protection on, Chrome + Firefox) → `CLIENT_VERIFICATION.md` | Cookie session; CSRF satisfied by a per-origin `declarativeNetRequestWithHostAccess` header rule |
+| aria2 (1.36+) | `aria2` | **VERIFIED FOR V1** (2026-09-09, 1.37.0, Chrome + Firefox) → `CLIENT_VERIFICATION.md` | JSON-RPC with token |
 | Deluge Web UI | `deluge` | EXPERIMENTAL / HIDDEN | Cookie session repaired to browser model but no live environment; not advertised |
 | Flood | `flood` | EXPERIMENTAL / HIDDEN | Bootstrap/cookie contract unverified |
 | ruTorrent | `rutorrent` | EXPERIMENTAL / HIDDEN | XML body now sent verbatim; endpoint conventions unverified |
@@ -58,10 +58,10 @@ evidence of support.
 README support table, listing copy, or privacy policy. Existing configurations
 of a hidden type keep working (the adapter code remains) and are labelled
 "experimental, not verified" in the server list. The final VERIFIED / not
-column is filled in by `CLIENT_VERIFICATION.md` (not yet written) after the
-live-verification wave. As of the packaging wave no client has been
-live-verified and the hiding of experimental clients in the UI has not been
-implemented; both are pending waves, not completed work.
+column is filled in by `CLIENT_VERIFICATION.md` (written 2026-09-09 after the
+live-verification wave: all three candidates verified in both browsers; the
+hiding of experimental clients in the UI was implemented in the
+product-surface wave).
 
 ## 4. Feature classification
 
@@ -95,7 +95,8 @@ implemented; both are pending waves, not completed work.
 | `contextMenus` | yes | right-click add |
 | `notifications` | yes | add/error result notifications (user-switchable) |
 | `alarms` | yes | 1-minute badge refresh when no UI is open |
-| `optional_host_permissions: http://*/*, https://*/*` | yes | user-configured client origins, granted per origin at runtime |
+| `declarativeNetRequestWithHostAccess` | yes (added 2026-09-09) | session rule per configured qBittorrent origin that sets `Origin`/`Referer` to that origin, so qBittorrent's default CSRF check accepts the extension without the user weakening their server; applies only to hosts the user granted; no extra install-time warning |
+| `optional_host_permissions: http://*/*, https://*/*` | yes | user-configured client origins, granted per origin at runtime (Chrome: `http://host:port/*`; Firefox: `http://host/*` — its patterns have no port support) |
 | `activeTab`, `scripting` | removed | page scanning removed |
 | `ws://*/*`, `wss://*/*` | removed | no consumer |
 

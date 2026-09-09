@@ -1,3 +1,4 @@
+import { HttpError } from './HttpError';
 import { FetchHttpClient, RequestConfig, TransportProfile } from './FetchHttpClient';
 
 export interface JsonRpcRequest {
@@ -35,6 +36,19 @@ export class JsonRpcError extends Error {
     }
 }
 
+function parseJsonRpcError(bodyText: string): { code: number; message: string } | null {
+    if (!bodyText) return null;
+    try {
+        const parsed = JSON.parse(bodyText) as { error?: { code?: unknown; message?: unknown } };
+        if (parsed && parsed.error && typeof parsed.error.code === 'number') {
+            return { code: parsed.error.code, message: String(parsed.error.message ?? '') };
+        }
+    } catch {
+        // not JSON
+    }
+    return null;
+}
+
 export interface JsonRpcCallOptions {
     /** Read-only methods may be retried safely; mutations are never retried. */
     idempotent?: boolean;
@@ -69,7 +83,18 @@ export class JsonRpcClient {
         }
 
         // JSON-RPC is always a POST to the endpoint the client was created with.
-        const response = await this.httpClient.post<JsonRpcResponse<T>>('', request, config);
+        let response: JsonRpcResponse<T>;
+        try {
+            response = await this.httpClient.post<JsonRpcResponse<T>>('', request, config);
+        } catch (error) {
+            // Some servers answer a JSON-RPC error with a non-2xx status (aria2 sends
+            // HTTP 400 with {"error":{"code":1,"message":"Unauthorized"}} for a wrong
+            // secret, live-verified on 1.37.0). Surface the structured error rather
+            // than a generic HTTP failure so callers classify it correctly.
+            const structured = error instanceof HttpError ? parseJsonRpcError(error.bodyText) : null;
+            if (structured) throw new JsonRpcError(structured.code, structured.message);
+            throw error;
+        }
 
         if (response.error) {
             // Throw a structured error so callers can inspect .code and .message

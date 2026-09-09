@@ -387,35 +387,55 @@ await scenario('remove-keep-files', async () => {
 
 // 7. Bad credentials → truthful state, then restore
 await scenario('bad-credentials', async () => {
+    const expected = CLIENT === 'aria2' ? target.secret : target.password;
     await openTab(options, 'Servers');
     await options.waitFor(`return !!document.querySelector(${q(editButton)});`, 15000);
     await options.click(editButton);
     await waitForText(options, 'Server name');
     await options.type('#server-password', 'definitely-wrong-password');
     await clickText(options, 'button', 'Test connection');
-    const testHit = await waitForAnyText(options, ['Connection successful', 'Connection failed'], 30000);
+    const testHit = await waitForAnyText(options, ['Connection successful', 'Connection failed'], 30000).catch(() => 'no result');
     const testTexts = (await statusTexts(options)).filter((t) => t.includes('Connection')).join(' | ');
     await clickText(options, 'button', 'Save server');
     await waitForText(options, 'Server updated', 20000);
     await openTab(options, 'Dashboard');
-    const dash = await waitForStatus(options, /Authentication failed|AUTHENTICATION FAILED|Server unavailable|SERVER UNAVAILABLE|Connection lost|CONNECTION LOST/, 40000);
+    // Trace the background controller's own state while waiting (what the UI mirrors).
+    const trace = [];
+    const tracer = (async () => {
+        const started = Date.now();
+        let last = '';
+        for (let i = 0; i < 60; i++) {
+            try {
+                const st = await options.evaluate(`return (globalThis.browser ?? chrome).runtime.sendMessage({ type: 'GET_STATE' }).then((r) => r.connection.status + '/' + (r.connection.lastErrorType || '-'));`);
+                if (st !== last) { trace.push(`+${Date.now() - started}ms ${st}`); last = st; }
+            } catch { /* page busy */ }
+            await sleep(150);
+        }
+    })();
+    const dash = await waitForStatus(options, /Authentication failed|AUTHENTICATION FAILED|Server unavailable|SERVER UNAVAILABLE|Connection lost|CONNECTION LOST/, 40000).catch((e) => `NO FAILURE STATE SHOWN; last statuses ${e.message.replace(/.*last: /, '').slice(0, 160)}`);
+    await tracer;
+    note(`controller state after saving wrong credentials: ${trace.join(' → ')}`);
     await shot(options, 'bad-credentials');
-    // restore
+
+    // Always restore before judging, so later scenarios run with valid credentials.
     await openTab(options, 'Servers');
     await options.waitFor(`return !!document.querySelector(${q(editButton)});`, 15000);
     await options.click(editButton);
     await waitForText(options, 'Server name');
-    const expected = CLIENT === 'aria2' ? target.secret : target.password;
     await options.type('#server-password', expected);
     const restoredOk = await options.evaluate(`return document.querySelector('#server-password').value === ${q(expected)};`);
     note(`restored password field holds the expected value: ${restoredOk}`);
     await clickText(options, 'button', 'Save server');
     await waitForText(options, 'Server updated', 20000);
     await openTab(options, 'Dashboard');
-    await waitForStatus(options, /^LIVE$|^Connected/, 40000);
-    if (testHit !== 'Connection failed') throw new Error(`test connection with a wrong password reported "${testHit}"`);
-    if (!/Authentication failed|AUTHENTICATION FAILED/.test(dash)) throw new Error(`dashboard showed "${dash}" instead of an authentication failure`);
-    return `test: ${testTexts}; dashboard: ${dash}; restored → connected`;
+    const back = await waitForStatus(options, /^LIVE$|^Connected/, 40000).catch((e) => `not reconnected (${e.message.slice(0, 120)})`);
+
+    const problems = [];
+    if (testHit !== 'Connection failed') problems.push(`test connection with a wrong password reported "${testHit}"`);
+    if (!/Authentication failed|AUTHENTICATION FAILED/.test(dash)) problems.push(`dashboard showed "${dash}" instead of an authentication failure`);
+    if (!/^LIVE$|^Connected/.test(back)) problems.push(`after restoring the password: ${back}`);
+    if (problems.length) throw new Error(problems.join('; '));
+    return `test: ${testTexts}; dashboard: ${dash}; restored → ${back}`;
 }, { requires: ['connected'] });
 
 // 8. Server unavailable → reconnect after restart

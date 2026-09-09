@@ -1,25 +1,26 @@
 {
   "client": "transmission",
   "clientVersion": "4.1.3 (838877323f) (rpc 19)",
+  "serverSettings": "Transmission: RPC authentication required (Basic), host whitelist default",
   "browser": "firefox",
   "browserVersion": "155.0.1",
   "headless": true,
   "extensionVersion": "0.2.0-beta.1",
   "address": "http://192.168.1.235:19091/",
   "lanAddress": "192.168.1.235",
-  "ranAt": "2026-09-09T19:46:18.077Z",
+  "ranAt": "2026-09-09T23:10:17.295Z",
   "results": [
     {
       "name": "vault-setup",
       "result": "PASS",
       "observed": "master password created; options dashboard shown",
-      "ms": 658
+      "ms": 545
     },
     {
       "name": "configure-server",
       "result": "PASS",
       "observed": "form filled (address http://192.168.1.235:19091/); credential disclosure shown; plain-http warning not shown (private host)",
-      "ms": 1004
+      "ms": 934
     },
     {
       "name": "grant-permission",
@@ -31,73 +32,73 @@
       "name": "test-connection",
       "result": "PASS",
       "observed": "Connection successful",
-      "ms": 72
+      "ms": 68
     },
     {
       "name": "save-server",
       "result": "PASS",
       "observed": "saved; list shows stored address verbatim: true",
-      "ms": 91
+      "ms": 71
     },
     {
       "name": "connected",
       "result": "PASS",
       "observed": "dashboard status: LIVE",
-      "ms": 498
+      "ms": 496
     },
     {
       "name": "add-magnet",
       "result": "PASS",
       "observed": "popup: Torrent added; server has ctrl-live-a.bin (638ceb8d793cd066ae854013514d1f32f95fb752) status=4",
-      "ms": 703
+      "ms": 696
     },
     {
       "name": "list-shows-torrent",
       "result": "PASS",
       "observed": "rows: [\"ctrl-live-a.bin, Downloading, 0%\"]",
-      "ms": 512
+      "ms": 501
     },
     {
       "name": "add-paused",
       "result": "PASS",
       "observed": "server shows ctrl-live-b.bin status=0 (paused)",
-      "ms": 1633
+      "ms": 1601
     },
     {
       "name": "pause",
       "result": "PASS",
       "observed": "server: ctrl-live-a.bin status=0",
-      "ms": 1338
+      "ms": 1328
     },
     {
       "name": "resume",
       "result": "PASS",
       "observed": "server: ctrl-live-a.bin status=4",
-      "ms": 78
+      "ms": 596
     },
     {
       "name": "remove-keep-files",
       "result": "PASS",
       "observed": "removed on server; other torrent untouched: true",
-      "ms": 888
+      "ms": 879
     },
     {
       "name": "bad-credentials",
       "result": "PASS",
-      "observed": "test: Connection failed Authentication failed. Check your Transmission username and password.; dashboard: AUTHENTICATION FAILED; restored → connected",
-      "ms": 17580
+      "observed": "test: Connection failed Authentication failed. Check your Transmission username and password.; dashboard: AUTHENTICATION FAILED; restored → LIVE",
+      "ms": 27664
     },
     {
       "name": "server-unavailable",
       "result": "PASS",
       "observed": "dashboard: CONNECTION LOST",
-      "ms": 5819
+      "ms": 5807
     },
     {
       "name": "reconnect-after-restart",
       "result": "PASS",
       "observed": "dashboard: LIVE; server lists 1 torrent(s) after restart",
-      "ms": 534
+      "ms": 525
     },
     {
       "name": "browser-restart-lock",
@@ -107,6 +108,7 @@
     }
   ],
   "notes": [
+    "controller state after saving wrong credentials: +7ms auth_failed/AUTH_FAILED",
     "restored password field holds the expected value: true"
   ]
 }

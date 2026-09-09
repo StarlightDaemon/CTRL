@@ -108,6 +108,7 @@ interface Harness {
     persisted: { value: unknown };
     permissions: Set<string>;
     addPaused: { value: boolean };
+    prepared: ServerConfig[];
 }
 
 function harness(): Harness {
@@ -116,6 +117,7 @@ function harness(): Harness {
     const persisted = { value: undefined as unknown };
     const permissions = new Set<string>();
     const addPaused = { value: false };
+    const prepared: ServerConfig[] = [];
 
     const controller = new TorrentController({
         resolve: async () => resolution,
@@ -127,6 +129,7 @@ function harness(): Harness {
             return client;
         },
         hasHostPermission: async (url) => permissions.size === 0 || permissions.has(url),
+        prepareTransport: async (config) => { prepared.push(config); },
         getSettings: async () => ({ ...DEFAULT_OPTIONS, globals: { ...DEFAULT_OPTIONS.globals, addPaused: addPaused.value } }),
         persist: (snapshot) => { persisted.value = snapshot; },
         now: () => 1000,
@@ -138,6 +141,7 @@ function harness(): Harness {
         persisted,
         permissions,
         addPaused,
+        prepared,
         setServers: (servers, activeIndex) => {
             resolution = { state: ResolutionState.OK, servers, activeServer: servers[activeIndex] ?? null };
         },
@@ -432,6 +436,17 @@ describe('TorrentController — restart, hydration and connection state', () => 
         }
     });
 
+    it('prepares the transport before creating a client and before a connection test, never per poll', async () => {
+        h.setServers([A], 0);
+        const client = Object.assign(new FakeClient('A'), { auto: [torrent('a')] as Torrent[] | Error });
+        h.clients.set('A', client);
+        await h.controller.refresh();
+        await h.controller.refresh();
+        expect(h.prepared.map((s) => s.id)).toEqual(['A']);
+        await h.controller.testConnection(server('B'));
+        expect(h.prepared.map((s) => s.id)).toEqual(['A', 'B']);
+    });
+
     it('reports permission_missing without contacting the server', async () => {
         h.setServers([A], 0);
         h.permissions.add('http://somewhere-else/');
@@ -508,6 +523,53 @@ describe('TorrentController — restart, hydration and connection state', () => 
         await h.controller.refresh();
         expect(h.controller.getConnection().status).toBe('auth_failed');
         expect(h.controller.getSnapshotTorrents()).toBeNull();
+    });
+
+    it('keeps auth_failed on screen and stops automatic polling until the settings change or the user forces a refresh', async () => {
+        h.setServers([A], 0);
+        const client = Object.assign(new FakeClient('A'), { auto: new Error('Authentication Failed (401 Unauthorized)') as Torrent[] | Error });
+        h.clients.set('A', client);
+        const port = new FakePort();
+        h.controller.attachPort(port);
+        await h.controller.refresh();
+        expect(h.controller.getConnection().status).toBe('auth_failed');
+        const attempts = client.getTorrents.mock.calls.length;
+
+        // Background cadence: no more attempts, no "connecting" flicker.
+        await h.controller.refresh();
+        await h.controller.refresh();
+        expect(client.getTorrents.mock.calls.length).toBe(attempts);
+        expect(h.controller.getConnection().status).toBe('auth_failed');
+        expect(port.sent.some((m) => m.type === 'STATUS' && m.connection.status === 'connecting' && m.connection.lastErrorType !== null)).toBe(false);
+
+        // The user asks explicitly: one attempt, still failing, still shown as auth_failed while it runs.
+        await h.controller.handleRequest({ type: 'FORCE_REFRESH' });
+        expect(client.getTorrents.mock.calls.length).toBe(attempts + 1);
+        expect(h.controller.getConnection().status).toBe('auth_failed');
+
+        // The settings change (new password): the outcome is reopened and retried.
+        client.auto = [torrent('a')];
+        h.controller.invalidate('vault-data');
+        expect(h.controller.getConnection().status).toBe('connecting');
+        await h.controller.refresh();
+        expect(h.controller.getConnection().status).toBe('connected');
+    });
+
+    it('does not flicker to connecting while retrying an unreachable server', async () => {
+        h.setServers([A], 0);
+        const client = Object.assign(new FakeClient('A'), { auto: new Error('Failed to fetch') as Torrent[] | Error });
+        h.clients.set('A', client);
+        const port = new FakePort();
+        h.controller.attachPort(port);
+        await h.controller.refresh();
+        expect(h.controller.getConnection().status).toBe('unavailable');
+        const before = port.sent.length;
+        await h.controller.refresh();
+        expect(h.controller.getConnection().status).toBe('unavailable');
+        expect(port.sent.slice(before).some((m) => m.connection.status === 'connecting')).toBe(false);
+        client.auto = [torrent('a')];
+        await h.controller.refresh();
+        expect(h.controller.getConnection().status).toBe('connected');
     });
 
     it('persists successful snapshots with their server id', async () => {
