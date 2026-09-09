@@ -1,8 +1,17 @@
 import React, { useState } from 'react';
 import { AppOptions, ServerConfig } from '@/shared/lib/types';
-import { CLIENT_LIST } from '@/shared/lib/constants';
+import { DEFAULT_CLIENT_ID, PUBLIC_CLIENT_LIST, getClientCapability, isPublicClient } from '@/shared/lib/constants';
 import { checkHostPermission, requestHostPermission } from '@/shared/lib/permissions';
-import { isPrivateIP } from '@/shared/lib/network';
+import { isPrivateHost } from '@/shared/lib/endpoint';
+
+/** True when the configured address points at a loopback/LAN host. */
+const isPrivateEndpoint = (address: string): boolean => {
+    try {
+        return isPrivateHost(new URL(address).hostname);
+    } catch {
+        return false;
+    }
+};
 import { SettingsPageLayout } from '@/shared/ui/settings/SettingsPageLayout';
 import { SettingsCard } from '@/shared/ui/settings/SettingsCard';
 import { Server, ShieldAlert } from 'lucide-react';
@@ -46,8 +55,8 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
     // Temp state for the server being edited/added
     const [tempServer, setTempServer] = useState<ServerConfig>({
         name: 'New Server',
-        application: 'qbittorrent',
-        type: 'qbittorrent',
+        application: DEFAULT_CLIENT_ID,
+        type: DEFAULT_CLIENT_ID,
         hostname: 'http://localhost:8080/',
         username: '',
         password: '',
@@ -69,8 +78,8 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
     const startAdd = () => {
         setTempServer({
             name: 'New Server',
-            application: 'qbittorrent',
-            type: 'qbittorrent',
+            application: DEFAULT_CLIENT_ID,
+            type: DEFAULT_CLIENT_ID,
             hostname: 'http://localhost:8080/',
             username: '',
             password: '',
@@ -220,9 +229,16 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
                                     handleTempChange('type', e.target.value);
                                 }}
                             >
-                                {CLIENT_LIST.map(c => (
+                                {PUBLIC_CLIENT_LIST.map(c => (
                                     <option key={c.id} value={c.id}>{c.name}</option>
                                 ))}
+                                {/* An existing configuration of a hidden client keeps its type;
+                                    hidden clients are not offered for new configurations. */}
+                                {!isPublicClient(tempServer.application) && getClientCapability(tempServer.application) && (
+                                    <option value={tempServer.application}>
+                                        {getClientCapability(tempServer.application)!.name} (experimental, not verified)
+                                    </option>
+                                )}
                             </select>
                         </div>
 
@@ -314,7 +330,7 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
 
                             {!hasPermission && (
                                 <div className="flex flex-col space-y-2">
-                                    {isPrivateIP(tempServer.hostname) && (
+                                    {isPrivateEndpoint(tempServer.hostname) && (
                                         <div className="text-xs bg-orange-100 border border-orange-200 text-orange-800 p-2 rounded mb-2">
                                             <strong>Local Network Access:</strong> Chrome restricts access to local IPs. You must explicitly grant permission.
                                         </div>
@@ -324,7 +340,7 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
                                         className="bg-yellow-500/10 text-yellow-600 border border-yellow-500/20 px-3 py-2 rounded-md hover:bg-yellow-500/20 text-sm font-medium flex items-center justify-center"
                                     >
                                         <ShieldAlert size={16} className="mr-2" />
-                                        {isPrivateIP(tempServer.hostname) ? 'Grant Local Access' : 'Grant Permission'}
+                                        {isPrivateEndpoint(tempServer.hostname) ? 'Grant Local Access' : 'Grant Permission'}
                                     </button>
                                 </div>
                             )}
@@ -398,7 +414,11 @@ export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, e
                                     )}
                                 </div>
                                 <div className="text-sm text-text-secondary mt-1">
-                                    {CLIENT_LIST.find(c => c.id === server.application)?.name} • {server.hostname}
+                                    {getClientCapability(server.application)?.name ?? server.application}
+                                    {!isPublicClient(server.application) && (
+                                        <span className="ml-2 text-xs px-2 py-0.5 rounded-full border border-border text-text-secondary">experimental, not verified</span>
+                                    )}
+                                    {' • '}{server.hostname}
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">

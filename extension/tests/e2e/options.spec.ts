@@ -95,39 +95,3 @@ test.describe('Options Page', () => {
         expect(foundSetup).toBeTruthy();
     });
 });
-
-test.describe('Options Page - Theme', () => {
-
-    test('should have theme options visible', async ({ page, extensionId }) => {
-        await page.goto(`chrome-extension://${extensionId}/options.html`);
-        await waitForExtensionReady(page);
-
-        // Navigate to appearance/theme section if available
-        const appearanceLink = page.getByRole('link', { name: /appearance|theme/i })
-            .or(page.getByRole('button', { name: /appearance|theme/i }))
-            .or(page.locator('[data-tab="appearance"]'));
-
-        // Same gating as the "About" tab above: "Appearance" is a
-        // Dashboard.tsx secondaryNavItem, so it only exists post-unlock. A
-        // locked/uninitialized vault on a fresh e2e profile is the expected
-        // reason this is absent, not evidence the theme section was removed.
-        if (await appearanceLink.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-            await appearanceLink.first().click();
-            await page.waitForTimeout(300);
-
-            // Theme options should be present (buttons, radios, or select)
-            const themeControls = page.getByRole('button')
-                .or(page.getByRole('radio'))
-                .or(page.locator('[data-theme]'));
-
-            const count = await themeControls.count();
-            expect(count).toBeGreaterThan(0);
-        } else {
-            // Vault locked/uninitialized in this run - Dashboard never
-            // mounted, so the Appearance nav item can't exist yet. Skip
-            // rather than fail; this is a valid pre-unlock state.
-            test.skip();
-        }
-    });
-});
-

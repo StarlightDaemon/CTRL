@@ -1,5 +1,6 @@
 import { storage } from 'wxt/utils/storage';
-import { AppSettings, ServerConfig } from '@/shared/lib/types';
+import { AppSettings, ContextMenuMode, ServerConfig } from '@/shared/lib/types';
+import { normalizeContextMenuMode } from '@/features/torrent-control/model/settingsSchema';
 import { DEFAULT_OPTIONS } from '@/shared/lib/constants';
 import { SESSION_KEY_KEY, VAULT_DATA_KEY, VAULT_SALT_KEY } from '@/shared/api/security/VaultService';
 import { ServerResolver, ResolutionState, ResolvedServers } from '@/shared/api/server/ServerResolver';
@@ -161,8 +162,7 @@ export class ContextMenuService {
      */
     private determineMenuItems(
         resolution: ResolvedServers,
-        mode: number,
-        custom: Partial<Record<string, boolean>> | undefined,
+        mode: ContextMenuMode,
         globals: AppSettings['globals']
     ): chrome.contextMenus.CreateProperties[] {
         const items: chrome.contextMenus.CreateProperties[] = [];
@@ -195,8 +195,8 @@ export class ContextMenuService {
 
         // OK state: build full menu
         const servers = resolution.servers;
-        const showAdd = mode === 1 || mode === 2 || (mode === 3 && custom?.addToClient);
-        const showPaused = mode === 1 || (mode === 3 && custom?.pauseResume);
+        const showAdd = mode === 1 || mode === 2;
+        const showPaused = mode === 1;
 
         // 1. Add to CTRL (default server, global add-paused default applies)
         if (showAdd) {
@@ -308,10 +308,9 @@ export class ContextMenuService {
             const settings = await storage.getItem<AppSettings>('local:options') || DEFAULT_OPTIONS;
             const globals = settings?.globals || DEFAULT_OPTIONS.globals;
 
-            // Carbon radio group can persist string values. Normalize mode so MV3 gating stays stable.
-            const parsedMode = Number(globals.contextMenu);
-            const mode = Number.isInteger(parsedMode) ? parsedMode : DEFAULT_OPTIONS.globals.contextMenu;
-            const custom = globals.contextMenuCustomOptions || DEFAULT_OPTIONS.globals.contextMenuCustomOptions;
+            // Stored values may be strings (old radio groups) or the removed
+            // "custom" mode; normalise to the retained 0/1/2 set.
+            const mode = normalizeContextMenuMode(globals.contextMenu);
 
             // ── Step 1: Resolver snapshot (single call per rebuild) ──
             const rawResolution = await ServerResolver.resolve();
@@ -320,7 +319,7 @@ export class ContextMenuService {
             const resolution = this.stabilizeResolution(rawResolution);
 
             // ── Step 3: Determine full menu set (pure function, no side effects) ──
-            const menuItems = this.determineMenuItems(resolution, mode, custom, globals);
+            const menuItems = this.determineMenuItems(resolution, mode, globals);
 
             // ── Step 4: ATOMIC replacement ──
             await chrome.contextMenus.removeAll();

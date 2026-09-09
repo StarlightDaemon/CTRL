@@ -1,34 +1,22 @@
 import React from 'react';
-import { AppOptions, ServerConfig } from '@/shared/lib/types';
+import { AppOptions, ContextMenuMode, ServerConfig } from '@/shared/lib/types';
 import { SettingsPageLayout } from '@/shared/ui/settings/SettingsPageLayout';
 import { SettingsCard } from '@/shared/ui/settings/SettingsCard';
 import { SettingsToggle } from '@/shared/ui/settings/SettingsToggle';
-import { Settings as SettingsIcon, Download, Info } from 'lucide-react';
+import { Settings as SettingsIcon, Download, Info, Bell } from 'lucide-react';
 import { Select, SelectItem, Stack } from '@carbon/react';
 import { ContextMenuSettings } from './settings/ContextMenuSettings';
-import { NotificationSettings } from './settings/NotificationSettings';
 
 import { useDebugId } from '@/shared/lib/hooks/useDebugId';
 
 interface Props {
     settings: AppOptions;
     updateSettings: (newSettings: AppOptions) => Promise<void> | void;
-    previewContextMenu: number;
-    setPreviewContextMenu: (value: number) => void;
-    previewCustomOptions: {
-        addToClient: boolean;
-        pauseResume: boolean;
-        openWebUI: boolean;
-    };
-    setPreviewCustomOptions: (options: { addToClient: boolean; pauseResume: boolean; openWebUI: boolean }) => void;
+    previewContextMenu: ContextMenuMode;
+    setPreviewContextMenu: (value: ContextMenuMode) => void;
     applyContextMenu: () => Promise<void>;
     previewServers: ServerConfig[];
     setPreviewServers: (servers: ServerConfig[]) => void;
-    previewNotification: boolean;
-    setPreviewNotification: (enabled: boolean) => void;
-    previewNotificationLevel: string;
-    setPreviewNotificationLevel: (level: string) => void;
-    applyNotifications: () => Promise<void>;
 }
 
 export const FunctionSettings: React.FC<Props> = ({
@@ -36,18 +24,11 @@ export const FunctionSettings: React.FC<Props> = ({
     updateSettings,
     previewContextMenu,
     setPreviewContextMenu,
-    previewCustomOptions,
-    setPreviewCustomOptions,
     applyContextMenu,
     previewServers,
     setPreviewServers,
-    previewNotification,
-    setPreviewNotification,
-    previewNotificationLevel,
-    setPreviewNotificationLevel,
-    applyNotifications
 }) => {
-    const handleChange = (field: keyof AppOptions['globals'], value: AppOptions['globals'][keyof AppOptions['globals']]) => {
+    const handleChange = <K extends keyof AppOptions['globals']>(field: K, value: AppOptions['globals'][K]) => {
         updateSettings({
             ...settings,
             globals: {
@@ -61,6 +42,7 @@ export const FunctionSettings: React.FC<Props> = ({
     const addPausedDebug = useDebugId('settings', 'function', 'add-paused-toggle');
     const addAdvancedDebug = useDebugId('settings', 'function', 'add-advanced-toggle');
     const badgeInfoDebug = useDebugId('settings', 'function', 'badge-info-select');
+    const notificationsDebug = useDebugId('settings', 'notifications', 'enable-toggle');
 
     return (
         <SettingsPageLayout
@@ -91,7 +73,7 @@ export const FunctionSettings: React.FC<Props> = ({
                 <SettingsCard title="Extension Badge">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
                         <Stack gap={4}>
-                            <p className="text-sm text-[var(--cds-text-secondary)]">Choose what information to display on the extension icon.</p>
+                            <p className="text-sm text-[var(--cds-text-secondary)]">Choose what information to display on the extension icon. CTRL only polls your client in the background while the badge is enabled.</p>
                             <Select
                                 id="badge-info-select"
                                 labelText="Badge Information"
@@ -126,23 +108,24 @@ export const FunctionSettings: React.FC<Props> = ({
                     settings={settings}
                     previewContextMenu={previewContextMenu}
                     setPreviewContextMenu={setPreviewContextMenu}
-                    previewCustomOptions={previewCustomOptions}
-                    setPreviewCustomOptions={setPreviewCustomOptions}
                     applyContextMenu={applyContextMenu}
                     previewServers={previewServers}
                     setPreviewServers={setPreviewServers}
                 />
 
-                <NotificationSettings
-                    settings={settings}
-                    previewNotification={previewNotification}
-                    setPreviewNotification={setPreviewNotification}
-                    previewNotificationLevel={previewNotificationLevel}
-                    setPreviewNotificationLevel={setPreviewNotificationLevel}
-                    applyNotifications={applyNotifications}
-                    updateSettings={updateSettings}
-                />
-            </Stack >
-        </SettingsPageLayout >
+                <SettingsCard
+                    title="Notifications"
+                    description="Show a browser notification when a torrent is added from the context menu, or when adding fails."
+                >
+                    <SettingsToggle
+                        checked={settings.globals.enableNotifications}
+                        onChange={() => handleChange('enableNotifications', !settings.globals.enableNotifications)}
+                        label="Enable notifications"
+                        icon={<Bell size={20} />}
+                        {...notificationsDebug}
+                    />
+                </SettingsCard>
+            </Stack>
+        </SettingsPageLayout>
     );
 };
