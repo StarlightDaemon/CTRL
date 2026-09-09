@@ -117,16 +117,20 @@ Not supported: mobile browsers, Safari, other clients (adapters hidden).
 - A qBittorrent session that already exists stays valid until it expires or the client restarts, even if the stored password was changed in CTRL (the server decides when a session ends).
 - Plain HTTP is the user's choice; CTRL warns but does not block it.
 
-## 9. Artefacts and checksums (current pre-release build, commit `d4617d1` tree)
+## 9. Artefacts and checksums (pre-release build of commit `0e6742b`, Windows host, Node 24.18 / npm 11.16)
 
 | Artefact | Size | SHA-256 |
 |---|---|---|
-| `ctrl-extension-0.2.0.1-firefox.zip` | 326,684 B | _fill from `sha256sum` at release time; CI records `SHA256SUMS.txt`_ |
-| `ctrl-extension-0.2.0-beta.1-chrome.zip` | 326,607 B | _idem_ |
-| `ctrl-extension-0.2.0-beta.1-source.zip` (AMO source) | 519,946 B (261 entries) | _idem_ |
+| `ctrl-extension-0.2.0.1-firefox.zip` | 326,651 B | `5a34832163bfa31bc77b4580d2af57b5a2c5b938bf8860e59eb4a06ba0e9fe28` |
+| `ctrl-extension-0.2.0-beta.1-chrome.zip` | 326,574 B | `43b8fd731c2dc1e951d376448d5adaeb1c4cfb0c2cb2986c738685d7d7f0c38f` |
+| `ctrl-extension-0.2.0-beta.1-source.zip` (AMO source archive) | 518,160 B (262 entries) | `159d79be17fdeb571b3ccc8cae20fd39e754150233cdb3957d81689f9191a50e` |
 
-The reviewer-style rebuild of `firefox-mv3` from the source archive was
-compared against the checked-in build (see `EXECUTION_STATE.md`, Phase F).
+These are pre-release artefacts for reference; the release artefacts (and
+`SHA256SUMS.txt`) come from the CI `package` job on the tagged 1.0.0 commit.
+Zip container bytes vary with entry timestamps; what reviewers compare are
+the package *contents*, and a reviewer-style rebuild of `firefox-mv3` from
+the source archive was byte-identical to the checked-in build (14/14 files;
+see `EXECUTION_STATE.md`, Phase F).
 
 ## 10. Store asset inventory
 
