@@ -116,7 +116,8 @@ export class FloodAdapter implements ITorrentClient {
     private retryConfig: RetryConfig;
 
     constructor(private config: ServerConfig) {
-        this.httpClient = new FetchHttpClient(config.hostname);
+        // Flood may authenticate with an HttpOnly jwt cookie; let the browser carry it.
+        this.httpClient = new FetchHttpClient(config.hostname, { credentials: 'include' });
         // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
         this.retryConfig = {
             ...DEFAULT_RETRY_CONFIG,

@@ -41,7 +41,9 @@ export class DelugeAdapter implements ITorrentClient {
     constructor(config: ServerConfig) {
         this.config = config;
         this.baseUrl = `${config.hostname.replace(/\/$/, '')}/json`;
-        this.client = new FetchHttpClient(this.baseUrl);
+        // Deluge authenticates with an HttpOnly _session_id cookie; the browser's
+        // cookie jar carries it when credentials: 'include' is set.
+        this.client = new FetchHttpClient(this.baseUrl, { credentials: 'include' });
         // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
         this.retryConfig = {
             ...DEFAULT_RETRY_CONFIG,

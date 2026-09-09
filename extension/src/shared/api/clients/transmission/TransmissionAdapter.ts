@@ -33,6 +33,10 @@ import {
 import { TransmissionAdapterError } from './TransmissionAdapterError';
 import { AdapterConnectionResult } from '@/shared/api/clients/shared/AdapterConnectionResult';
 import { withAdapterRetry, RetryConfig, DEFAULT_RETRY_CONFIG } from '@/shared/lib/retry/withAdapterRetry';
+import { resolveClientEndpoint } from '@/shared/lib/endpoint';
+
+/** RPC methods that only read state and are therefore safe to repeat. */
+const READ_ONLY_METHODS = new Set(['session-get', 'torrent-get', 'session-stats', 'free-space', 'port-test']);
 
 /**
  * Phase 1 Enhanced Transmission RPC Adapter
@@ -61,8 +65,11 @@ export class TransmissionAdapter implements ITorrentClient {
     private retryConfig: RetryConfig;
 
     constructor(private config: ServerConfig) {
-        this.httpClient = new FetchHttpClient(config.hostname);
-        this.rpcUrl = '/transmission/rpc';
+        // The RPC endpoint honours a reverse-proxy sub-path in the stored
+        // address (e.g. https://box.example/tm/ -> https://box.example/tm/transmission/rpc).
+        this.rpcUrl = resolveClientEndpoint(config.type || 'transmission', config.hostname);
+        // Basic auth is sent explicitly; cookies are neither needed nor wanted.
+        this.httpClient = new FetchHttpClient(this.rpcUrl, { credentials: 'omit', timeoutMs: 14000 });
 
         // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
         this.retryConfig = {
@@ -222,10 +229,10 @@ export class TransmissionAdapter implements ITorrentClient {
         }
 
         try {
-            const response = await this.httpClient.post<T>(this.rpcUrl, {
+            const response = await this.httpClient.post<T>('', {
                 method,
                 arguments: args,
-            }, { headers, timeoutMs: 14000 });
+            }, { headers, idempotent: READ_ONLY_METHODS.has(method) });
 
             // Debug logging for successful response
             if (typeof __UI_DEBUG_MODE__ !== 'undefined' && __UI_DEBUG_MODE__) {
@@ -299,16 +306,11 @@ export class TransmissionAdapter implements ITorrentClient {
                 throw new Error('Cannot reach server. Verify host/port and that remote access allows this device.');
             }
 
-            // Timeout: enrich with resolved URL for diagnostics (no credentials included)
-            if (e instanceof Error && e.message.startsWith('Connection timed out after')) {
-                let resolvedUrl = '(unknown)';
-                try {
-                    resolvedUrl = new URL(this.rpcUrl, this.config.hostname).toString();
-                } catch {
-                    // hostname may be malformed; fall back to raw values
-                    resolvedUrl = `${this.config.hostname}${this.rpcUrl}`;
-                }
-                throw new Error(`${e.message} (target: ${resolvedUrl})`);
+            // Timeout: enrich with resolved URL for diagnostics (no credentials included).
+            // OutcomeUnknownError (a mutation that timed out) is passed through untouched
+            // so callers can tell the user the request may already have been applied.
+            if (e instanceof Error && e.name === 'TimeoutError') {
+                throw new Error(`${e.message} (target: ${this.rpcUrl})`);
             }
 
             // Re-throw all other errors

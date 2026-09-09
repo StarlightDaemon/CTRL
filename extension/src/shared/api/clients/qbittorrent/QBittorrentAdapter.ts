@@ -7,6 +7,20 @@ import { ServerConfig } from '@/shared/lib/types';
 import { QBittorrentAdapterError } from './QBittorrentAdapterError';
 import { AdapterConnectionResult } from '@/shared/api/clients/shared/AdapterConnectionResult';
 import { withAdapterRetry, RetryConfig, DEFAULT_RETRY_CONFIG } from '@/shared/lib/retry/withAdapterRetry';
+import { resolveClientEndpoint } from '@/shared/lib/endpoint';
+
+/** Web API version from which torrents/pause|resume were renamed to stop|start. */
+const STOP_START_MIN_API = [2, 11, 0] as const;
+
+function compareApiVersion(version: string, min: readonly [number, number, number]): number {
+    const parts = version.split('.').map((p) => parseInt(p, 10) || 0);
+    for (let i = 0; i < 3; i++) {
+        const a = parts[i] ?? 0;
+        const b = min[i];
+        if (a !== b) return a - b;
+    }
+    return 0;
+}
 
 /**
  * Error messages from qBittorrent that require special handling
@@ -20,12 +34,16 @@ const QB_ERROR_MESSAGES = {
 /**
  * qBittorrent Web API v2 Adapter
  * 
- * Implements full session management with:
- * - Automatic re-authentication on session expiry
- * - Exponential backoff for failed logins
- * - IP ban detection to prevent lockout
- * - CSRF header injection for browser extension compatibility
- * - Request timeout handling
+ * Session handling: qBittorrent issues an HttpOnly SID cookie on login. The
+ * browser owns that cookie, so requests run with `credentials: 'include'`
+ * and the adapter never reads or writes it. CSRF protection on the server
+ * compares the browser-controlled Origin/Referer with the request host; an
+ * extension cannot influence those headers, so the documented server-side
+ * setting is the supported path (see docs/CLIENTS.md).
+ *
+ * Versioning: qBittorrent 5.0 (Web API 2.11) renamed pause/resume to
+ * stop/start and introduced the stoppedDL/stoppedUP states. The adapter
+ * reads the Web API version after login and picks the matching endpoints.
  */
 export class QBittorrentAdapter implements ITorrentClient {
     private client: FetchHttpClient;
@@ -47,9 +65,11 @@ export class QBittorrentAdapter implements ITorrentClient {
 
     constructor(config: ServerConfig) {
         this.config = config;
-        // Ensure trailing slash for URL constructor to work as "directory"
-        this.baseUrl = `${config.hostname.replace(/\/$/, '')}/api/v2/`;
-        this.client = new FetchHttpClient(this.baseUrl);
+        this.baseUrl = resolveClientEndpoint('qbittorrent', config.hostname);
+        this.client = new FetchHttpClient(this.baseUrl, {
+            credentials: 'include',
+            timeoutMs: this.REQUEST_TIMEOUT_MS,
+        });
         // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
         this.retryConfig = {
             ...DEFAULT_RETRY_CONFIG,
@@ -77,7 +97,6 @@ export class QBittorrentAdapter implements ITorrentClient {
             this.loginAttempts = 0;
         }
 
-        console.log(`[QBit] Logging in to ${this.baseUrl} as ${this.config.username}`);
         this.lastLoginAttempt = Date.now();
 
         // qBittorrent requires form-urlencoded, NOT JSON
@@ -91,8 +110,6 @@ export class QBittorrentAdapter implements ITorrentClient {
                 method: 'POST',
                 body,
             });
-
-            console.log(`[QBit] Login Response: ${responseText}`);
 
             // Check for explicit failure responses
             if (typeof responseText === 'string') {
@@ -112,12 +129,11 @@ export class QBittorrentAdapter implements ITorrentClient {
             // Success
             this.isAuthenticated = true;
             this.loginAttempts = 0;
-            console.log('[QBit] Login successful');
 
         } catch (error) {
             if (error instanceof HttpError && (error.status === 401 || error.status === 403)) {
                 // 401 or 403 can mean either wrong password or IP ban - check response body
-                const body = await error.response?.text?.() || '';
+                const body = error.bodyText || '';
                 if (body.includes(QB_ERROR_MESSAGES.IP_BANNED)) {
                     throw new Error('IP has been banned by qBittorrent.');
                 }
@@ -149,8 +165,8 @@ export class QBittorrentAdapter implements ITorrentClient {
         if (this.apiVersion) {
             return this.apiVersion;
         }
-        this.apiVersion = await this.makeAuthenticatedRequest<string>('app/webapiVersion');
-        console.log(`[QBit] API Version: ${this.apiVersion}`);
+        const version = await this.makeAuthenticatedRequest<string>('app/webapiVersion');
+        this.apiVersion = typeof version === 'string' ? version.trim() : String(version);
         return this.apiVersion;
     }
 
@@ -205,17 +221,25 @@ export class QBittorrentAdapter implements ITorrentClient {
     }
 
     async pauseTorrent(id: string): Promise<void> {
-        await this.makeAuthenticatedRequest('torrents/pause', {
+        const endpoint = (await this.supportsStopStart()) ? 'torrents/stop' : 'torrents/pause';
+        await this.makeAuthenticatedRequest(endpoint, {
             method: 'POST',
             body: new URLSearchParams({ hashes: id }),
         });
     }
 
     async resumeTorrent(id: string): Promise<void> {
-        await this.makeAuthenticatedRequest('torrents/resume', {
+        const endpoint = (await this.supportsStopStart()) ? 'torrents/start' : 'torrents/resume';
+        await this.makeAuthenticatedRequest(endpoint, {
             method: 'POST',
             body: new URLSearchParams({ hashes: id }),
         });
+    }
+
+    /** True for Web API >= 2.11 (qBittorrent 5.0+), where pause/resume became stop/start. */
+    private async supportsStopStart(): Promise<boolean> {
+        const version = await this.getApiVersion();
+        return compareApiVersion(version, STOP_START_MIN_API) >= 0;
     }
 
     async removeTorrent(id: string, deleteData?: boolean): Promise<void> {
@@ -230,14 +254,11 @@ export class QBittorrentAdapter implements ITorrentClient {
 
     async testConnection(): Promise<AdapterConnectionResult> {
         try {
-            console.log('[QBit] Testing Connection...');
             // login() is intentionally NOT wrapped in retry: qBittorrent bans the IP
             // after repeated failed logins, and login() already enforces a backoff
             // cooldown. Only the (idempotent) version probe is retried.
             await this.login();
-            console.log('[QBit] Login passed, checking version...');
-            const v = await withAdapterRetry(() => this.getAppVersion(), this.retryConfig);
-            console.log(`[QBit] Version response: ${v}`);
+            await withAdapterRetry(() => this.getApiVersion(), this.retryConfig);
             return { connected: true };
         } catch (error) {
             return { connected: false, error: QBittorrentAdapterError.from(error) };
@@ -316,55 +337,20 @@ export class QBittorrentAdapter implements ITorrentClient {
     // ============================================
 
     /**
-     * Makes a request with CSRF headers injected for browser extension compatibility.
-     * qBittorrent validates Origin/Referer headers to prevent CSRF attacks.
+     * Sends a request through the shared transport. Cookies are managed by the
+     * browser (`credentials: 'include'`); read-only GETs are marked idempotent.
      */
     private async makeRequest<T>(
         endpoint: string,
         init: RequestInit = {}
     ): Promise<T> {
-        const url = new URL(endpoint, this.baseUrl);
-
-        // Inject CSRF bypass headers - critical for browser extensions
-        const headers = new Headers(init.headers);
-        const origin = new URL(this.baseUrl).origin;
-        headers.set('Origin', origin);
-        headers.set('Referer', origin + '/');
-
-        // Setup timeout via AbortController
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT_MS);
-
-        try {
-            const response = await fetch(url.toString(), {
-                ...init,
-                headers,
-                credentials: 'include',
-                signal: controller.signal,
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                throw new HttpError(response.status, response.statusText, response);
-            }
-
-            const text = await response.text();
-            if (!text) return {} as T;
-
-            try {
-                return JSON.parse(text);
-            } catch {
-                return text as unknown as T;
-            }
-        } catch (error) {
-            clearTimeout(timeoutId);
-
-            if (error instanceof Error && error.name === 'AbortError') {
-                throw new Error(`Request timeout after ${this.REQUEST_TIMEOUT_MS}ms`);
-            }
-            throw error;
-        }
+        const method = (init.method ?? 'GET').toUpperCase();
+        return this.client.request<T>(endpoint, {
+            method,
+            headers: init.headers,
+            body: (init.body ?? undefined) as BodyInit | undefined,
+            idempotent: method === 'GET',
+        });
     }
 
     /**
@@ -384,7 +370,6 @@ export class QBittorrentAdapter implements ITorrentClient {
         } catch (error) {
             // Handle session expiry - re-authenticate and retry once
             if (error instanceof HttpError && (error.status === 401 || error.status === 403)) {
-                console.log('[QBit] Session expired, re-authenticating...');
                 this.isAuthenticated = false;
                 await this.login();
                 return await this.makeRequest<T>(endpoint, init);
@@ -441,6 +426,8 @@ export class QBittorrentAdapter implements ITorrentClient {
                 return 'seeding';
             case 'pausedDL':
             case 'pausedUP':
+            case 'stoppedDL': // qBittorrent 5.x
+            case 'stoppedUP':
                 return 'paused';
             case 'queuedDL':
             case 'queuedUP':
@@ -454,7 +441,7 @@ export class QBittorrentAdapter implements ITorrentClient {
             case 'unknown':
                 return 'error';
             default:
-                if (state.includes('paused')) return 'paused';
+                if (state.includes('paused') || state.includes('stopped')) return 'paused';
                 return 'unknown';
         }
     }

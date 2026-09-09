@@ -123,23 +123,21 @@ describe('QBittorrentAdapter', () => {
             await expect(adapter.login()).rejects.toThrow('Login attempts exhausted');
         });
 
-        it('should inject CSRF headers (Origin and Referer)', async () => {
+        it('uses browser-managed cookies and never sets browser-controlled headers', async () => {
             const fetchSpy = mockFetch('Ok.');
 
             await adapter.login();
 
-            expect(fetchSpy).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.objectContaining({
-                    headers: expect.any(Headers),
-                })
-            );
-
-            // Check headers contain Origin
             const callArgs = fetchSpy.mock.calls[0][1] as RequestInit;
+            // The SID cookie is HttpOnly and owned by the browser's cookie jar.
+            expect(callArgs.credentials).toBe('include');
+            // Origin/Referer/Cookie are forbidden request headers: the browser sets
+            // its own extension Origin and silently drops anything we put here.
             const headers = callArgs.headers as Headers;
-            expect(headers.get('Origin')).toBe('http://localhost:8080');
-            expect(headers.get('Referer')).toBe('http://localhost:8080/');
+            expect(headers.get('Origin')).toBeNull();
+            expect(headers.get('Referer')).toBeNull();
+            expect(headers.get('Cookie')).toBeNull();
+            expect(fetchSpy.mock.calls[0][0]).toBe('http://localhost:8080/api/v2/auth/login');
         });
     });
 
@@ -346,9 +344,27 @@ describe('QBittorrentAdapter', () => {
     });
 
     describe('pauseTorrent', () => {
-        it('should pause torrent by hash', async () => {
+        it('uses torrents/stop on Web API 2.11+ (qBittorrent 5.x)', async () => {
+            const fetchSpy = mockFetchSequence([
+                { response: 'Ok.' },      // auth/login
+                { response: '2.11.2' },   // app/webapiVersion
+                { response: 'Ok.' },      // torrents/stop
+            ]);
+
+            await adapter.login();
+            await adapter.pauseTorrent('abc123');
+
+            expect(fetchSpy).toHaveBeenLastCalledWith(
+                expect.stringContaining('torrents/stop'),
+                expect.objectContaining({ method: 'POST' })
+            );
+            expect(fetchSpy).not.toHaveBeenCalledWith(expect.stringContaining('torrents/pause'), expect.anything());
+        });
+
+        it('uses torrents/pause on Web API < 2.11 (qBittorrent 4.x)', async () => {
             const fetchSpy = mockFetchSequence([
                 { response: 'Ok.' },
+                { response: '2.8.3' },
                 { response: 'Ok.' },
             ]);
 
@@ -360,12 +376,45 @@ describe('QBittorrentAdapter', () => {
                 expect.objectContaining({ method: 'POST' })
             );
         });
+
+        it('reads the Web API version once per adapter instance', async () => {
+            const fetchSpy = mockFetchSequence([
+                { response: 'Ok.' },
+                { response: '2.11.2' },
+                { response: 'Ok.' },
+                { response: 'Ok.' },
+            ]);
+
+            await adapter.login();
+            await adapter.pauseTorrent('a');
+            await adapter.pauseTorrent('b');
+
+            const versionCalls = fetchSpy.mock.calls.filter(([url]) => String(url).includes('webapiVersion'));
+            expect(versionCalls).toHaveLength(1);
+        });
     });
 
     describe('resumeTorrent', () => {
-        it('should resume torrent by hash', async () => {
+        it('uses torrents/start on Web API 2.11+', async () => {
             const fetchSpy = mockFetchSequence([
                 { response: 'Ok.' },
+                { response: '2.11.2' },
+                { response: 'Ok.' },
+            ]);
+
+            await adapter.login();
+            await adapter.resumeTorrent('abc123');
+
+            expect(fetchSpy).toHaveBeenLastCalledWith(
+                expect.stringContaining('torrents/start'),
+                expect.objectContaining({ method: 'POST' })
+            );
+        });
+
+        it('uses torrents/resume on Web API < 2.11', async () => {
+            const fetchSpy = mockFetchSequence([
+                { response: 'Ok.' },
+                { response: '2.9.3' },
                 { response: 'Ok.' },
             ]);
 
@@ -596,7 +645,7 @@ describe('QBittorrentAdapter.testConnection', () => {
     it('returns { connected: true } on success', async () => {
         const adapter = new QBittorrentAdapter(makeConfig());
         vi.spyOn(adapter, 'login').mockResolvedValue(undefined);
-        vi.spyOn(adapter, 'getAppVersion').mockResolvedValue('v4.6.0');
+        vi.spyOn(adapter, 'getApiVersion').mockResolvedValue('2.11.2');
         await expect(adapter.testConnection()).resolves.toEqual({ connected: true });
     });
 

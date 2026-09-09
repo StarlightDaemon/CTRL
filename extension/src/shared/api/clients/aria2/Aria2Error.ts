@@ -64,7 +64,8 @@ export class Aria2Error extends Error {
             code: isTimeout ? 'TIMEOUT' : 'NETWORK_ERROR',
             message: error.message,
             context,
-            retryable: true, // Network errors are always retryable
+            // A mutation that timed out after being sent is never safe to repeat.
+            retryable: error.name !== 'OutcomeUnknownError',
         });
     }
 

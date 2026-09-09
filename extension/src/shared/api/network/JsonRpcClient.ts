@@ -1,4 +1,4 @@
-import { FetchHttpClient, RequestConfig } from './FetchHttpClient';
+import { FetchHttpClient, RequestConfig, TransportProfile } from './FetchHttpClient';
 
 export interface JsonRpcRequest {
     jsonrpc: '2.0';
@@ -35,15 +35,22 @@ export class JsonRpcError extends Error {
     }
 }
 
+export interface JsonRpcCallOptions {
+    /** Read-only methods may be retried safely; mutations are never retried. */
+    idempotent?: boolean;
+    signal?: AbortSignal;
+    timeoutMs?: number;
+}
+
 export class JsonRpcClient {
     private httpClient: FetchHttpClient;
     private idCounter = 0;
 
-    constructor(endpoint: string, private authHeader?: { key: string; value: string }) {
-        this.httpClient = new FetchHttpClient(endpoint);
+    constructor(endpoint: string, private authHeader?: { key: string; value: string }, profile: TransportProfile = {}) {
+        this.httpClient = new FetchHttpClient(endpoint, profile);
     }
 
-    async call<T>(method: string, params: unknown[] = []): Promise<T> {
+    async call<T>(method: string, params: unknown[] = [], options: JsonRpcCallOptions = {}): Promise<T> {
         const id = this.generateId();
         const request: JsonRpcRequest = {
             jsonrpc: '2.0',
@@ -52,12 +59,16 @@ export class JsonRpcClient {
             id,
         };
 
-        const config: RequestConfig = {};
+        const config: RequestConfig = {
+            idempotent: options.idempotent,
+            signal: options.signal,
+            timeoutMs: options.timeoutMs,
+        };
         if (this.authHeader) {
             config.headers = { [this.authHeader.key]: this.authHeader.value };
         }
 
-        // JSON-RPC is always a POST to the root (or specific endpoint handled by httpClient base URL)
+        // JSON-RPC is always a POST to the endpoint the client was created with.
         const response = await this.httpClient.post<JsonRpcResponse<T>>('', request, config);
 
         if (response.error) {
@@ -68,7 +79,6 @@ export class JsonRpcClient {
 
         if (response.result === undefined) {
             // Some methods might return null/undefined on success, but usually result is present.
-            // If strict, we might check for 'result' key presence.
             return null as unknown as T;
         }
 

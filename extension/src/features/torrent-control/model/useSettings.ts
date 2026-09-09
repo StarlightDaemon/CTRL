@@ -10,6 +10,7 @@ export const settingsStorage = storage.defineItem<AppOptions>('local:options', {
 });
 
 import { VaultService } from '@/shared/api/security/VaultService';
+import { sanitizeServersForExport } from './exportSanitizer';
 
 // Zod Schemas for Validation
 const ServerConfigSchema = z.object({
@@ -189,11 +190,8 @@ export function useSettings() {
         if (type === 'full') {
             exportData.data = dataToExport;
             if (sanitize && exportData.data.servers) {
-                exportData.data.servers = exportData.data.servers.map((s: ServerConfig) => ({
-                    ...s,
-                    password: '', // Clear password
-                    httpAuth: s.httpAuth ? { ...s.httpAuth, password: '' } : undefined
-                }));
+                // Allowlist-based: only known non-secret fields survive.
+                exportData.data.servers = sanitizeServersForExport(exportData.data.servers) as unknown as ServerConfig[];
             }
         } else {
             // Settings Only (Global + Appearance)
@@ -217,20 +215,16 @@ export function useSettings() {
             return;
         }
 
-        let serversToExport = [...serversToUse];
-
-        if (sanitize) {
-            serversToExport = serversToExport.map(s => ({
-                ...s,
-                password: '', // Clear main password
-                httpAuth: s.httpAuth ? { ...s.httpAuth, password: '' } : undefined
-            }));
-        }
+        const serversToExport: unknown[] = sanitize
+            ? sanitizeServersForExport(serversToUse)
+            : [...serversToUse];
 
         const exportData = {
             version: 2,
             type: 'server_config',
             timestamp: new Date().toISOString(),
+            /** Marks whether credentials are present so the file is self-describing. */
+            containsSecrets: !sanitize,
             data: {
                 servers: serversToExport
             }
