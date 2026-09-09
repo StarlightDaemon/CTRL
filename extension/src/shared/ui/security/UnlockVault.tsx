@@ -9,17 +9,25 @@ import {
     Loading,
     InlineNotification
 } from '@carbon/react';
+import { ResetVaultDialog } from './ResetVaultDialog';
 
 interface UnlockVaultProps {
     onUnlock: () => void;
     /** Popup-sized layout: no full-height centering. */
     compact?: boolean;
+    /**
+     * When provided, offers "Forgot your master password?" which resets the
+     * vault after explicit confirmation. Omitted in the popup, which points
+     * to the settings page instead.
+     */
+    onReset?: () => Promise<void>;
 }
 
-export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock, compact = false }) => {
+export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock, compact = false, onReset }) => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [resetOpen, setResetOpen] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -35,7 +43,7 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock, compact = fa
             }
         } catch (err) {
             if (err instanceof VaultCorruptedError) {
-                setError('The stored vault data is incomplete or damaged and cannot be unlocked. Reset it from Settings → System.');
+                setError('The stored vault data is incomplete or damaged and cannot be unlocked. Open CTRL settings to reset it.');
             } else {
                 setError('Unlock failed. Please try again.');
             }
@@ -96,8 +104,23 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock, compact = fa
                             </div>
                         </Stack>
                     </form>
+
+                    {onReset && (
+                        <div className="text-center">
+                            <Button kind="ghost" size="sm" onClick={() => setResetOpen(true)}>
+                                Forgot your master password?
+                            </Button>
+                            <p className="text-xs text-[var(--cds-text-helper)] mt-1 m-0">
+                                The password cannot be recovered. Resetting deletes the saved servers so you can start again.
+                            </p>
+                        </div>
+                    )}
                 </Stack>
             </Tile>
+
+            {onReset && (
+                <ResetVaultDialog open={resetOpen} onClose={() => setResetOpen(false)} onConfirm={onReset} />
+            )}
         </div>
     );
 };

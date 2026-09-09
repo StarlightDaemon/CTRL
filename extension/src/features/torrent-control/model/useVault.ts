@@ -104,6 +104,15 @@ export const useVault = () => {
         setServers(newServers);
     };
 
+    /**
+     * Destroys the vault: every saved server and the master password. The
+     * caller must have obtained explicit confirmation from the user.
+     */
+    const reset = async () => {
+        await VaultService.reset();
+        await checkStatus();
+    };
+
     return {
         status,
         servers,
@@ -111,6 +120,7 @@ export const useVault = () => {
         setup,
         unlock,
         lock,
+        reset,
         saveServers,
         refresh: checkStatus
     };

@@ -20,6 +20,7 @@ import { useTorrentSubscription } from '@/features/torrent-control/model/useTorr
 import { useTorrentStore } from '@/stores/useTorrentStore';
 import { describeConnection } from './ConnectionBanner';
 import { formatSpeed } from '@/shared/lib/format';
+import { requestHostPermission } from '@/shared/lib/permissions';
 import type { AddTorrentRequest, CommandResult } from '@/shared/api/messaging/protocol';
 
 import { Logo } from '@/shared/ui/Logo';
@@ -255,6 +256,15 @@ const LiveDashboard: React.FC<{ onLock: () => Promise<void> }> = ({ onLock }) =>
                                 )}
                             </div>
                         </div>
+                        {connection.status === 'permission_missing' && currentServer?.hostname && (
+                            <Button
+                                kind="tertiary"
+                                size="sm"
+                                onClick={() => { void requestHostPermission(currentServer.hostname); }}
+                            >
+                                Grant access
+                            </Button>
+                        )}
                     </Tile>
                 </Layer>
 

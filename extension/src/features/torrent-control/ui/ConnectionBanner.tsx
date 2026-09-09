@@ -21,13 +21,16 @@ export function describeConnection(connection: ConnectionState): ConnectionPrese
         case 'locked':
             return { kind: 'warning', title: 'Locked', detail: 'Unlock CTRL with your master password to see your torrents.' };
         case 'vault_corrupted':
-            return { kind: 'error', title: 'Vault damaged', detail: 'The stored vault data is incomplete or damaged and cannot be unlocked. Open Settings → System to reset it.' };
+            return { kind: 'error', title: 'Vault damaged', detail: 'The stored vault data is incomplete or damaged and cannot be unlocked. Open CTRL settings to reset it.' };
         case 'no_servers':
             return { kind: 'info', title: 'No server configured', detail: 'Add a torrent client in Settings → Servers.' };
         case 'invalid_config':
             return { kind: 'error', title: 'Server configuration invalid', detail: connection.lastError ?? 'Check the server address and client type in Settings → Servers.' };
         case 'permission_missing':
-            return { kind: 'warning', title: 'Access not granted', detail: `CTRL needs permission to contact ${server}. Open Settings → Servers and grant access.` };
+            if (connection.lastErrorType === 'PERMISSION_REVOKED') {
+                return { kind: 'warning', title: 'Access revoked', detail: `Access to ${server} was removed in the browser. Grant it again to reconnect.` };
+            }
+            return { kind: 'warning', title: 'Access not granted', detail: `CTRL needs permission to contact ${server}. Grant access in Settings → Servers.` };
         case 'connecting':
             return { kind: 'info', title: 'Connecting…', detail: `Contacting ${server}.` };
         case 'connected':

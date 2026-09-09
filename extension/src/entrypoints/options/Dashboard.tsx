@@ -20,6 +20,7 @@ interface DashboardProps {
     exportServerConfig: (sanitize?: boolean) => void;
     importBackup: (file: File) => Promise<{ success: boolean; message: string }>;
     lockVault: () => Promise<void>;
+    resetVault: () => Promise<void>;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -29,7 +30,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     exportSystemBackup,
     exportServerConfig,
     importBackup,
-    lockVault
+    lockVault,
+    resetVault
 }) => {
     const [activeView, setActiveView] = useState('dashboard');
 
@@ -146,6 +148,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 settings={settings}
                                 exportSystemBackup={exportSystemBackup}
                                 importBackup={importBackup}
+                                resetVault={resetVault}
                             />
                         </div>
                     </div>

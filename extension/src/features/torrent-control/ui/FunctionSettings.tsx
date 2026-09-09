@@ -54,6 +54,7 @@ export const FunctionSettings: React.FC<Props> = ({
                 <SettingsCard title="General Behavior">
                     <Stack gap={4}>
                         <SettingsToggle
+                            id="setting-add-paused"
                             checked={settings.globals.addPaused}
                             onChange={() => handleChange('addPaused', !settings.globals.addPaused)}
                             label="Add torrents paused"
@@ -61,6 +62,7 @@ export const FunctionSettings: React.FC<Props> = ({
                             {...addPausedDebug}
                         />
                         <SettingsToggle
+                            id="setting-add-advanced"
                             checked={settings.globals.addAdvanced}
                             onChange={() => handleChange('addAdvanced', !settings.globals.addAdvanced)}
                             label="Show advanced dialog when adding"
@@ -118,6 +120,7 @@ export const FunctionSettings: React.FC<Props> = ({
                     description="Show a browser notification when a torrent is added from the context menu, or when adding fails."
                 >
                     <SettingsToggle
+                        id="setting-enable-notifications"
                         checked={settings.globals.enableNotifications}
                         onChange={() => handleChange('enableNotifications', !settings.globals.enableNotifications)}
                         label="Enable notifications"

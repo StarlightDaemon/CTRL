@@ -11,6 +11,7 @@ const SecureContent: React.FC<{
     vaultServers: ServerConfig[];
     saveServers: (servers: ServerConfig[]) => Promise<void>;
     lock: () => Promise<void>;
+    reset: () => Promise<void>;
     settings: AppSettings | null;
     updateSettings: (settings: AppSettings) => Promise<void>;
     loading: boolean;
@@ -21,6 +22,7 @@ const SecureContent: React.FC<{
     vaultServers,
     saveServers,
     lock,
+    reset,
     settings,
     updateSettings,
     loading,
@@ -62,6 +64,7 @@ const SecureContent: React.FC<{
                 exportServerConfig={(sanitize) => exportServerConfig(sanitize, mergedSettings?.servers)}
                 importBackup={importBackup}
                 lockVault={lock}
+                resetVault={reset}
             />
         );
     };
@@ -79,11 +82,12 @@ const App = () => {
     return (
         <ErrorBoundary>
             <VaultGuard>
-                {({ servers: vaultServers, saveServers, lock }) => (
+                {({ servers: vaultServers, saveServers, lock, reset }) => (
                     <SecureContent
                         vaultServers={vaultServers}
                         saveServers={saveServers}
                         lock={lock}
+                        reset={reset}
                         settings={settings}
                         updateSettings={updateSettings}
                         loading={loading}

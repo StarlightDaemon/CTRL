@@ -109,6 +109,9 @@ export class TorrentController {
     private connection: ConnectionState = initialConnectionState();
     private stats: GlobalStats = emptyStats();
 
+    /** Set when the browser reports an optional host permission being removed; cleared once access is confirmed again. */
+    private permissionRevoked = false;
+
     private subscribers = new Set<Subscriber>();
     private clients = new Map<string, CachedClient>();
     private inFlight: Promise<void> | null = null;
@@ -178,6 +181,17 @@ export class TorrentController {
         if (this.connection.status === 'connected' || this.connection.status === 'stale') {
             this.setConnection({ status: 'connecting' });
         }
+    }
+
+    /**
+     * Records that the browser removed an optional host permission (the user
+     * revoked site access from the browser's extension settings). The next
+     * poll that finds the active server unreachable for lack of permission
+     * reports it as revoked rather than never granted, so the recovery step
+     * is named correctly.
+     */
+    notePermissionRemoved(): void {
+        this.permissionRevoked = true;
     }
 
     // ------------------------------------------------------------------
@@ -288,18 +302,22 @@ export class TorrentController {
         const permitted = await this.deps.hasHostPermission(server.hostname);
         if (generation !== this.generation) return;
         if (!permitted) {
+            const revoked = this.permissionRevoked;
             this.clearSnapshot();
             this.setConnection({
                 status: 'permission_missing',
                 serverId,
                 serverName: server.name,
                 lastAttemptAt: this.now(),
-                lastError: 'CTRL has not been granted access to this server address.',
-                lastErrorType: 'PERMISSION_MISSING',
+                lastError: revoked
+                    ? 'Access to this server address was removed in the browser. Grant it again to reconnect.'
+                    : 'CTRL has not been granted access to this server address.',
+                lastErrorType: revoked ? 'PERMISSION_REVOKED' : 'PERMISSION_MISSING',
             });
             this.broadcastStatus(true);
             return;
         }
+        this.permissionRevoked = false;
 
         let client: ITorrentClient;
         try {

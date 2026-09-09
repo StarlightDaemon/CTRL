@@ -171,7 +171,10 @@ export default defineBackground(() => {
     }
 
     if (chrome.permissions?.onRemoved) {
-        chrome.permissions.onRemoved.addListener(() => invalidate('permission-removed'));
+        chrome.permissions.onRemoved.addListener(() => {
+            controller.notePermissionRemoved();
+            invalidate('permission-removed');
+        });
     }
     if (chrome.permissions?.onAdded) {
         chrome.permissions.onAdded.addListener(() => invalidate('permission-added'));

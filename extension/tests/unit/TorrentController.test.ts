@@ -437,7 +437,49 @@ describe('TorrentController — restart, hydration and connection state', () => 
         h.permissions.add('http://somewhere-else/');
         await h.controller.refresh();
         expect(h.controller.getConnection().status).toBe('permission_missing');
+        expect(h.controller.getConnection().lastErrorType).toBe('PERMISSION_MISSING');
         expect(h.clients.get('A')).toBeUndefined();
+    });
+
+    it('reports a revoked permission as revoked, drops the queue, and recovers once access is granted again', async () => {
+        h.setServers([A], 0);
+        h.permissions.add(A.hostname);
+        const client = Object.assign(new FakeClient('A'), { auto: [torrent('a')] as Torrent[] | Error });
+        h.clients.set('A', client);
+        const port = new FakePort();
+        h.controller.attachPort(port);
+        await h.controller.refresh();
+        expect(h.controller.getConnection().status).toBe('connected');
+
+        // The user removes site access from the browser: background gets onRemoved.
+        // (The harness treats an empty set as "everything permitted", so keep an unrelated entry.)
+        h.permissions.delete(A.hostname);
+        h.permissions.add('http://unrelated.example/');
+        h.controller.notePermissionRemoved();
+        h.controller.invalidate('permission-removed');
+        await h.controller.refresh();
+
+        const connection = h.controller.getConnection();
+        expect(connection.status).toBe('permission_missing');
+        expect(connection.lastErrorType).toBe('PERMISSION_REVOKED');
+        expect(connection.lastError).toContain('removed in the browser');
+        expect(h.controller.getSnapshotTorrents()).toBeNull();
+        const last = port.last() as StatusMessage;
+        expect(last.type).toBe('STATUS');
+        expect(last.cleared).toBe(true);
+        expect(client.getTorrents).toHaveBeenCalledTimes(1);
+
+        // Granted again (onAdded → invalidate → refresh): back to live data, flag cleared.
+        h.permissions.add(A.hostname);
+        h.controller.invalidate('permission-added');
+        await h.controller.refresh();
+        expect(h.controller.getConnection().status).toBe('connected');
+
+        // A later, ordinary missing permission is no longer described as revoked.
+        h.permissions.delete(A.hostname);
+        h.controller.invalidate('test');
+        await h.controller.refresh();
+        expect(h.controller.getConnection().lastErrorType).toBe('PERMISSION_MISSING');
     });
 
     it('marks data stale when a later poll fails and unavailable when none succeeded', async () => {

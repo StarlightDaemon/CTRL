@@ -1,22 +1,14 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+import { Button, InlineNotification, Modal, Stack, Tag } from '@carbon/react';
+import { Server } from 'lucide-react';
 import { AppOptions, ServerConfig } from '@/shared/lib/types';
-import { DEFAULT_CLIENT_ID, PUBLIC_CLIENT_LIST, getClientCapability, isPublicClient } from '@/shared/lib/constants';
-import { checkHostPermission, requestHostPermission } from '@/shared/lib/permissions';
-import { isPrivateHost } from '@/shared/lib/endpoint';
-
-/** True when the configured address points at a loopback/LAN host. */
-const isPrivateEndpoint = (address: string): boolean => {
-    try {
-        return isPrivateHost(new URL(address).hostname);
-    } catch {
-        return false;
-    }
-};
+import { getClientCapability, isPublicClient } from '@/shared/lib/constants';
+import { requestHostPermission } from '@/shared/lib/permissions';
 import { SettingsPageLayout } from '@/shared/ui/settings/SettingsPageLayout';
 import { SettingsCard } from '@/shared/ui/settings/SettingsCard';
-import { Server, ShieldAlert } from 'lucide-react';
-import { useDebugId } from '@/shared/lib/hooks/useDebugId';
-import { VaultService } from '@/shared/api/security/VaultService';
+import { useTorrentStore } from '@/stores/useTorrentStore';
+import { describeConnection } from './ConnectionBanner';
+import { ServerForm } from './ServerForm';
 
 interface Props {
     settings: AppOptions;
@@ -25,479 +17,262 @@ interface Props {
     importBackup: (file: File) => Promise<{ success: boolean; message: string }>;
 }
 
+type Mode = { kind: 'list' } | { kind: 'add' } | { kind: 'edit'; index: number };
+
+interface Notice {
+    kind: 'success' | 'error' | 'info';
+    title: string;
+    subtitle?: string;
+}
+
+/**
+ * Server list and add/edit workflow of the options page.
+ *
+ * All confirmation and result messaging is in-product (Carbon modal and
+ * notifications); nothing uses the browser's native alert/confirm dialogs.
+ * The status shown for the active server is the background controller's
+ * canonical connection state, read from the shared store.
+ */
 export const ServerConfigPanel: React.FC<Props> = ({ settings, updateSettings, exportServerConfig, importBackup }) => {
-    const [editingIndex, setEditingIndex] = useState<number | null>(null);
-    const [isAdding, setIsAdding] = useState(false);
-    const [testStatus, setTestStatus] = useState<{ loading: boolean; success: boolean; message: string | null }>({ loading: false, success: false, message: null });
-    const [saveError, setSaveError] = useState<string | null>(null);
-    const [hasPermission, setHasPermission] = useState(true);
-    const [vaultStatus, setVaultStatus] = useState<string>('');
+    const [mode, setMode] = useState<Mode>({ kind: 'list' });
+    const [notice, setNotice] = useState<Notice | null>(null);
+    const [pendingRemove, setPendingRemove] = useState<number | null>(null);
+    const [removing, setRemoving] = useState(false);
+    const importInputRef = useRef<HTMLInputElement>(null);
+    const connection = useTorrentStore((s) => s.connection);
 
-    React.useEffect(() => {
-        const checkVault = async () => {
-            try {
-                const isInit = await VaultService.isInitialized();
-                if (!isInit) {
-                    setVaultStatus('Vault: Uninitialized');
-                    return;
-                }
-                const isLocked = await VaultService.isLocked();
-                setVaultStatus(isLocked ? 'Vault: Locked' : 'Vault: Unlocked');
-            } catch (e) {
-                console.error('Failed to check vault status', e);
-            }
-        };
-        checkVault();
-        const interval = setInterval(checkVault, 2000);
-        return () => clearInterval(interval);
-    }, []);
+    const servers = settings.servers;
+    const currentIndex = settings.globals.currentServer;
 
-    // Temp state for the server being edited/added
-    const [tempServer, setTempServer] = useState<ServerConfig>({
-        name: 'New Server',
-        application: DEFAULT_CLIENT_ID,
-        type: DEFAULT_CLIENT_ID,
-        hostname: 'http://localhost:8080/',
-        username: '',
-        password: '',
-        directories: [],
-        clientOptions: {},
-    });
-
-    React.useEffect(() => {
-        if (tempServer.hostname) {
-            checkHostPermission(tempServer.hostname).then(setHasPermission);
-        }
-    }, [tempServer.hostname]);
-
-    const handleGrantPermission = async () => {
-        const granted = await requestHostPermission(tempServer.hostname);
-        setHasPermission(granted);
-    };
-
-    const startAdd = () => {
-        setTempServer({
-            name: 'New Server',
-            application: DEFAULT_CLIENT_ID,
-            type: DEFAULT_CLIENT_ID,
-            hostname: 'http://localhost:8080/',
-            username: '',
-            password: '',
-            directories: [],
-            clientOptions: {},
+    const persistServers = async (nextServers: ServerConfig[], nextCurrent: number) => {
+        const clamped = nextServers.length === 0 ? 0 : Math.min(Math.max(0, nextCurrent), nextServers.length - 1);
+        await updateSettings({
+            ...settings,
+            servers: nextServers,
+            globals: { ...settings.globals, currentServer: clamped },
         });
-        setTestStatus({ loading: false, success: false, message: null });
-        setSaveError(null);
-        setIsAdding(true);
-        setEditingIndex(null);
     };
 
-    const startEdit = (index: number) => {
-        setTempServer({ ...settings.servers[index] });
-        setTestStatus({ loading: false, success: false, message: null });
-        setSaveError(null);
-        setEditingIndex(index);
-        setIsAdding(false);
-    };
-
-    const cancelEdit = () => {
-        setIsAdding(false);
-        setEditingIndex(null);
-        setSaveError(null);
-    };
-
-    const saveServer = async () => {
-        setSaveError(null);
-        const newServers = [...settings.servers];
-        if (isAdding) {
-            newServers.push(tempServer);
-        } else if (editingIndex !== null) {
-            newServers[editingIndex] = tempServer;
+    const handleSave = async (server: ServerConfig) => {
+        const next = [...servers];
+        if (mode.kind === 'edit') {
+            next[mode.index] = server;
+        } else {
+            next.push(server);
         }
+        await persistServers(next, currentIndex);
+        setNotice({ kind: 'success', title: mode.kind === 'edit' ? 'Server updated' : 'Server added', subtitle: `${server.name} is saved in the encrypted vault.` });
+        setMode({ kind: 'list' });
+    };
 
+    const confirmRemove = async () => {
+        if (pendingRemove === null) return;
+        const index = pendingRemove;
+        const target = servers[index];
+        setRemoving(true);
         try {
-            await updateSettings({
-                ...settings,
-                servers: newServers,
-                // If we just added the first server, make it default
-                globals: {
-                    ...settings.globals,
-                    currentServer: settings.globals.currentServer >= newServers.length ? 0 : settings.globals.currentServer
-                }
-            });
-            cancelEdit();
-        } catch (e: unknown) {
-            const errMsg = e instanceof Error ? e.message : 'Failed to save server settings';
-            setSaveError(errMsg);
-        }
-    };
-
-    const removeServer = async (index: number) => {
-        if (confirm('Are you sure you want to remove this server?')) {
-            const newServers = settings.servers.filter((_, i) => i !== index);
-            let newCurrent = settings.globals.currentServer;
-            if (newCurrent >= index && newCurrent > 0) newCurrent--;
-
-            try {
-                await updateSettings({
-                    ...settings,
-                    servers: newServers,
-                    globals: { ...settings.globals, currentServer: newCurrent }
-                });
-            } catch (e: unknown) {
-                const errMsg = e instanceof Error ? e.message : 'Failed to remove server';
-                alert(errMsg);
-            }
+            const next = servers.filter((_, i) => i !== index);
+            let nextCurrent = currentIndex;
+            if (nextCurrent >= index && nextCurrent > 0) nextCurrent--;
+            await persistServers(next, nextCurrent);
+            setNotice({ kind: 'success', title: 'Server removed', subtitle: `${target?.name ?? 'The server'} was removed from CTRL. Nothing changed on the torrent client.` });
+            setPendingRemove(null);
+        } catch (error) {
+            setNotice({ kind: 'error', title: 'Server not removed', subtitle: error instanceof Error ? error.message : 'The server could not be removed.' });
+            setPendingRemove(null);
+        } finally {
+            setRemoving(false);
         }
     };
 
     const setDefault = async (index: number) => {
         try {
-            await updateSettings({
-                ...settings,
-                globals: { ...settings.globals, currentServer: index }
-            });
-        } catch (e: unknown) {
-            const errMsg = e instanceof Error ? e.message : 'Failed to set default server';
-            alert(errMsg);
+            await persistServers(servers, index);
+            setNotice({ kind: 'success', title: 'Default server changed', subtitle: `${servers[index]?.name ?? 'The server'} is now the default.` });
+        } catch (error) {
+            setNotice({ kind: 'error', title: 'Default server not changed', subtitle: error instanceof Error ? error.message : 'The default server could not be changed.' });
         }
     };
 
-    const testConnection = async () => {
-        setTestStatus({ loading: true, success: false, message: null });
+    const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
         try {
-            // Pass the raw config to background for testing
-            const res = await chrome.runtime.sendMessage({ type: 'TEST_CONNECTION', config: tempServer });
-
-            if (res && typeof res === 'object' && res.connected) {
-                setTestStatus({ loading: false, success: true, message: 'Connection Successful!' });
-            } else if (res && typeof res === 'object' && typeof res.error === 'string' && res.error) {
-                setTestStatus({ loading: false, success: false, message: res.error });
-            } else {
-                setTestStatus({ loading: false, success: false, message: 'Connection failed' });
-            }
-        } catch (e: unknown) {
-            const errMsg = e instanceof Error ? e.message : 'Connection Error';
-            setTestStatus({ loading: false, success: false, message: errMsg });
+            const result = await importBackup(file);
+            setNotice({ kind: result.success ? 'success' : 'error', title: result.success ? 'Import complete' : 'Import failed', subtitle: result.message });
+        } catch (error) {
+            setNotice({ kind: 'error', title: 'Import failed', subtitle: error instanceof Error ? error.message : 'The file could not be imported.' });
         }
     };
 
-
-    const handleTempChange = <K extends keyof ServerConfig>(field: K, value: ServerConfig[K]) => {
-        setTempServer(prev => ({ ...prev, [field]: value }));
-    };
-
-    // Debug IDs for form inputs
-    const hostInputDebug = useDebugId('server-config', 'address', 'host-input');
-    const portInputDebug = useDebugId('server-config', 'address', 'port-input');
-
-    // Render Form
-    if (isAdding || editingIndex !== null) {
+    if (mode.kind !== 'list') {
+        const editing = mode.kind === 'edit' ? servers[mode.index] ?? null : null;
         return (
             <SettingsPageLayout
-                title={isAdding ? 'Add New Server' : 'Edit Server'}
+                title={mode.kind === 'edit' ? 'Edit server' : 'Add server'}
+                description="Tell CTRL where your BitTorrent client's web interface is and how to sign in."
                 icon={Server}
-                actions={
-                    <button onClick={cancelEdit} className="text-text-secondary hover:text-text-primary px-4 py-2">
-                        Cancel
-                    </button>
-                }
             >
-                <SettingsCard>
-                    <div className="grid grid-cols-1 gap-4">
-                        {/* Name */}
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary">Server Name</label>
-                            <input
-                                type="text"
-                                data-component="Input"
-                                className="mt-1 block w-full rounded-md border-border bg-background text-text-primary shadow-sm focus:border-accent focus:ring-accent sm:text-sm p-2 border"
-                                value={tempServer.name}
-                                onChange={(e) => handleTempChange('name', e.target.value)}
-                            />
-                        </div>
-
-                        {/* Application */}
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary">BitTorrent Client</label>
-                            <select
-                                data-component="Select"
-                                className="mt-1 block w-full rounded-md border-border bg-background text-text-primary shadow-sm focus:border-accent focus:ring-accent sm:text-sm p-2 border"
-                                value={tempServer.application}
-                                onChange={(e) => {
-                                    handleTempChange('application', e.target.value);
-                                    handleTempChange('type', e.target.value);
-                                }}
-                            >
-                                {PUBLIC_CLIENT_LIST.map(c => (
-                                    <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
-                                {/* An existing configuration of a hidden client keeps its type;
-                                    hidden clients are not offered for new configurations. */}
-                                {!isPublicClient(tempServer.application) && getClientCapability(tempServer.application) && (
-                                    <option value={tempServer.application}>
-                                        {getClientCapability(tempServer.application)!.name} (experimental, not verified)
-                                    </option>
-                                )}
-                            </select>
-                        </div>
-
-                        {/* Address */}
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary">Server Address</label>
-                            <div className="mt-1 flex rounded-md shadow-sm">
-                                <select
-                                    data-component="Select"
-                                    className="rounded-l-md border-border border-r-0 focus:ring-accent focus:border-accent sm:text-sm p-2 border bg-background text-text-primary"
-                                    value={tempServer.hostname.startsWith('https') ? 'https://' : 'http://'}
-                                    onChange={(e) => {
-                                        const protocol = e.target.value;
-                                        const cleanHost = tempServer.hostname.replace(/^https?:\/\//, '');
-                                        handleTempChange('hostname', `${protocol}${cleanHost}`);
-                                    }}
-                                >
-                                    <option value="http://">HTTP</option>
-                                    <option value="https://">HTTPS</option>
-                                </select>
-                                <input
-                                    type="text"
-                                    className="flex-1 min-w-0 block w-full border-border bg-background text-text-primary focus:ring-accent focus:border-accent sm:text-sm p-2 border border-l-0 border-r-0"
-                                    placeholder="127.0.0.1"
-                                    value={tempServer.hostname.replace(/^https?:\/\//, '').split(':')[0].replace(/\/$/, '')}
-                                    onChange={(e) => {
-                                        const host = e.target.value;
-                                        const protocol = tempServer.hostname.startsWith('https') ? 'https://' : 'http://';
-                                        const portMatch = tempServer.hostname.match(/:(\d+)\/?$/);
-                                        const port = portMatch ? portMatch[1] : '';
-                                        handleTempChange('hostname', `${protocol}${host}${port ? ':' + port : ''}/`);
-                                    }}
-                                    {...hostInputDebug}
-                                />
-                                <span className="inline-flex items-center px-3 border border-l-0 border-border bg-background text-text-secondary sm:text-sm">:</span>
-                                <input
-                                    type="text"
-                                    className="rounded-r-md border-border bg-background text-text-primary focus:ring-accent focus:border-accent sm:text-sm p-2 border w-24"
-                                    placeholder="8080"
-                                    value={(() => {
-                                        const match = tempServer.hostname.match(/:(\d+)\/?$/);
-                                        return match ? match[1] : '';
-                                    })()}
-                                    onChange={(e) => {
-                                        const port = e.target.value;
-                                        const protocol = tempServer.hostname.startsWith('https') ? 'https://' : 'http://';
-                                        const host = tempServer.hostname.replace(/^https?:\/\//, '').split(':')[0].replace(/\/$/, '');
-                                        handleTempChange('hostname', `${protocol}${host}${port ? ':' + port : ''}/`);
-                                    }}
-                                    {...portInputDebug}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Auth */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary">Username</label>
-                                <input
-                                    type="text"
-                                    data-component="Input"
-                                    className="mt-1 block w-full rounded-md border-border bg-background text-text-primary shadow-sm focus:border-accent focus:ring-accent sm:text-sm p-2 border"
-                                    value={tempServer.username || ''}
-                                    onChange={(e) => handleTempChange('username', e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary">Password</label>
-                                <input
-                                    type="password"
-                                    data-component="Input"
-                                    className="mt-1 block w-full rounded-md border-border bg-background text-text-primary shadow-sm focus:border-accent focus:ring-accent sm:text-sm p-2 border"
-                                    value={tempServer.password || ''}
-                                    onChange={(e) => handleTempChange('password', e.target.value)}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-4 border-t border-border">
-                        <div className="flex items-center space-x-4">
-                            <button
-                                onClick={testConnection}
-                                disabled={testStatus.loading || !hasPermission}
-                                className={`bg-surface border border-border text-text-primary px-4 py-2 rounded-md hover:bg-hover min-w-[140px] ${!hasPermission ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                                {testStatus.loading ? 'Testing...' : 'Test Connection'}
-                            </button>
-
-                            {!hasPermission && (
-                                <div className="flex flex-col space-y-2">
-                                    {isPrivateEndpoint(tempServer.hostname) && (
-                                        <div className="text-xs bg-orange-100 border border-orange-200 text-orange-800 p-2 rounded mb-2">
-                                            <strong>Local Network Access:</strong> Chrome restricts access to local IPs. You must explicitly grant permission.
-                                        </div>
-                                    )}
-                                    <button
-                                        onClick={handleGrantPermission}
-                                        className="bg-yellow-500/10 text-yellow-600 border border-yellow-500/20 px-3 py-2 rounded-md hover:bg-yellow-500/20 text-sm font-medium flex items-center justify-center"
-                                    >
-                                        <ShieldAlert size={16} className="mr-2" />
-                                        {isPrivateEndpoint(tempServer.hostname) ? 'Grant Local Access' : 'Grant Permission'}
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Result Area - Fixed Width/Position to prevent shifting */}
-                            <div className="min-w-[200px]">
-                                {testStatus.message ? (
-                                    <span className={`text-sm font-medium ${testStatus.success ? 'text-green-500' : 'text-red-500'}`}>
-                                        {testStatus.message}
-                                    </span>
-                                ) : (
-                                    <span className="text-sm text-text-secondary italic">Not tested yet</span>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="space-x-3 flex items-center">
-                            {saveError && (
-                                <span className="text-sm font-medium text-red-500 mr-2">
-                                    {saveError}
-                                </span>
-                            )}
-                            {vaultStatus === 'Vault: Locked' && (
-                                <span className="text-sm font-medium text-red-500 mr-2">
-                                    Unlock vault to save
-                                </span>
-                            )}
-                            <button
-                                onClick={saveServer}
-                                disabled={vaultStatus === 'Vault: Locked' || !hasPermission}
-                                className={`px-4 py-2 rounded-md shadow-sm ${(vaultStatus === 'Vault: Locked' || !hasPermission) ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-accent text-white hover:bg-accent-hover'
-                                    }`}
-                            >
-                                Save Server
-                            </button>
-                        </div>
-                    </div>
-                </SettingsCard>
+                <ServerForm
+                    key={mode.kind === 'edit' ? editing?.id ?? mode.index : 'new'}
+                    server={editing}
+                    onSave={handleSave}
+                    onCancel={() => setMode({ kind: 'list' })}
+                />
             </SettingsPageLayout>
         );
     }
 
-    // Render List
+    const removeTarget = pendingRemove !== null ? servers[pendingRemove] : undefined;
+
     return (
         <SettingsPageLayout
-            title="Server Configuration"
-            description="Manage your torrent client connections. Add, edit, or remove servers."
+            title="Servers"
+            description="The BitTorrent clients CTRL can send links to. Addresses and logins are stored encrypted in this browser."
             icon={Server}
             actions={
-                <button
-                    onClick={startAdd}
-                    className="bg-accent text-white px-4 py-2 rounded-md hover:bg-accent-hover shadow-sm flex items-center"
-                >
-                    <span className="mr-2">+</span> Add Server
-                </button>
+                <Button onClick={() => { setNotice(null); setMode({ kind: 'add' }); }}>
+                    Add server
+                </Button>
             }
         >
-            <div className="space-y-4">
-                {settings.servers.length === 0 ? (
-                    <div className="text-center py-10 bg-surface rounded-lg border border-border text-text-secondary">
-                        No servers configured. Click "Add Server" to get started.
-                    </div>
-                ) : (
-                    settings.servers.map((server, index) => (
-                        <div key={index} className="bg-surface shadow-sm rounded-xl p-4 border border-border flex justify-between items-center transition-colors hover:border-accent/30">
-                            <div>
-                                <div className="flex items-center space-x-2">
-                                    <h3 className="font-bold text-text-primary">{server.name || `Server ${index + 1}`}</h3>
-                                    {settings.globals.currentServer === index && (
-                                        <span className="text-xs bg-accent text-white px-2 py-0.5 rounded-full">Default</span>
-                                    )}
-                                </div>
-                                <div className="text-sm text-text-secondary mt-1">
-                                    {getClientCapability(server.application)?.name ?? server.application}
-                                    {!isPublicClient(server.application) && (
-                                        <span className="ml-2 text-xs px-2 py-0.5 rounded-full border border-border text-text-secondary">experimental, not verified</span>
-                                    )}
-                                    {' • '}{server.hostname}
-                                </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                {settings.globals.currentServer !== index && (
-                                    <button
-                                        onClick={() => setDefault(index)}
-                                        className="text-xs text-text-secondary hover:text-accent px-2 py-1"
-                                    >
-                                        Set Default
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => startEdit(index)}
-                                    className="text-xs bg-surface border border-border text-text-primary px-3 py-1.5 rounded hover:bg-hover"
-                                >
-                                    Edit
-                                </button>
-                                <button
-                                    onClick={() => removeServer(index)}
-                                    className="text-xs text-red-500 hover:text-red-700 px-2 py-1"
-                                >
-                                    Remove
-                                </button>
-                            </div>
-                        </div>
-                    ))
+            <Stack gap={5}>
+                {notice && (
+                    <InlineNotification
+                        kind={notice.kind}
+                        title={notice.title}
+                        subtitle={notice.subtitle}
+                        lowContrast
+                        role={notice.kind === 'error' ? 'alert' : 'status'}
+                        onCloseButtonClick={() => setNotice(null)}
+                        aria-label="Close notification"
+                    />
                 )}
-            </div>
 
-            <SettingsCard title="Migration" className="mt-8">
-                <p className="text-xs text-text-secondary mb-4">
-                    Export your server configurations to a JSON file to transfer them to another device or browser.
-                    <br />
-                    <em>Passwords are included in the export. Keep the file secure.</em>
+                {servers.length === 0 ? (
+                    <SettingsCard>
+                        <p className="text-[var(--cds-text-secondary)]">
+                            No server configured yet. Add your torrent client to start sending links to it.
+                        </p>
+                    </SettingsCard>
+                ) : (
+                    <ul className="list-none m-0 p-0 flex flex-col gap-3" aria-label="Configured servers">
+                        {servers.map((server, index) => {
+                            const isDefault = index === currentIndex;
+                            const client = getClientCapability(server.type || server.application);
+                            const isActiveInBackground = !!server.id && connection.serverId === server.id;
+                            const presentation = isActiveInBackground ? describeConnection(connection) : null;
+                            const needsGrant = isActiveInBackground && connection.status === 'permission_missing';
+                            const label = server.name || `Server ${index + 1}`;
+                            return (
+                                <li key={server.id ?? index} className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] rounded p-4">
+                                    <div className="flex flex-wrap justify-between gap-4">
+                                        <div className="min-w-0">
+                                            <div className="flex items-center flex-wrap gap-2">
+                                                <h3 className="font-bold text-[var(--cds-text-primary)] m-0">{label}</h3>
+                                                {isDefault && <Tag type="blue" size="sm">Default</Tag>}
+                                                {!isPublicClient(server.type || server.application) && (
+                                                    <Tag type="gray" size="sm">experimental, not verified</Tag>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-[var(--cds-text-secondary)] mt-1 break-all">
+                                                {client?.name ?? server.type} · {server.hostname}
+                                            </p>
+                                            {presentation && (
+                                                <p className="text-sm mt-2" role="status">
+                                                    <StatusDot kind={presentation.kind} />
+                                                    <span className="font-medium">{presentation.title}</span>
+                                                    {connection.status !== 'connected' && (
+                                                        <span className="text-[var(--cds-text-secondary)]"> — {presentation.detail}</span>
+                                                    )}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="flex items-start flex-wrap gap-2">
+                                            {needsGrant && (
+                                                <Button
+                                                    kind="tertiary"
+                                                    size="sm"
+                                                    onClick={() => { void requestHostPermission(server.hostname); }}
+                                                    aria-label={`Grant access to ${label}`}
+                                                >
+                                                    Grant access
+                                                </Button>
+                                            )}
+                                            {!isDefault && (
+                                                <Button kind="ghost" size="sm" onClick={() => { void setDefault(index); }} aria-label={`Make ${label} the default server`}>
+                                                    Set default
+                                                </Button>
+                                            )}
+                                            <Button kind="secondary" size="sm" onClick={() => { setNotice(null); setMode({ kind: 'edit', index }); }} aria-label={`Edit ${label}`}>
+                                                Edit
+                                            </Button>
+                                            <Button kind="danger--ghost" size="sm" onClick={() => setPendingRemove(index)} aria-label={`Remove ${label}`}>
+                                                Remove
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+
+                <SettingsCard title="Move servers to another browser" description="Export the server list as a JSON file and import it elsewhere.">
+                    <Stack gap={4}>
+                        <p className="text-sm text-[var(--cds-text-secondary)] m-0">
+                            The safe export leaves out usernames and passwords. The full export includes them in plain text; keep that file private.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            <Button kind="secondary" size="sm" onClick={() => exportServerConfig(true)} disabled={servers.length === 0}>
+                                Export servers (without passwords)
+                            </Button>
+                            <Button kind="tertiary" size="sm" onClick={() => exportServerConfig(false)} disabled={servers.length === 0}>
+                                Export servers (with passwords)
+                            </Button>
+                            <Button kind="tertiary" size="sm" onClick={() => importInputRef.current?.click()}>
+                                Import servers…
+                            </Button>
+                            <input
+                                ref={importInputRef}
+                                type="file"
+                                accept=".json,application/json"
+                                className="hidden"
+                                tabIndex={-1}
+                                aria-hidden="true"
+                                onChange={(e) => { void handleImport(e); }}
+                            />
+                        </div>
+                    </Stack>
+                </SettingsCard>
+            </Stack>
+
+            <Modal
+                open={pendingRemove !== null}
+                danger
+                modalHeading="Remove server?"
+                modalLabel={removeTarget?.name}
+                primaryButtonText={removing ? 'Removing…' : 'Remove'}
+                secondaryButtonText="Cancel"
+                primaryButtonDisabled={removing}
+                onRequestClose={() => { if (!removing) setPendingRemove(null); }}
+                onRequestSubmit={() => { void confirmRemove(); }}
+                size="sm"
+            >
+                <p className="text-sm">
+                    Remove <strong>{removeTarget?.name}</strong> ({removeTarget?.hostname}) from CTRL? Its saved address, username and
+                    password are deleted from this browser. Nothing changes on the torrent client itself.
                 </p>
-                <div className="flex space-x-4">
-                    <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
-                        <button
-                            onClick={() => exportServerConfig(true)}
-                            className="bg-accent text-white px-4 py-2 rounded-md hover:bg-accent-hover shadow-sm flex items-center justify-center"
-                            title="Export without passwords"
-                        >
-                            <Server className="w-4 h-4 mr-2" />
-                            Export (Safe)
-                        </button>
-                        <button
-                            onClick={() => exportServerConfig(false)}
-                            className="bg-surface border border-border text-text-primary px-4 py-2 rounded-md hover:bg-hover shadow-sm flex items-center justify-center"
-                            title="Export including passwords"
-                        >
-                            <Server className="w-4 h-4 mr-2" />
-                            Export (Secrets)
-                        </button>
-                    </div>
-                    <label className="cursor-pointer bg-surface border border-border text-text-primary px-4 py-2 rounded-md hover:bg-hover shadow-sm flex items-center">
-                        <Server className="w-4 h-4 mr-2" />
-                        Import Servers
-                        <input
-                            type="file"
-                            accept=".json"
-                            className="hidden"
-                            onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                    try {
-                                        const result = await importBackup(file);
-                                        alert(result.message);
-                                        window.location.reload();
-                                    } catch (err: unknown) {
-                                        const errMsg = err instanceof Error ? err.message : 'Unknown error';
-                                        alert('Import failed: ' + errMsg);
-                                    }
-                                    e.target.value = '';
-                                }
-                            }}
-                        />
-                    </label>
-                </div>
-            </SettingsCard>
+            </Modal>
         </SettingsPageLayout>
     );
+};
+
+const StatusDot: React.FC<{ kind: 'success' | 'info' | 'warning' | 'error' }> = ({ kind }) => {
+    const color =
+        kind === 'success' ? 'var(--cds-support-success)' :
+            kind === 'warning' ? 'var(--cds-support-warning)' :
+                kind === 'error' ? 'var(--cds-support-error)' : 'var(--cds-support-info)';
+    return <span className="inline-block w-2 h-2 rounded-full mr-2 align-middle" style={{ backgroundColor: color }} aria-hidden="true" />;
 };
