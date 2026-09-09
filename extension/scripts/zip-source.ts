@@ -78,8 +78,11 @@ try {
   console.log(`Creating AMO source archive for v${version} from clean HEAD...`);
 
   const quotedPathspecs = includePathspecs.map((pathspec) => `"${pathspec}"`).join(' ');
+  // Export blobs exactly as stored (LF): with core.autocrlf=true a Windows host
+  // would otherwise write CRLF into the archive and reviewers building on
+  // Linux would get different bytes than a Linux checkout produces.
   execSync(
-    `git archive --format=zip --output "${relativeArchiveOutPath}" HEAD ${quotedPathspecs}`,
+    `git -c core.autocrlf=false archive --format=zip --output "${relativeArchiveOutPath}" HEAD ${quotedPathspecs}`,
     {
       cwd: repoRoot,
       stdio: 'inherit',
