@@ -68,8 +68,8 @@
     "fs-extra": "11.3.2",
     "globals": "17.0.0",
     "jsdom": "29.1.1",
-    "postcss": "^8.5.14",
-    "sharp": "0.34.5",
+    "postcss": "^8.5.18",
+    "sharp": "0.35.3",
     "tailwindcss": "3.4.3",
     "tsx": "4.21.0",
     "typescript": "5.7.2",
@@ -86,6 +86,9 @@
     },
     "node-notifier": {
       "uuid": "11.1.1"
-    }
+    },
+    "shell-quote": "1.9.0",
+    "adm-zip": "0.6.0",
+    "immutable": "5.1.8"
   }
 }
