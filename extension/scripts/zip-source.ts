@@ -52,6 +52,8 @@ try {
   const archivePath = join(outDir, archiveName);
 
   const includePathspecs = [
+    'LICENSE',
+    'extension/BUILD.md',
     'extension/.gitignore',
     'extension/CHANGELOG.md',
     'extension/LINUX_SETUP.md',
