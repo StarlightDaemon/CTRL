@@ -2,13 +2,36 @@
 
 ## Checkpoint
 
-- timestamp: 2026-09-09 (Phase 8B server configuration / truthful UX / core accessibility close-out)
+- timestamp: 2026-09-09 (Phase B disposable runtime environment close-out)
 - repository: `E:\Citadel\CTRL`
-- branch: `main` (tracks `origin/main`; 12 local commits ahead after this checkpoint, nothing pushed)
-- ending HEAD: the commit that adds this checkpoint file, child of `8959576` (see Local Commits)
+- branch: `main` (tracks `origin/main`; 14 local commits ahead after this checkpoint, nothing pushed)
+- ending HEAD: the commit that adds this checkpoint file, child of the Phase B harness commit (see Local Commits)
 - version: `0.2.0-beta.1` (unchanged; manifest `version` `0.2.0.1`; not eligible for 1.0.0 — gates not passed)
 - working tree at checkpoint: only the pre-existing operator files under `.raiden/` and `.serena/` remain modified/untracked (11 modified or deleted, 2 untracked). No staged changes. Stash `stash@{0}` (obsolete buildInfo.ts stamp) untouched.
 - toolchain used: Node v24.18.0, npm 11.16.0 (`.nvmrc` says 22; CI uses 22 — both work for this tree), addons-linter 10.11.0
+
+## Phase B — Disposable Runtime Test Environment — COMPLETE, COMMITTED
+
+Docker is unavailable on this host (no WSL either). The environment is built from the upstream projects' own release binaries, unpacked without running any installer, into `CTRL_LIVE_ROOT` (default `%LOCALAPPDATA%\Temp\ctrl-live`). Nothing is installed or registered; `env.mjs clean|purge` removes it. Full details: `extension/tests/live/README.md`.
+
+| Component | Version | Provenance | Runtime |
+|---|---|---|---|
+| Transmission daemon | 4.1.3 (rpc 19) | `transmission-4.1.3-x64.msi`, sha256 `c8ea492d…41f8`, `msiexec /a` extract | `0.0.0.0:19091`, Basic auth, DHT/LPD/portmap off |
+| qBittorrent | 5.2.3 (Web API 2.11) | `qbittorrent_5.2.3_x64_setup.exe`, sha256 `ff508e2f…ab2f`, **GPG signature verified** (sledgehammer999 `D8F3…C9A2`), 7-Zip extract | `*:18080`, PBKDF2 login, **CSRF / Host-header / clickjacking protection at defaults (on)** |
+| aria2 | 1.37.0 | `aria2-1.37.0-win-64bit-build1.zip`, sha256 `67d01530…41f8` | `0.0.0.0:16800/jsonrpc`, `--rpc-secret` |
+| geckodriver | 0.37.1 | `geckodriver-v0.37.1-win64.zip`, sha256 `dfed9315…edd8` | Firefox harness |
+| Chrome | 152.0.7977.83 | installed release build | headed, throwaway profile |
+| Firefox | 155.0.1 | installed release build | headless, throwaway profile |
+
+Ports, throwaway credentials (`ctrl` / `ctrl-test-password`, aria2 token `ctrl-test-token` — not secrets), directories, start/stop/cleanup commands and logs are recorded in the README and pinned in `extension/tests/live/env.mjs`. The extension targets the host LAN address `192.168.1.235` (non-loopback origin). All three clients were started and probed through their own APIs (`oracles.mjs`: Transmission session-id negotiation + Basic auth; qBittorrent login → `204` + `QBT_SID_18080` cookie in 5.2; aria2 `getVersion`).
+
+**Browser harness (`extension/tests/live/browsers.mjs`)** — both real release browsers load the built extension and open its pages; the optional host permission is granted end-to-end:
+- Chrome: `puppeteer-core` 25.10.0 + CDP `Extensions.loadUnpacked`; the native permission bubble is accepted by `win-invoke-button.ps1` (Windows UI Automation, scoped to the harness's own Chrome process). Verified: `permissions.request` → granted, `contains` → true.
+- Firefox: `selenium-webdriver` 4.49.0 + geckodriver `--allow-system-access`; temporary add-on install; extension tab opened from chrome context; `extensions.webextOptionalPermissionPrompts=false`. Verified headless: granted.
+- Rejected: Playwright's bundled Chromium (side-by-side manifest failure on this host; not the release target), branded Chrome `--load-extension` (ignored), Firefox BiDi (`moz-extension://` navigation refused), Chrome auto-confirm test switch (no effect on the permissions prompt).
+- Deterministic fixture torrents (`fixtures.mjs`): private, trackerless, content that exists nowhere; info-hashes recorded in the README.
+
+Nothing beyond scripts/docs/dev-dependencies is committed (no binaries; `builds/`, profiles and `CTRL_LIVE_ROOT` stay outside git).
 
 ## Phase 8B — Server Configuration, Truthful UX, Core Accessibility — COMPLETE, VERIFIED, COMMITTED
 
@@ -74,8 +97,8 @@ Starting HEAD `7c2f019`. Startup reconciliation confirmed the previous checkpoin
 | B — State integrity | NOT YET EVALUATED | unit-tested in `d16b7df` (+ revocation path in `8959576`); no runtime/multi-window verification |
 | C — Vault/security | NOT YET EVALUATED | unit-tested incl. corrupted → reset; migration from a real prior install untested |
 | D — Supported clients | NOT YET EVALUATED | no client live-verified in either browser; the three visible clients are candidates only |
-| E — Chrome | NOT YET EVALUATED | automation harness still to establish (Phase B) |
-| F — Firefox | PASS (static) | validator 0 errors; unchanged |
+| E — Chrome | NOT YET EVALUATED | harness established (Phase B): stock Chrome 152 loads the build, extension pages drivable, host permission grant automated; runtime scenarios pending (Phase C) |
+| F — Firefox | PASS (static) | validator 0 errors; harness established (Phase B): stock Firefox 155 installs the build temporarily, pages drivable headless, permission grant automated; runtime scenarios pending (Phase C) |
 | G — Build/package | PASS (static) | 1.59 MB / 326 KB; deterministic; no contamination; no permission change |
 | H — Automated verification | NOT YET EVALUATED | unit suite green (696); CI has no linter/size/diff gates; e2e specs not re-run |
 | I — UX/accessibility | **PASS (STATIC)** | All 8B exit criteria met at jsdom level: keyboard-only server setup, every input named, no `alert`/`confirm`, sub-path survives save/edit, credential disclosure, HTTP warning, truthful state incl. revocation, SettingsToggle names, vault reset with explicit confirmation. Residual for a browser pass (Phase B/E): contrast of the Tailwind-token status text, screen-reader announcement order, Firefox permission-prompt behaviour from the popup (the doorhanger may close the popup; options page path exists) |
@@ -87,14 +110,14 @@ Starting HEAD `7c2f019`. Startup reconciliation confirmed the previous checkpoin
 1. Operator confirmation of the permanent gecko add-on id `{2d629a61-d2b9-45d9-8f88-d58e8b43e9fb}` before first AMO signing — **OPERATOR DECISION REQUIRED**.
 2. `BUILD.md` for the AMO source archive; `zip:source` run from a clean tagged tree.
 3. CI packaging gates (addons-linter, size regression, build-twice diff, contamination check).
-4. Firefox and Chrome runtime verification; Chrome automation (`chrome-extension://` navigation blocked after `Extensions.loadUnpacked` in a prior attempt); Firefox harness not established.
-5. qBittorrent CSRF supported-path decision from a live browser test.
-6. Live client environment lives only in a prior session scratchpad (scripts not preserved in repo); Docker unavailable on this host.
+4. Firefox and Chrome runtime verification (harnesses now exist; the scenario matrix is Phase C). Note: in Chrome 152 `chrome-extension://` pages are navigable after CDP `Extensions.loadUnpacked` — the earlier note was wrong for this path.
+5. qBittorrent CSRF supported-path decision from a live browser test (environment now runs 5.2.3 with default protections on).
+6. ~~Live client environment lives only in a prior session scratchpad~~ — now repository-native under `extension/tests/live/` (Docker still unavailable; native upstream binaries used instead).
 7. `.raiden/state/` still reflects the pre-run state (operator-owned dirty files left untouched by instruction).
 
 ## Exact Next Execution Wave
 
-**Phase B — disposable runtime test environments** for Transmission, qBittorrent and Aria2 on this Windows host without Docker: official upstream portable/native binaries into temporary directories with temporary configuration and non-default ports; record provenance/versions; repository-native scripts and docs under `docs/release/v1/` and `extension/tests/live/` (no binaries committed); then a Chrome and a Firefox extension-loading path that yields reliable evidence (Playwright persistent context for Chromium; `web-ext run` / Firefox `-profile` with a dev profile for Firefox). Then Phase C live matrix.
+**Phase C — live browser + torrent-client verification.** Write `extension/tests/live/verify.mjs`: for each client × browser run the common matrix (clean state → vault setup → server configuration → permission grant → test connection → save → connected → add magnet → add paused → pause → resume → remove keeping files → bad credentials → server unavailable → reconnect/client restart), checking every claim against the server through `oracles.mjs`, and write sanitized evidence to `docs/release/v1/evidence/`. Transmission first (Basic auth, session-id negotiation, sub-path, numeric ids, reconnect), then qBittorrent (5.2.3, cookie session, CSRF with defaults on, non-localhost, modern stop/start states), then aria2 (`/jsonrpc`, token, endpoint round-trip). Classify each client VERIFIED FOR V1 / FAILED — REPAIRABLE / BLOCKED BY ENVIRONMENT / EXPERIMENTAL-HIDE.
 
 ## Local Commits (all on `main`, none pushed)
 
@@ -111,7 +134,9 @@ Starting HEAD `7c2f019`. Startup reconciliation confirmed the previous checkpoin
 | `9191c15` | refactor(product): reduce CTRL to the v1 public surface |
 | `7c2f019` | docs(release): checkpoint product-surface reduction |
 | `8959576` | feat(ui): accessible server configuration, truthful connection recovery, vault reset |
-| (this file) | docs(release): checkpoint server configuration and accessibility wave |
+| `0542209` | docs(release): checkpoint server configuration and accessibility wave |
+| (harness) | test(live): disposable torrent-client environment and real-browser harness |
+| (this file) | docs(release): checkpoint disposable runtime environment |
 
 Repository rule observed: the RAIDEN `commit-msg` hook forbids `Co-Authored-By` trailers; commits carry the operator identity only.
 
@@ -122,3 +147,4 @@ Repository rule observed: the RAIDEN `commit-msg` hook forbids `Co-Authored-By` 
 - Consumer analysis for the deleted surfaces: done; do not re-audit unless a regression is suspected.
 - Confirming that branded Chrome ignores `--load-extension`: confirmed.
 - Carbon-in-jsdom quirks (empty `role="alert"` announcers in TextInput; "danger" prefix in danger button names; `ResizeObserver` needed for Modal): known, handled in `vitest.setup.ts` and the UI tests.
+- Browser-harness research (Playwright Chromium, BiDi, auto-confirm switch): done; see `extension/tests/live/README.md` "Rejected paths". Do not re-try them.
