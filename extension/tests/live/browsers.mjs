@@ -47,7 +47,7 @@ function fnFromBody(body) {
 
 // -------------------------------------------------------------------- Chrome
 
-export async function launchChrome({ headless = false, buildDir = path.join(EXTENSION_ROOT, 'builds', 'chrome-mv3'), profileDir } = {}) {
+export async function launchChrome({ headless = false, buildDir = path.join(EXTENSION_ROOT, 'builds', 'chrome-mv3'), profileDir, downloadDir } = {}) {
     const puppeteer = (await import('puppeteer-core')).default;
     const profile = profileDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'ctrl-live-chrome-'));
     const browser = await puppeteer.launch({
@@ -63,6 +63,11 @@ export async function launchChrome({ headless = false, buildDir = path.join(EXTE
     const extensionId = new URL(worker.url()).hostname;
     const version = await browser.version();
     const pid = browser.process()?.pid;
+    if (downloadDir) {
+        fs.mkdirSync(downloadDir, { recursive: true });
+        const cdp = await browser.target().createCDPSession();
+        await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloadDir, eventsEnabled: true });
+    }
 
     // A background tab is throttled (and can be discarded) by Chrome, which makes
     // CDP calls hang; every operation first brings its tab to the front.
@@ -73,7 +78,12 @@ export async function launchChrome({ headless = false, buildDir = path.join(EXTE
         title: async () => { await front(page); return page.title(); },
         text: async (selector) => { await front(page); return page.$eval(selector, (el) => el.innerText ?? el.textContent ?? ''); },
         exists: async (selector) => { await front(page); return (await page.$(selector)) !== null; },
-        click: async (selector) => { await front(page); await page.click(selector); },
+        click: async (selector) => {
+            await front(page);
+            // Centre the element first: the options page has a sticky top bar that would otherwise catch clicks near the top edge.
+            await page.$eval(selector, (el) => el.scrollIntoView({ block: 'center', inline: 'center' })).catch(() => { });
+            await page.click(selector);
+        },
         type: async (selector, text) => {
             await front(page);
             await page.click(selector);
@@ -88,6 +98,8 @@ export async function launchChrome({ headless = false, buildDir = path.join(EXTE
         evaluate: async (body, ...args) => { await front(page); return page.evaluate(fnFromBody(`return (function(){${body}}).apply(null, arguments);`), ...args); },
         waitFor: async (body, timeoutMs = 15000) => { await front(page); return (await page.waitForFunction(fnFromBody(body), { timeout: timeoutMs, polling: 250 })).jsonValue(); },
         screenshot: async (file) => { await front(page); await page.screenshot({ path: file, fullPage: true }); },
+        upload: async (selector, filePath) => { await front(page); const input = await page.$(selector); await input.uploadFile(filePath); },
+        reload: async () => { await front(page); await page.reload({ waitUntil: 'domcontentloaded' }); },
         close: () => page.close(),
     });
 
@@ -106,6 +118,15 @@ export async function launchChrome({ headless = false, buildDir = path.join(EXTE
         /** Click "Allow" in the native permission bubble (must be called right after the in-page click that opened it). */
         acceptPermissionPrompt: () => invokeNativeButton(pid, 'Allow', 15),
         supportsNativePrompt: !headless,
+        /** Terminates the extension's service worker (as Chrome does when idle) and waits for it to come back. */
+        restartBackground: async () => {
+            const sw = await browser.waitForTarget((t) => t.type() === 'service_worker' && t.url().startsWith('chrome-extension://'), { timeout: 10000 });
+            const cdp = await browser.target().createCDPSession();
+            const targetId = (sw)._targetId ?? (await cdp.send('Target.getTargets')).targetInfos.find((t) => t.type === 'service_worker' && t.url.startsWith('chrome-extension://'))?.targetId;
+            await cdp.send('Target.closeTarget', { targetId });
+            const next = await browser.waitForTarget((t) => t.type() === 'service_worker' && t.url().startsWith('chrome-extension://') && t !== sw, { timeout: 20000 });
+            return next.url();
+        },
         close: async () => {
             const proc = browser.process();
             await Promise.race([browser.close(), new Promise((r) => setTimeout(r, 15000))]).catch(() => { });
@@ -128,7 +149,7 @@ function invokeNativeButton(pid, name, timeoutSeconds) {
 
 // ------------------------------------------------------------------- Firefox
 
-export async function launchFirefox({ headless = true, buildDir = path.join(EXTENSION_ROOT, 'builds', 'firefox-mv3'), geckodriver } = {}) {
+export async function launchFirefox({ headless = true, buildDir = path.join(EXTENSION_ROOT, 'builds', 'firefox-mv3'), geckodriver, downloadDir } = {}) {
     const { Builder, Key } = await import('selenium-webdriver');
     const firefox = (await import('selenium-webdriver/firefox.js')).default;
     if (!geckodriver || !fs.existsSync(geckodriver)) throw new Error(`geckodriver not found at ${geckodriver} (run: node tests/live/env.mjs fetch && node tests/live/env.mjs extract)`);
@@ -136,6 +157,14 @@ export async function launchFirefox({ headless = true, buildDir = path.join(EXTE
     const options = new firefox.Options()
         .setBinary(BROWSER_BINARIES.firefox)
         .setPreference('extensions.webextOptionalPermissionPrompts', false);
+    if (downloadDir) {
+        fs.mkdirSync(downloadDir, { recursive: true });
+        options.setPreference('browser.download.folderList', 2)
+            .setPreference('browser.download.dir', downloadDir)
+            .setPreference('browser.download.useDownloadDir', true)
+            .setPreference('browser.download.manager.showWhenStarting', false)
+            .setPreference('browser.helperApps.neverAsk.saveToDisk', 'application/json,application/octet-stream');
+    }
     if (headless) options.addArguments('-headless');
     const service = new firefox.ServiceBuilder(geckodriver).addArguments('--allow-system-access');
     const driver = await new Builder().forBrowser('firefox').setFirefoxOptions(options).setFirefoxService(service).build();
@@ -179,7 +208,12 @@ export async function launchFirefox({ headless = true, buildDir = path.join(EXTE
         title: async () => { await driver.switchTo().window(handle); return driver.getTitle(); },
         text: async (selector) => { await driver.switchTo().window(handle); return byCss(selector).getText(); },
         exists: async (selector) => { await driver.switchTo().window(handle); return (await driver.findElements({ css: selector })).length > 0; },
-        click: async (selector) => { await driver.switchTo().window(handle); await byCss(selector).click(); },
+        click: async (selector) => {
+            await driver.switchTo().window(handle);
+            const el = byCss(selector);
+            await driver.executeScript('arguments[0].scrollIntoView({ block: "center", inline: "center" });', el).catch(() => { });
+            await el.click();
+        },
         type: async (selector, text) => {
             await driver.switchTo().window(handle);
             const el = byCss(selector);
@@ -201,6 +235,8 @@ export async function launchFirefox({ headless = true, buildDir = path.join(EXTE
             return driver.wait(async () => driver.executeScript(body), timeoutMs, `waitFor timed out: ${body.slice(0, 80)}`);
         },
         screenshot: async (file) => { await driver.switchTo().window(handle); fs.writeFileSync(file, Buffer.from(await driver.takeScreenshot(), 'base64')); },
+        upload: async (selector, filePath) => { await driver.switchTo().window(handle); await byCss(selector).sendKeys(filePath); },
+        reload: async () => { await driver.switchTo().window(handle); await driver.navigate().refresh(); },
         close: async () => { await driver.switchTo().window(handle); await driver.close(); },
     });
 
@@ -213,6 +249,7 @@ export async function launchFirefox({ headless = true, buildDir = path.join(EXTE
         openPage: async (relative) => wrap(await openTab(`moz-extension://${uuid}/${relative}`)),
         acceptPermissionPrompt: async () => ({ ok: true, output: 'prompt disabled by extensions.webextOptionalPermissionPrompts=false' }),
         supportsNativePrompt: true,
+        restartBackground: async () => { throw new Error('not available for Firefox through WebDriver classic'); },
         close: async () => { await driver.quit().catch(() => { }); },
     };
 }
