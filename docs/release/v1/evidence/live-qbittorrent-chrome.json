@@ -1,0 +1,112 @@
+{
+  "client": "qbittorrent",
+  "clientVersion": "v5.2.3 (web api 2.15.1)",
+  "browser": "chrome",
+  "browserVersion": "Chrome/152.0.7977.83",
+  "headless": false,
+  "extensionVersion": "0.2.0-beta.1",
+  "address": "http://192.168.1.235:18080/",
+  "lanAddress": "192.168.1.235",
+  "ranAt": "2026-09-09T19:46:25.346Z",
+  "results": [
+    {
+      "name": "vault-setup",
+      "result": "PASS",
+      "observed": "master password created; options dashboard shown",
+      "ms": 1069
+    },
+    {
+      "name": "configure-server",
+      "result": "PASS",
+      "observed": "form filled (address http://192.168.1.235:18080/); credential disclosure shown; plain-http warning not shown (private host)",
+      "ms": 1580
+    },
+    {
+      "name": "grant-permission",
+      "result": "PASS",
+      "observed": "granted (invoked 'Allow' in window 'CTRL Settings - Google Chrome' (pid 15908))",
+      "ms": 1677
+    },
+    {
+      "name": "test-connection",
+      "result": "FAIL",
+      "observed": "test reported failure: Connection failed Authentication failed. Check your qBittorrent username and password.",
+      "ms": 279
+    },
+    {
+      "name": "save-server",
+      "result": "SKIP",
+      "observed": "prerequisite failed: test-connection",
+      "ms": 0
+    },
+    {
+      "name": "connected",
+      "result": "SKIP",
+      "observed": "prerequisite failed: save-server",
+      "ms": 0
+    },
+    {
+      "name": "add-magnet",
+      "result": "SKIP",
+      "observed": "prerequisite failed: connected",
+      "ms": 0
+    },
+    {
+      "name": "list-shows-torrent",
+      "result": "SKIP",
+      "observed": "prerequisite failed: add-magnet",
+      "ms": 0
+    },
+    {
+      "name": "add-paused",
+      "result": "SKIP",
+      "observed": "prerequisite failed: add-magnet",
+      "ms": 0
+    },
+    {
+      "name": "pause",
+      "result": "SKIP",
+      "observed": "prerequisite failed: list-shows-torrent",
+      "ms": 0
+    },
+    {
+      "name": "resume",
+      "result": "SKIP",
+      "observed": "prerequisite failed: pause",
+      "ms": 0
+    },
+    {
+      "name": "remove-keep-files",
+      "result": "SKIP",
+      "observed": "prerequisite failed: list-shows-torrent",
+      "ms": 0
+    },
+    {
+      "name": "bad-credentials",
+      "result": "SKIP",
+      "observed": "prerequisite failed: connected",
+      "ms": 0
+    },
+    {
+      "name": "server-unavailable",
+      "result": "SKIP",
+      "observed": "prerequisite failed: connected",
+      "ms": 0
+    },
+    {
+      "name": "reconnect-after-restart",
+      "result": "SKIP",
+      "observed": "prerequisite failed: server-unavailable",
+      "ms": 0
+    },
+    {
+      "name": "browser-restart-lock",
+      "result": "SKIP",
+      "observed": "prerequisite failed: reconnect-after-restart",
+      "ms": 0
+    }
+  ],
+  "notes": [
+    "on failure of test-connection, options page showed: Dashboard Servers Settings System About Add server Tell CTRL where your BitTorrent client's web interface is and how to sign in. New server Server name How this server is listed in CTRL. BitTorrent client Transmission qBittorrent Aria2 / Motrix The program CTRL sends links to and reads the queue from. Server address The full address of the qBittorrent web interface, including https:// or http://, the port, and any path behind a reverse proxy. Example: http://127.0.0.1:8080/ CTRL may contact http://192.168.1.235:18080. Login Username Password CTRL encrypts this username and password before storing them in this browser. They are sent only to the server address above, to sign in to that torrent client. CTRL never sends them to the CTRL developer or to anyone else. Connection failed Authentication failed. Check your qBittorrent username and password. Save server Test connection Cancel"
+  ]
+}

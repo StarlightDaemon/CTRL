@@ -25,6 +25,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "live:env": "node tests/live/env.mjs",
+    "live:verify": "node tests/live/verify.mjs",
     "postinstall": "wxt prepare"
   },
   "dependencies": {

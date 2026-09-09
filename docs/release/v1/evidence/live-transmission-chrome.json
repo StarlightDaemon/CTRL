@@ -1,0 +1,112 @@
+{
+  "client": "transmission",
+  "clientVersion": "4.1.3 (838877323f) (rpc 19)",
+  "browser": "chrome",
+  "browserVersion": "Chrome/152.0.7977.83",
+  "headless": false,
+  "extensionVersion": "0.2.0-beta.1",
+  "address": "http://192.168.1.235:19091/",
+  "lanAddress": "192.168.1.235",
+  "ranAt": "2026-09-09T19:47:51.246Z",
+  "results": [
+    {
+      "name": "vault-setup",
+      "result": "PASS",
+      "observed": "master password created; options dashboard shown",
+      "ms": 1042
+    },
+    {
+      "name": "configure-server",
+      "result": "PASS",
+      "observed": "form filled (address http://192.168.1.235:19091/); credential disclosure shown; plain-http warning not shown (private host)",
+      "ms": 1588
+    },
+    {
+      "name": "grant-permission",
+      "result": "PASS",
+      "observed": "granted (invoked 'Allow' in window 'CTRL Settings - Google Chrome' (pid 11604))",
+      "ms": 1684
+    },
+    {
+      "name": "test-connection",
+      "result": "PASS",
+      "observed": "Connection successful",
+      "ms": 280
+    },
+    {
+      "name": "save-server",
+      "result": "PASS",
+      "observed": "saved; list shows stored address verbatim: true",
+      "ms": 268
+    },
+    {
+      "name": "connected",
+      "result": "PASS",
+      "observed": "dashboard status: LIVE",
+      "ms": 498
+    },
+    {
+      "name": "add-magnet",
+      "result": "PASS",
+      "observed": "popup: Torrent added; server has ctrl-live-a.bin (638ceb8d793cd066ae854013514d1f32f95fb752) status=4",
+      "ms": 1635
+    },
+    {
+      "name": "list-shows-torrent",
+      "result": "PASS",
+      "observed": "rows: [\"ctrl-live-a.bin, Downloading, 0%\"]",
+      "ms": 518
+    },
+    {
+      "name": "add-paused",
+      "result": "PASS",
+      "observed": "server shows ctrl-live-b.bin status=0 (paused)",
+      "ms": 2470
+    },
+    {
+      "name": "pause",
+      "result": "PASS",
+      "observed": "server: ctrl-live-a.bin status=0",
+      "ms": 1239
+    },
+    {
+      "name": "resume",
+      "result": "PASS",
+      "observed": "server: ctrl-live-a.bin status=4",
+      "ms": 30
+    },
+    {
+      "name": "remove-keep-files",
+      "result": "PASS",
+      "observed": "removed on server; other torrent untouched: true",
+      "ms": 776
+    },
+    {
+      "name": "bad-credentials",
+      "result": "PASS",
+      "observed": "test: Connection failed Authentication failed. Check your Transmission username and password.; dashboard: AUTHENTICATION FAILED; restored → connected",
+      "ms": 18380
+    },
+    {
+      "name": "server-unavailable",
+      "result": "PASS",
+      "observed": "dashboard: CONNECTION LOST",
+      "ms": 2690
+    },
+    {
+      "name": "reconnect-after-restart",
+      "result": "PASS",
+      "observed": "dashboard: LIVE; server lists 1 torrent(s) after restart",
+      "ms": 525
+    },
+    {
+      "name": "browser-restart-lock",
+      "result": "PASS",
+      "observed": "locked after restart; unlocked → LIVE; host grant had to be repeated after the harness reloaded the unpacked extension (recovery flow via Servers → Grant access worked)",
+      "ms": 5352
+    }
+  ],
+  "notes": [
+    "restored password field holds the expected value: true"
+  ]
+}

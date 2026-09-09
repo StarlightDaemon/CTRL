@@ -1,0 +1,114 @@
+{
+  "client": "qbittorrent",
+  "clientVersion": "v5.2.3 (web api 2.15.1)",
+  "browser": "firefox",
+  "browserVersion": "155.0.1",
+  "headless": true,
+  "extensionVersion": "0.2.0-beta.1",
+  "address": "http://192.168.1.235:18080/",
+  "lanAddress": "192.168.1.235",
+  "ranAt": "2026-09-09T19:51:24.254Z",
+  "results": [
+    {
+      "name": "vault-setup",
+      "result": "PASS",
+      "observed": "master password created; options dashboard shown",
+      "ms": 601
+    },
+    {
+      "name": "configure-server",
+      "result": "PASS",
+      "observed": "form filled (address http://192.168.1.235:18080/); credential disclosure shown; plain-http warning not shown (private host)",
+      "ms": 958
+    },
+    {
+      "name": "grant-permission",
+      "result": "PASS",
+      "observed": "granted (prompt disabled by extensions.webextOptionalPermissionPrompts=false)",
+      "ms": 68
+    },
+    {
+      "name": "test-connection",
+      "result": "PASS",
+      "observed": "Connection successful",
+      "ms": 78
+    },
+    {
+      "name": "save-server",
+      "result": "PASS",
+      "observed": "saved; list shows stored address verbatim: true",
+      "ms": 69
+    },
+    {
+      "name": "connected",
+      "result": "PASS",
+      "observed": "dashboard status: LIVE",
+      "ms": 495
+    },
+    {
+      "name": "add-magnet",
+      "result": "PASS",
+      "observed": "popup: Torrent added; server has ctrl-live-a.bin (638ceb8d793cd066ae854013514d1f32f95fb752) status=queuedDL",
+      "ms": 711
+    },
+    {
+      "name": "list-shows-torrent",
+      "result": "PASS",
+      "observed": "rows: [\"ctrl-live-a.bin, Queued, 0%\"]",
+      "ms": 500
+    },
+    {
+      "name": "add-paused",
+      "result": "FAIL",
+      "observed": "server never showed ctrl-live-b.bin paused within 20000 ms; last list: [{\"hash\":\"638ceb8d793cd066ae854013514d1f32f95fb752\",\"name\":\"ctrl-live-a.bin\",\"status\":\"metaDL\"},{\"hash\":\"28f801e89e63463a469463ca0dbc8c36dc8cc0fc\",\"name\":\"ctrl-live-b.bin\",\"status\":\"metaDL\"}]",
+      "ms": 21140
+    },
+    {
+      "name": "pause",
+      "result": "PASS",
+      "observed": "server: ctrl-live-a.bin status=stoppedDL",
+      "ms": 2132
+    },
+    {
+      "name": "resume",
+      "result": "PASS",
+      "observed": "server: ctrl-live-a.bin status=metaDL",
+      "ms": 1370
+    },
+    {
+      "name": "remove-keep-files",
+      "result": "PASS",
+      "observed": "removed on server; other torrent untouched: true",
+      "ms": 885
+    },
+    {
+      "name": "bad-credentials",
+      "result": "FAIL",
+      "observed": "no status matching /Authentication failed|AUTHENTICATION FAILED|Server unavailable|SERVER UNAVAILABLE|Connection lost|CONNECTION LOST/ within 40000 ms; last: [\"LIVE\"]",
+      "ms": 41451
+    },
+    {
+      "name": "server-unavailable",
+      "result": "PASS",
+      "observed": "dashboard: CONNECTION LOST",
+      "ms": 5812
+    },
+    {
+      "name": "reconnect-after-restart",
+      "result": "FAIL",
+      "observed": "no status matching /^LIVE$|^Connected/ within 60000 ms; last: [\"AUTHENTICATION FAILED\",\"Authentication failed qBittorrent has temporarily banned this IP after too many failed logins. Wait, or restart qBittorrent.\",\"No queue to show The queue appears once CTRL is unlocked and connected to a server.\"]",
+      "ms": 60733
+    },
+    {
+      "name": "browser-restart-lock",
+      "result": "SKIP",
+      "observed": "prerequisite failed: reconnect-after-restart",
+      "ms": 0
+    }
+  ],
+  "notes": [
+    "on failure of add-paused, options page showed: Dashboard Servers Settings System About Settings Configure extension behavior, browser integration, and notifications. General Behavior Add torrents paused On Show advanced dialog when adding Off Extension Badge Choose what information to display on the extension icon. CTRL only polls your client in the background while the badge is enabled. Badge Information 3 Preview Context Menu Choose which right-click options CTRL adds to links. Menu Mode Full (add, add paused, labels, folders, per-server) Simple (add to the default server only) Hidden (no context menu) Server Visibility Servers switched on appear at the top level of the menu; the others are grouped under \"Add to server...\". Live qBittorrent Show Live qBittorrent at the top level Show Live qBittorrent at the top level Open Link in New Tab Save Link As... Add to CTRL Add to CTRL (paused) Inspect Preview Notifications Show a browser notification when a torrent is added from the context menu, or when adding fails. Enable notifications On",
+    "on failure of bad-credentials, options page showed: Dashboard Servers Settings System About Torrents on Live qBittorrent LIVE ctrl-live-b.bin Downloading 0% 0 B Transfer DOWNLOAD 0 B/s UPLOAD 0 B/s Connection Connected Active: 1 · Total: 1 Last update: just now",
+    "on failure of reconnect-after-restart, options page showed: Dashboard Servers Settings System About Torrents on Live qBittorrent AUTHENTICATION FAILED Authentication failed qBittorrent has temporarily banned this IP after too many failed logins. Wait, or restart qBittorrent. No queue to show The queue appears once CTRL is unlocked and connected to a server. Transfer DOWNLOAD — UPLOAD — Connection Authentication failed qBittorrent has temporarily banned this IP after too many failed logins. Wait, or restart qBittorrent. Active: — · Total: — Last update: 1 min ago"
+  ]
+}

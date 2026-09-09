@@ -56,29 +56,38 @@ export async function launchChrome({ headless = false, buildDir = path.join(EXTE
         userDataDir: profile,
         pipe: true,
         enableExtensions: [buildDir],
-        args: ['--no-first-run', '--no-default-browser-check', '--window-size=1200,900'],
+        args: ['--no-first-run', '--no-default-browser-check', '--window-size=1200,900', '--disable-features=HighEfficiencyModeAvailable,MemorySaverModeAggressiveness'],
+        protocolTimeout: 60000,
     });
     const worker = await browser.waitForTarget((t) => t.type() === 'service_worker' && t.url().startsWith('chrome-extension://'), { timeout: 20000 });
     const extensionId = new URL(worker.url()).hostname;
     const version = await browser.version();
     const pid = browser.process()?.pid;
 
+    // A background tab is throttled (and can be discarded) by Chrome, which makes
+    // CDP calls hang; every operation first brings its tab to the front.
+    const front = async (page) => { try { await page.bringToFront(); } catch { /* closed */ } };
     const wrap = (page) => ({
         raw: page,
-        goto: async (url) => { await page.goto(url, { waitUntil: 'domcontentloaded' }); },
-        title: () => page.title(),
-        text: async (selector) => page.$eval(selector, (el) => el.innerText ?? el.textContent ?? ''),
-        exists: async (selector) => (await page.$(selector)) !== null,
-        click: async (selector) => { await page.click(selector); },
+        goto: async (url) => { await front(page); await page.goto(url, { waitUntil: 'domcontentloaded' }); },
+        title: async () => { await front(page); return page.title(); },
+        text: async (selector) => { await front(page); return page.$eval(selector, (el) => el.innerText ?? el.textContent ?? ''); },
+        exists: async (selector) => { await front(page); return (await page.$(selector)) !== null; },
+        click: async (selector) => { await front(page); await page.click(selector); },
         type: async (selector, text) => {
-            await page.click(selector, { clickCount: 3 });
+            await front(page);
+            await page.click(selector);
+            // Select-all + Backspace clears password fields too (a triple-click does not select their contents).
+            await page.keyboard.down('Control');
+            await page.keyboard.press('a');
+            await page.keyboard.up('Control');
             await page.keyboard.press('Backspace');
             if (text) await page.type(selector, text, { delay: 5 });
         },
-        select: async (selector, value) => { await page.select(selector, value); },
-        evaluate: (body, ...args) => page.evaluate(fnFromBody(`return (function(){${body}}).apply(null, arguments);`), ...args),
-        waitFor: async (body, timeoutMs = 15000) => (await page.waitForFunction(fnFromBody(body), { timeout: timeoutMs, polling: 250 })).jsonValue(),
-        screenshot: (file) => page.screenshot({ path: file, fullPage: true }),
+        select: async (selector, value) => { await front(page); await page.select(selector, value); },
+        evaluate: async (body, ...args) => { await front(page); return page.evaluate(fnFromBody(`return (function(){${body}}).apply(null, arguments);`), ...args); },
+        waitFor: async (body, timeoutMs = 15000) => { await front(page); return (await page.waitForFunction(fnFromBody(body), { timeout: timeoutMs, polling: 250 })).jsonValue(); },
+        screenshot: async (file) => { await front(page); await page.screenshot({ path: file, fullPage: true }); },
         close: () => page.close(),
     });
 
@@ -98,7 +107,10 @@ export async function launchChrome({ headless = false, buildDir = path.join(EXTE
         acceptPermissionPrompt: () => invokeNativeButton(pid, 'Allow', 15),
         supportsNativePrompt: !headless,
         close: async () => {
-            await browser.close().catch(() => { });
+            const proc = browser.process();
+            await Promise.race([browser.close(), new Promise((r) => setTimeout(r, 15000))]).catch(() => { });
+            try { if (proc && proc.exitCode === null) proc.kill(); } catch { /* already gone */ }
+            await new Promise((r) => setTimeout(r, 1000));
             if (!profileDir) fs.rmSync(profile, { recursive: true, force: true });
         },
     };
@@ -117,7 +129,7 @@ function invokeNativeButton(pid, name, timeoutSeconds) {
 // ------------------------------------------------------------------- Firefox
 
 export async function launchFirefox({ headless = true, buildDir = path.join(EXTENSION_ROOT, 'builds', 'firefox-mv3'), geckodriver } = {}) {
-    const { Builder } = await import('selenium-webdriver');
+    const { Builder, Key } = await import('selenium-webdriver');
     const firefox = (await import('selenium-webdriver/firefox.js')).default;
     if (!geckodriver || !fs.existsSync(geckodriver)) throw new Error(`geckodriver not found at ${geckodriver} (run: node tests/live/env.mjs fetch && node tests/live/env.mjs extract)`);
 
@@ -172,8 +184,7 @@ export async function launchFirefox({ headless = true, buildDir = path.join(EXTE
             await driver.switchTo().window(handle);
             const el = byCss(selector);
             await el.click();
-            await driver.executeScript('arguments[0].select();', el);
-            await el.sendKeys(String.fromCharCode(8)); // Backspace clears the selection
+            await el.sendKeys(Key.chord(Key.CONTROL, 'a'), Key.BACK_SPACE); // clear through real key events so React sees the change
             if (text) await el.sendKeys(text);
         },
         select: async (selector, value) => {

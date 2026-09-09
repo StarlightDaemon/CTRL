@@ -218,14 +218,20 @@ function launch(client, exe, args, { cwd, env: extraEnv } = {}) {
     return child.pid;
 }
 
-export async function startClient(client) {
+/**
+ * Starts a client. Existing runtime state (config, resume data) is kept so a
+ * stop/start behaves like a real client restart; pass `fresh: true` (or run
+ * `clean`) to start from an empty state.
+ */
+export async function startClient(client, { fresh = false } = {}) {
     const { address } = lanAddress();
     if (isRunning(readPid(client))) {
         console.log(`${client}: already running (pid ${readPid(client)})`);
         return;
     }
     const dir = runDir(client);
-    fs.rmSync(dir, { recursive: true, force: true });
+    if (fresh) fs.rmSync(dir, { recursive: true, force: true });
+    const firstStart = !fs.existsSync(dir);
     fs.mkdirSync(dir, { recursive: true });
     const downloads = path.join(dir, 'downloads');
     fs.mkdirSync(downloads, { recursive: true });
@@ -256,7 +262,7 @@ export async function startClient(client) {
             const profile = path.join(dir, 'profile');
             const configDir = path.join(profile, 'qBittorrent', 'config');
             fs.mkdirSync(configDir, { recursive: true });
-            fs.writeFileSync(path.join(configDir, 'qBittorrent.ini'), [
+            if (firstStart || !fs.existsSync(path.join(configDir, 'qBittorrent.ini'))) fs.writeFileSync(path.join(configDir, 'qBittorrent.ini'), [
                 '[LegalNotice]',
                 'Accepted=true',
                 '',
@@ -268,7 +274,9 @@ export async function startClient(client) {
                 `WebUI\\Username=${TEST_CREDENTIALS.username}`,
                 `WebUI\\Password_PBKDF2="${qbittorrentPasswordHash(TEST_CREDENTIALS.password)}"`,
                 'WebUI\\LocalHostAuth=true',
-                'WebUI\\CSRFProtection=true',
+                // Default is on. CTRL_QBT_CSRF=off reproduces the documented server-side setting
+                // some users apply for browser extensions; the evidence must say which was used.
+                `WebUI\\CSRFProtection=${process.env.CTRL_QBT_CSRF === 'off' ? 'false' : 'true'}`,
                 'WebUI\\HostHeaderValidation=true',
                 'WebUI\\ClickjackingProtection=true',
                 'WebUI\\UseUPnP=false',
@@ -401,7 +409,7 @@ if (isMain) {
         switch (command) {
             case 'fetch': await fetchAssets(); break;
             case 'extract': extractAssets(); break;
-            case 'start': for (const c of clients) await startClient(c); break;
+            case 'start': for (const c of clients) await startClient(c, { fresh: process.argv.includes('--fresh') }); break;
             case 'stop': for (const c of clients) stopClient(c); break;
             case 'restart': for (const c of clients) { stopClient(c); await startClient(c); } break;
             case 'status': await status(); break;
@@ -409,7 +417,7 @@ if (isMain) {
             case 'clean': clean(); break;
             case 'purge': clean({ purge: true }); break;
             default:
-                console.error('usage: env.mjs fetch|extract|start|stop|restart|status|info|clean|purge [client|all]');
+                console.error('usage: env.mjs fetch|extract|start [--fresh]|stop|restart|status|info|clean|purge [client|all]');
                 process.exit(2);
         }
     } catch (e) {
