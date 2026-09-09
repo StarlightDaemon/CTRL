@@ -1,4 +1,3 @@
-import { injectable } from 'tsyringe';
 import { ITorrentClient, AddTorrentOptions } from '@/entities/client/model/ITorrentClient';
 import { Torrent, TorrentStatus } from '@/entities/torrent/model/Torrent';
 import { JsonRpcClient } from '@/shared/api/network/JsonRpcClient';
@@ -20,7 +19,6 @@ interface Aria2VersionInfo {
 /** Request timeout in milliseconds */
 const REQUEST_TIMEOUT_MS = 30000;
 
-@injectable()
 export class Aria2Adapter implements ITorrentClient {
     private rpcClient: JsonRpcClient;
     private secret: string;
@@ -158,6 +156,10 @@ export class Aria2Adapter implements ITorrentClient {
         const start = Date.now();
         await this.call('aria2.getVersion', []);
         return Date.now() - start;
+    }
+
+    classifyError(error: unknown): Aria2AdapterError {
+        return Aria2AdapterError.from(error);
     }
 
     // =====================

@@ -1,4 +1,3 @@
-import 'reflect-metadata';
 import '@testing-library/jest-dom';
 import { vi, beforeEach } from 'vitest';
 import { fakeBrowser } from '@webext-core/fake-browser';

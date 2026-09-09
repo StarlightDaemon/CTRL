@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, Unlock } from 'lucide-react';
-import { VaultService } from '@/shared/api/security/VaultService';
+import { VaultService, VaultCorruptedError } from '@/shared/api/security/VaultService';
 import {
     Button,
     PasswordInput,
@@ -12,9 +12,11 @@ import {
 
 interface UnlockVaultProps {
     onUnlock: () => void;
+    /** Popup-sized layout: no full-height centering. */
+    compact?: boolean;
 }
 
-export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock }) => {
+export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock, compact = false }) => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -32,7 +34,11 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock }) => {
                 setError('Incorrect password');
             }
         } catch (err) {
-            setError('An error occurred');
+            if (err instanceof VaultCorruptedError) {
+                setError('The stored vault data is incomplete or damaged and cannot be unlocked. Reset it from Settings → System.');
+            } else {
+                setError('Unlock failed. Please try again.');
+            }
             console.error(err);
         } finally {
             setLoading(false);
@@ -40,8 +46,8 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock }) => {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center h-screen bg-[var(--cds-background)] p-4">
-            <Tile className="w-full max-w-sm p-8 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
+        <div className={`flex flex-col items-center justify-center bg-[var(--cds-background)] p-4 ${compact ? 'min-h-full' : 'h-screen'}`}>
+            <Tile className={`w-full max-w-sm bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] ${compact ? 'p-5' : 'p-8'}`}>
                 <Stack gap={6}>
                     <div className="flex flex-col items-center">
                         <div className="w-16 h-16 bg-[var(--cds-layer-03)] rounded-full flex items-center justify-center mb-4 text-[var(--cds-link-primary)]">
@@ -64,6 +70,7 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock }) => {
                                 placeholder="Master Password"
                                 required
                                 autoFocus
+                                autoComplete="current-password"
                             />
 
                             {error && (

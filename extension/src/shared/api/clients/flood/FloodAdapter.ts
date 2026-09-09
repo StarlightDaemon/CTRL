@@ -1,4 +1,3 @@
-import { injectable } from 'tsyringe';
 import { ITorrentClient, AddTorrentOptions } from '@/entities/client/model/ITorrentClient';
 import { Torrent, TorrentStatus } from '@/entities/torrent/model/Torrent';
 import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
@@ -108,7 +107,6 @@ export interface FloodAddTorrentOptions extends AddTorrentOptions {
 // Flood Adapter
 // ============================================================================
 
-@injectable()
 export class FloodAdapter implements ITorrentClient {
     private httpClient: FetchHttpClient;
     private token: string | null = null;

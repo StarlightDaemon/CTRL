@@ -73,14 +73,7 @@ export default defineConfig({
         ...(isDev ? [Inspector({
           toggleButtonVisibility: 'never',
         })] : []),
-        react({
-          babel: {
-            plugins: [
-              ['@babel/plugin-proposal-decorators', { legacy: true }],
-              ['react-component-data-attribute', { onlyRootComponents: false }]
-            ]
-          }
-        })
+        react()
       ],
       build: {
         // Disable sourcemaps in production

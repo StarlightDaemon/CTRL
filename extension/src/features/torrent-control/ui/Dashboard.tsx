@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Button,
     TextInput,
@@ -9,111 +9,40 @@ import {
     Stack,
     Layer,
     Loading,
-    Grid,
-    Column
+    InlineNotification,
 } from '@carbon/react';
-import { Launch, Settings, Information, CheckmarkOutline, ErrorOutline, Add } from '@carbon/icons-react';
+import { Launch, Settings, Add, Locked } from '@carbon/icons-react';
+import { browser } from 'wxt/browser';
 
-// Hooks
 import { useSettings } from '@/features/torrent-control/model/useSettings';
+import { useVault } from '@/features/torrent-control/model/useVault';
+import { useTorrentSubscription } from '@/features/torrent-control/model/useTorrentSubscription';
+import { useTorrentStore } from '@/stores/useTorrentStore';
+import { describeConnection } from './ConnectionBanner';
+import { formatSpeed } from '@/shared/lib/format';
+import type { AddTorrentRequest, CommandResult } from '@/shared/api/messaging/protocol';
 
-// Entities
-import { Torrent } from '@/entities/torrent/model/Torrent';
-
-// Components
 import { Logo } from '@/shared/ui/Logo';
+import { UnlockVault } from '@/shared/ui/security/UnlockVault';
 import { AddTorrentDialog } from './AddTorrentDialog';
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
-import { VaultService } from '@/shared/api/security/VaultService';
 
-import { useDebugId } from '@/shared/lib/hooks/useDebugId';
+const POPUP_ROWS = 5;
 
+type AddState = { kind: 'idle' } | { kind: 'adding' } | { kind: 'added' } | { kind: 'failed'; message: string };
+
+/**
+ * Toolbar popup.
+ *
+ * Renders exactly one of: setup prompt, unlock form, corrupted-vault notice,
+ * "add a server" prompt, or the live dashboard. The dashboard subscribes to
+ * the background queue over the shared port, so the popup and the options
+ * page always show the same data and drive one poll loop.
+ */
 export const Dashboard = () => {
-    const { settings, updateSettings, loading } = useSettings();
-    const [status, setStatus] = useState<string>('Ready');
-    const [statusKind, setStatusKind] = useState<'success' | 'danger' | 'warning' | 'info'>('success');
-    const [torrents, setTorrents] = useState<Torrent[]>([]);
-    const [addUrl, setAddUrl] = useState('');
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const vault = useVault();
 
-    // Debug IDs
-    const setupBtnDebug = useDebugId('dashboard', 'global', 'setup-button');
-    const serverSelectDebug = useDebugId('dashboard', 'global', 'server-select');
-    const addInputDebug = useDebugId('dashboard', 'add-torrent', 'url-input');
-    const addBtnDebug = useDebugId('dashboard', 'add-torrent', 'add-button');
-    const webUiBtnDebug = useDebugId('dashboard', 'actions', 'web-ui-button');
-    const testBtnDebug = useDebugId('dashboard', 'actions', 'test-connection-button');
-    const settingsBtnDebug = useDebugId('dashboard', 'actions', 'open-settings-button');
-
-    const [vaultStatus, setVaultStatus] = useState<string>('');
-
-    useEffect(() => {
-        const checkVault = async () => {
-            try {
-                const isInit = await VaultService.isInitialized();
-                if (!isInit) {
-                    setVaultStatus('Vault: Uninitialized');
-                    return;
-                }
-                const isLocked = await VaultService.isLocked();
-                setVaultStatus(isLocked ? 'Vault: Locked' : 'Vault: Unlocked');
-            } catch (e) {
-                console.error('Failed to check vault status', e);
-            }
-        };
-        checkVault();
-        const interval = setInterval(checkVault, 2000);
-        return () => clearInterval(interval);
-    }, []);
-
-    useEffect(() => {
-        if (settings && (settings.servers || []).length > 0) {
-            fetchTorrents();
-            const interval = setInterval(fetchTorrents, 2000);
-            return () => clearInterval(interval);
-        }
-    }, [settings]);
-
-    const fetchTorrents = async () => {
-        try {
-            const response = await chrome.runtime.sendMessage({ type: 'GET_TORRENTS' });
-            if (response && !response.error) {
-                setTorrents(response);
-                setStatus('Online');
-                setStatusKind('success');
-            } else if (response && response.error) {
-                setStatus('Error: ' + response.error);
-                setStatusKind('danger');
-            }
-        } catch {
-            setStatus('Connection Failed');
-            setStatusKind('danger');
-        }
-    };
-
-    const handleAddTorrent = async () => {
-        if (!addUrl) return;
-        setStatus('Adding...');
-        setStatusKind('info');
-        try {
-            const response = await chrome.runtime.sendMessage({
-                type: 'ADD_TORRENT_URL',
-                url: addUrl
-            });
-            if (response && response.error) {
-                throw new Error(response.error);
-            }
-            setAddUrl('');
-            setStatus('Torrent Added');
-            setStatusKind('success');
-            fetchTorrents();
-        } catch (e: unknown) {
-            setStatus('Add Failed: ' + (e instanceof Error ? e.message : String(e)));
-            setStatusKind('danger');
-        }
-    };
-
-    if (loading || !settings) {
+    if (vault.status === 'loading') {
         return (
             <div className="w-full h-full flex items-center justify-center p-8">
                 <Loading withOverlay={false} description={browser.i18n.getMessage('commonLoading')} />
@@ -121,285 +50,326 @@ export const Dashboard = () => {
         );
     }
 
-    const configured = (settings.servers || []).length > 0 && settings.servers[settings.globals.currentServer]?.hostname;
-    const currentServer = settings.servers[settings.globals.currentServer];
+    if (vault.status === 'uninitialized') {
+        return (
+            <Prompt
+                title="Set up CTRL"
+                body="Create a master password to store your torrent client credentials encrypted on this device."
+                action="Set up now"
+                icon={Settings}
+                onAction={() => chrome.runtime.openOptionsPage()}
+            />
+        );
+    }
+
+    if (vault.status === 'corrupted') {
+        return (
+            <Prompt
+                title="Vault damaged"
+                body="The stored vault data is incomplete or damaged and cannot be unlocked. Open settings to reset it."
+                action="Open settings"
+                icon={Settings}
+                onAction={() => chrome.runtime.openOptionsPage()}
+                kind="error"
+            />
+        );
+    }
+
+    if (vault.status === 'locked') {
+        return (
+            <div className="w-full h-full overflow-y-auto">
+                <UnlockVault onUnlock={vault.refresh} compact />
+            </div>
+        );
+    }
+
+    if (vault.servers.length === 0) {
+        return (
+            <Prompt
+                title="No server configured"
+                body="Add your torrent client (for example qBittorrent or Transmission) to start sending links to it."
+                action="Add a server"
+                icon={Add}
+                onAction={() => chrome.runtime.openOptionsPage()}
+            />
+        );
+    }
+
+    return (
+        <ErrorBoundary>
+            <LiveDashboard onLock={vault.lock} />
+        </ErrorBoundary>
+    );
+};
+
+const Prompt: React.FC<{
+    title: string;
+    body: string;
+    action: string;
+    icon: React.ComponentType;
+    onAction: () => void;
+    kind?: 'info' | 'error';
+}> = ({ title, body, action, icon, onAction, kind = 'info' }) => (
+    <div className="w-full h-full bg-[var(--cds-background)] p-4 text-[var(--cds-text-primary)] overflow-y-auto">
+        <Tile className="p-5">
+            <Stack gap={6}>
+                <div className="flex flex-col items-start gap-3">
+                    <Logo className="w-10 h-10" />
+                    <h1 className="text-xl font-bold">{title}</h1>
+                </div>
+                {kind === 'error' ? (
+                    <InlineNotification kind="error" title={title} subtitle={body} lowContrast hideCloseButton role="status" />
+                ) : (
+                    <p className="text-[var(--cds-text-secondary)]">{body}</p>
+                )}
+                <Button onClick={onAction} renderIcon={icon} size="lg" className="w-full">
+                    {action}
+                </Button>
+            </Stack>
+        </Tile>
+    </div>
+);
+
+const LiveDashboard: React.FC<{ onLock: () => Promise<void> }> = ({ onLock }) => {
+    const { settings, updateSettings } = useSettings();
+    useTorrentSubscription({ start: 0, end: POPUP_ROWS });
+
+    const connection = useTorrentStore((s) => s.connection);
+    const stats = useTorrentStore((s) => s.globalStats);
+    const ids = useTorrentStore((s) => s.ids);
+    const byId = useTorrentStore((s) => s.byId);
+    const totalCount = useTorrentStore((s) => s.totalCount);
+
+    const [addUrl, setAddUrl] = useState('');
+    const [addState, setAddState] = useState<AddState>({ kind: 'idle' });
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    useEffect(() => {
+        if (addState.kind !== 'added') return;
+        const t = setTimeout(() => setAddState({ kind: 'idle' }), 3000);
+        return () => clearTimeout(t);
+    }, [addState]);
+
+    const servers = settings?.servers ?? [];
+    const currentIndex = settings?.globals.currentServer ?? 0;
+    const currentServer = servers[currentIndex] ?? servers[0];
+
+    const submitAdd = useCallback(async (url: string, options?: AddTorrentRequest['options']) => {
+        const trimmed = url.trim();
+        if (!trimmed) return;
+        setAddState({ kind: 'adding' });
+        try {
+            const request: AddTorrentRequest = { type: 'ADD_TORRENT_URL', url: trimmed, options };
+            const result = (await chrome.runtime.sendMessage(request)) as CommandResult | undefined;
+            if (!result?.ok) {
+                throw new Error(result?.error ?? 'The torrent could not be added.');
+            }
+            setAddUrl('');
+            setAddState({ kind: 'added' });
+        } catch (e) {
+            const message = e instanceof Error ? e.message : String(e);
+            setAddState({ kind: 'failed', message });
+            throw e;
+        }
+    }, []);
+
+    const handleAddClick = () => {
+        if (settings?.globals.addAdvanced) {
+            setIsDialogOpen(true);
+        } else {
+            void submitAdd(addUrl).catch(() => { /* surfaced via addState */ });
+        }
+    };
 
     const handleServerChange = (index: number) => {
-        updateSettings({
+        if (!settings) return;
+        void updateSettings({
             ...settings,
-            globals: {
-                ...settings.globals,
-                currentServer: index,
-            },
+            globals: { ...settings.globals, currentServer: index },
         });
     };
 
     const openWebUI = () => {
-        if (currentServer?.hostname) {
-            let url = currentServer.hostname;
-            if (!url.match(/^http/)) url = 'http://' + url;
-            chrome.tabs.create({ url });
-        }
-    };
-
-    const openOptions = () => {
-        chrome.runtime.openOptionsPage();
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            handleAddTorrent();
-        }
-    };
-
-    const isAdding = status === 'Adding...';
-
-    const handleAddClick = () => {
-        if (settings.globals.addAdvanced) {
-            setIsDialogOpen(true);
-        } else {
-            handleAddTorrent();
-        }
-    };
-
-    const handleDialogAdd = async (url: string, options: { path?: string; label?: string; paused?: boolean }) => {
-        setStatus('Adding...');
-        setStatusKind('info');
+        if (!currentServer?.hostname) return;
         try {
-            const response = await chrome.runtime.sendMessage({
-                type: 'ADD_TORRENT_URL',
-                url: url,
-                options: options
-            });
-            if (response && response.error) {
-                throw new Error(response.error);
+            const url = new URL(currentServer.hostname);
+            if (url.protocol === 'http:' || url.protocol === 'https:') {
+                void chrome.tabs.create({ url: url.toString() });
             }
-            setAddUrl('');
-            setStatus('Torrent Added');
-            setStatusKind('success');
-            fetchTorrents();
-        } catch (e: unknown) {
-            setStatus('Add Failed: ' + (e instanceof Error ? e.message : String(e)));
-            setStatusKind('danger');
-            throw e;
+        } catch {
+            // invalid hostname: nothing to open
         }
     };
 
-    const getStatusIcon = () => {
-        switch (statusKind) {
-            case 'success': return <CheckmarkOutline size={16} color="var(--cds-support-success)" />;
-            case 'danger': return <ErrorOutline size={16} color="var(--cds-support-error)" />;
-            default: return <Information size={16} color="var(--cds-support-info)" />;
-        }
-    };
+    const presentation = describeConnection(connection);
+    const isAdding = addState.kind === 'adding';
+    const canAdd = connection.status !== 'locked' && connection.status !== 'uninitialized' && connection.status !== 'no_servers';
 
     return (
-        <ErrorBoundary>
-            <div className="w-full h-full bg-[var(--cds-background)] p-4 font-sans text-[var(--cds-text-primary)] relative overflow-y-auto">
-                {!configured ? (
-                    <Grid className="h-full">
-                        <Column lg={4} md={4} sm={4}>
-                            <Tile className="p-5">
-                                <Stack gap={7}>
-                                    <div className="flex flex-col items-start gap-4">
-                                        <Logo className="w-12 h-12" />
-                                        <h1 className="text-2xl font-bold">{browser.i18n.getMessage('dashboardTitle')}</h1>
+        <div className="w-full h-full bg-[var(--cds-background)] p-4 font-sans text-[var(--cds-text-primary)] overflow-y-auto">
+            <Stack gap={4}>
+                <div className="flex justify-between items-center border-b border-[var(--cds-border-subtle)] pb-2">
+                    <h1 className="text-lg font-bold flex items-center">
+                        <Logo className="w-6 h-6 mr-2" />
+                        CTRL
+                    </h1>
+                    <div className="flex items-center gap-1">
+                        <Button kind="ghost" size="sm" hasIconOnly renderIcon={Locked} iconDescription="Lock CTRL" tooltipPosition="bottom" onClick={() => { void onLock(); }} />
+                        <Button kind="ghost" size="sm" hasIconOnly renderIcon={Settings} iconDescription="Open settings" tooltipPosition="bottom" onClick={() => chrome.runtime.openOptionsPage()} />
+                    </div>
+                </div>
+
+                <Layer level={1}>
+                    <Tile className="flex flex-col gap-2 p-3">
+                        <label htmlFor="server-select" className="text-[var(--cds-text-helper)] text-[10px] font-bold uppercase tracking-wider">
+                            Server
+                        </label>
+                        {servers.length > 1 ? (
+                            <Select
+                                id="server-select"
+                                hideLabel
+                                labelText="Active server"
+                                value={currentIndex}
+                                onChange={(e) => handleServerChange(Number(e.target.value))}
+                                size="sm"
+                            >
+                                {servers.map((server, index) => (
+                                    <SelectItem key={server.id ?? index} value={index} text={server.name} />
+                                ))}
+                            </Select>
+                        ) : (
+                            <div className="font-medium text-sm" id="server-select">{currentServer?.name ?? 'Server'}</div>
+                        )}
+
+                        <div className="flex items-start gap-2 text-xs" role="status" aria-live="polite">
+                            <StatusDot kind={presentation.kind} />
+                            <div className="min-w-0">
+                                <div className="font-medium">{presentation.title}</div>
+                                {connection.status !== 'connected' && (
+                                    <div className="text-[var(--cds-text-secondary)] break-words">{presentation.detail}</div>
+                                )}
+                                {connection.status === 'connected' && (
+                                    <div className="text-[var(--cds-text-secondary)] font-mono">
+                                        ↓ {formatSpeed(stats.downloadSpeed)} · ↑ {formatSpeed(stats.uploadSpeed)}
                                     </div>
-
-                                    <p className="text-[var(--cds-text-secondary)]">{browser.i18n.getMessage('dashboardEmptyState')}</p>
-
-                                    <Button
-                                        onClick={openOptions}
-                                        renderIcon={Settings}
-                                        size="lg"
-                                        className="w-full"
-                                        {...setupBtnDebug}
-                                    >
-                                        {browser.i18n.getMessage('dashboardSetupNow')}
-                                    </Button>
-                                </Stack>
-                            </Tile>
-                        </Column>
-                    </Grid>
-                ) : (
-                    <Stack gap={5}>
-                        <div className="flex justify-between items-center border-b border-[var(--cds-border-subtle)] pb-2">
-                            <h1 className="text-lg font-bold flex items-center">
-                                <Logo className="w-6 h-6 mr-2" />
-                                {browser.i18n.getMessage('dashboardTitle')}
-                            </h1>
-                            {vaultStatus && (
-                                <div className={`text-xs px-2 py-1 rounded-full font-medium ${vaultStatus === 'Vault: Unlocked' ? 'bg-[var(--cds-support-success)] text-white' :
-                                        vaultStatus === 'Vault: Locked' ? 'bg-[var(--cds-support-error)] text-white' :
-                                            'bg-[var(--cds-support-warning)] text-black'
-                                    }`}>
-                                    {vaultStatus}
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
+                    </Tile>
+                </Layer>
 
-                        <Stack gap={4}>
-                            <Layer level={1}>
-                                <Tile className="flex flex-col gap-2 p-3">
-                                    <label className="text-[var(--cds-text-helper)] text-[10px] font-bold uppercase tracking-wider">
-                                        {browser.i18n.getMessage('dashboardCurrentServer')}
-                                    </label>
+                <Layer level={1}>
+                    <Tile className="flex flex-col gap-2 p-3">
+                        <label htmlFor="add-url" className="text-[var(--cds-text-helper)] text-[10px] font-bold uppercase tracking-wider">
+                            Add torrent
+                        </label>
+                        <div className="flex gap-2">
+                            <div className="flex-1">
+                                <TextInput
+                                    id="add-url"
+                                    labelText="Magnet link or torrent URL"
+                                    hideLabel
+                                    value={addUrl}
+                                    onChange={(e) => setAddUrl(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddClick(); }}
+                                    placeholder="magnet:?xt=urn:btih:…"
+                                    size="sm"
+                                    disabled={isAdding || !canAdd}
+                                />
+                            </div>
+                            <Button
+                                onClick={handleAddClick}
+                                disabled={isAdding || !addUrl || !canAdd}
+                                renderIcon={isAdding ? undefined : Add}
+                                hasIconOnly
+                                iconDescription="Add torrent"
+                                size="sm"
+                                tooltipPosition="left"
+                            >
+                                {isAdding && <Loading withOverlay={false} small description="Adding" />}
+                            </Button>
+                        </div>
+                        {addState.kind === 'failed' && (
+                            <InlineNotification kind="error" title="Could not add" subtitle={addState.message} lowContrast hideCloseButton role="alert" />
+                        )}
+                        {addState.kind === 'added' && (
+                            <InlineNotification kind="success" title="Torrent added" lowContrast hideCloseButton role="status" />
+                        )}
+                        {settings?.globals.addPaused && (
+                            <p className="text-[10px] text-[var(--cds-text-helper)]">New torrents start paused (change in Settings).</p>
+                        )}
+                    </Tile>
+                </Layer>
 
-                                    {(settings.servers || []).length > 1 ? (
-                                        <Select
-                                            id="server-select"
-                                            hideLabel
-                                            labelText={browser.i18n.getMessage('dashboardSelectServer')}
-                                            value={settings.globals.currentServer}
-                                            onChange={(e) => handleServerChange(Number(e.target.value))}
-                                            size="sm"
-                                            {...serverSelectDebug}
-                                        >
-                                            {(settings.servers || []).map((server, index) => (
-                                                <SelectItem key={index} value={index} text={server.name} />
-                                            ))}
-                                        </Select>
-                                    ) : (
-                                        <div className="font-medium text-sm">{currentServer?.name || 'Unknown Server'}</div>
-                                    )}
-
-                                    <div className="flex items-center gap-2 text-xs font-medium">
-                                        {getStatusIcon()}
-                                        <span className="truncate">{status}</span>
-                                    </div>
-                                </Tile>
-                            </Layer>
-
-                            <Layer level={1}>
-                                <Tile className="flex flex-col gap-2 p-3">
-                                    <label className="text-[var(--cds-text-helper)] text-[10px] font-bold uppercase tracking-wider">
-                                        {browser.i18n.getMessage('dashboardQuickAdd')}
-                                    </label>
-                                    <div className="flex gap-2">
-                                        <div className="flex-1">
-                                            <TextInput
-                                                id="add-url"
-                                                labelText={browser.i18n.getMessage('dashboardMagnetPlaceholder')}
-                                                hideLabel
-                                                value={addUrl}
-                                                onChange={(e) => setAddUrl(e.target.value)}
-                                                onKeyDown={handleKeyDown}
-                                                placeholder={browser.i18n.getMessage('dashboardMagnetPlaceholder')}
-                                                size="sm"
-                                                disabled={isAdding}
-                                                {...addInputDebug}
+                <Layer level={1}>
+                    <div className="rounded border border-[var(--cds-border-subtle)] overflow-hidden">
+                        <div className="bg-[var(--cds-layer-02)] px-3 py-1.5 text-[10px] font-bold text-[var(--cds-text-helper)] uppercase flex justify-between items-center border-b border-[var(--cds-border-subtle)]">
+                            <span>Torrents</span>
+                            <span className="bg-[var(--cds-layer-03)] px-1.5 py-0.5 rounded-sm" aria-label={`${totalCount} torrents`}>{totalCount}</span>
+                        </div>
+                        <ul className="max-h-48 overflow-y-auto bg-[var(--cds-background)] list-none m-0 p-0" aria-label="Recent torrents">
+                            {ids.length > 0 ? (
+                                ids.map((id) => {
+                                    const t = byId[id];
+                                    if (!t) return null;
+                                    const progress = Math.max(0, Math.min(100, Math.round(t.progress)));
+                                    return (
+                                        <li key={id} className="p-3 border-b border-[var(--cds-border-subtle)] last:border-0">
+                                            <div className="text-xs font-semibold truncate mb-2" title={t.name}>{t.name}</div>
+                                            <ProgressBar
+                                                label={t.status}
+                                                helperText={`${progress}%`}
+                                                value={progress}
+                                                max={100}
+                                                size="small"
+                                                status={t.status === 'downloading' ? 'active' : 'finished'}
                                             />
-                                        </div>
-                                        <Button
-                                            onClick={handleAddClick}
-                                            disabled={isAdding || !addUrl}
-                                            renderIcon={isAdding ? undefined : Add}
-                                            hasIconOnly
-                                            iconDescription={browser.i18n.getMessage('dashboardAddTorrentTooltip')}
-                                            size="sm"
-                                            tooltipPosition="left"
-                                            {...addBtnDebug}
-                                        >
-                                            {isAdding && <Loading withOverlay={false} small description={browser.i18n.getMessage('commonLoading')} />}
-                                        </Button>
-                                    </div>
-                                </Tile>
-                            </Layer>
-
-                            <Layer level={1}>
-                                <div className="rounded border border-[var(--cds-border-subtle)] overflow-hidden">
-                                    <div className="bg-[var(--cds-layer-02)] px-3 py-1.5 text-[10px] font-bold text-[var(--cds-text-helper)] uppercase flex justify-between items-center border-b border-[var(--cds-border-subtle)]">
-                                        <span>{browser.i18n.getMessage('dashboardActiveTorrents')}</span>
-                                        <span className="bg-[var(--cds-layer-03)] px-1.5 py-0.5 rounded-sm">{torrents?.length || 0}</span>
-                                    </div>
-                                    <div className="max-h-40 overflow-y-auto bg-[var(--cds-background)]">
-                                        {Array.isArray(torrents) && torrents.length > 0 ? (
-                                            torrents.slice(0, 3).map(t => (
-                                                <div
-                                                    key={t.id}
-                                                    className="p-3 border-b border-[var(--cds-border-subtle)] last:border-0 hover:bg-[var(--cds-layer-hover-01)] transition-colors"
-                                                    data-debug-id={`dashboard:mini-list:row-${t.id}`}
-                                                >
-                                                    <div className="text-xs font-semibold truncate mb-2" title={t.name || 'Unknown'}>
-                                                        {t.name || 'Unknown'}
-                                                    </div>
-                                                    <ProgressBar
-                                                        label={String(t.status || '')}
-                                                        helperText={`${Math.round(t.progress || 0)}% completed`}
-                                                        value={t.progress || 0}
-                                                        max={100}
-                                                        size="small"
-                                                        status={(t.status as string) === 'Downloading' ? 'active' : 'finished'}
-                                                    />
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <div className="p-4 text-center text-xs text-[var(--cds-text-helper)] italic">
-                                                No active torrents
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </Layer>
-
-                            <div className="grid grid-cols-2 gap-2">
-                                <Button
-                                    kind="secondary"
-                                    size="sm"
-                                    onClick={openWebUI}
-                                    renderIcon={Launch}
-                                    className="w-full"
-                                    {...webUiBtnDebug}
-                                >
-                                    {browser.i18n.getMessage('dashboardWebUi')}
-                                </Button>
-                                <Button
-                                    kind="ghost"
-                                    size="sm"
-                                    onClick={async () => {
-                                        setStatus('Testing...');
-                                        setStatusKind('info');
-                                        const res = await chrome.runtime.sendMessage({ type: 'TEST_CONNECTION' });
-                                        if (res?.connected) {
-                                            setStatus('Online');
-                                            setStatusKind('success');
-                                        } else {
-                                            setStatus('Failed');
-                                            setStatusKind('danger');
-                                        }
-                                    }}
-                                    className="w-full"
-                                    {...testBtnDebug}
-                                >
-                                    {browser.i18n.getMessage('dashboardTest')}
-                                </Button>
+                                        </li>
+                                    );
+                                })
+                            ) : (
+                                <li className="p-4 text-center text-xs text-[var(--cds-text-helper)] italic">
+                                    {connection.status === 'connected' ? 'No torrents' : 'No data'}
+                                </li>
+                            )}
+                        </ul>
+                        {totalCount > ids.length && (
+                            <div className="px-3 py-1.5 text-[10px] text-[var(--cds-text-helper)] border-t border-[var(--cds-border-subtle)]">
+                                Showing {ids.length} of {totalCount}. Open settings for the full list.
                             </div>
+                        )}
+                    </div>
+                </Layer>
 
-                            <div className="pt-2 border-t border-[var(--cds-border-subtle)]">
-                                <Button
-                                    kind="ghost"
-                                    size="sm"
-                                    onClick={openOptions}
-                                    renderIcon={Settings}
-                                    className="w-full text-xs"
-                                    {...settingsBtnDebug}
-                                >
-                                    {browser.i18n.getMessage('dashboardOpenSettings')}
-                                </Button>
-                            </div>
+                <div className="grid grid-cols-2 gap-2">
+                    <Button kind="secondary" size="sm" onClick={openWebUI} renderIcon={Launch} className="w-full">
+                        Web UI
+                    </Button>
+                    <Button kind="ghost" size="sm" onClick={() => chrome.runtime.openOptionsPage()} renderIcon={Settings} className="w-full">
+                        Settings
+                    </Button>
+                </div>
 
-                            <AddTorrentDialog
-                                isOpen={isDialogOpen}
-                                onClose={() => setIsDialogOpen(false)}
-                                onAdd={handleDialogAdd}
-                                initialUrl={addUrl}
-                                server={currentServer}
-                                labels={settings.globals.labels || []}
-                            />
-                        </Stack>
-                    </Stack>
+                {currentServer && (
+                    <AddTorrentDialog
+                        isOpen={isDialogOpen}
+                        onClose={() => setIsDialogOpen(false)}
+                        onAdd={(url, options) => submitAdd(url, options)}
+                        initialUrl={addUrl}
+                        server={currentServer}
+                        labels={settings?.globals.labels ?? []}
+                        defaultPaused={settings?.globals.addPaused ?? false}
+                    />
                 )}
-            </div>
-        </ErrorBoundary>
+            </Stack>
+        </div>
     );
+};
+
+const StatusDot: React.FC<{ kind: 'success' | 'info' | 'warning' | 'error' }> = ({ kind }) => {
+    const color =
+        kind === 'success' ? 'var(--cds-support-success)' :
+            kind === 'warning' ? 'var(--cds-support-warning)' :
+                kind === 'error' ? 'var(--cds-support-error)' : 'var(--cds-support-info)';
+    return <span className="mt-1 inline-block w-2 h-2 rounded-full flex-none" style={{ backgroundColor: color }} aria-hidden="true" />;
 };

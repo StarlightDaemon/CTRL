@@ -1,6 +1,6 @@
 import { storage } from 'wxt/utils/storage';
 import { ServerConfig, AppSettings } from '@/shared/lib/types';
-import { VaultService } from '@/shared/api/security/VaultService';
+import { VaultService, VaultCorruptedError } from '@/shared/api/security/VaultService';
 import { DEFAULT_OPTIONS } from '@/shared/lib/constants';
 import { ClientFactory } from '@/entities/client/lib/ClientFactory';
 
@@ -10,11 +10,14 @@ export enum ResolutionState {
     UNINITIALIZED = 'UNINITIALIZED',
     NO_SERVERS = 'NO_SERVERS',
     NO_ACTIVE_SERVER = 'NO_ACTIVE_SERVER',
-    INVALID_CONFIG = 'INVALID_CONFIG'
+    INVALID_CONFIG = 'INVALID_CONFIG',
+    /** Stored vault material is incomplete or malformed; it will not unlock. */
+    CORRUPTED = 'CORRUPTED'
 }
 
 export interface ResolvedServers {
     state: ResolutionState;
+    /** Servers with stable ids (normalised by the vault layer). */
     servers: ServerConfig[];
     activeServer: ServerConfig | null;
 }
@@ -27,47 +30,32 @@ export class ServerResolver {
     static async resolve(): Promise<ResolvedServers> {
         const settings = await storage.getItem<AppSettings>('local:options') || DEFAULT_OPTIONS;
         let servers: ServerConfig[] = [];
-        let isInitialized = false;
-        let isLocked = false;
 
         try {
-            isInitialized = await VaultService.isInitialized();
-            if (!isInitialized) {
-                return { state: ResolutionState.UNINITIALIZED, servers: [], activeServer: null };
-            }
-
-            isLocked = await VaultService.isLocked();
-            if (isLocked) {
-                return { state: ResolutionState.LOCKED, servers: [], activeServer: null };
+            const vaultState = await VaultService.getState();
+            switch (vaultState) {
+                case 'uninitialized':
+                    return { state: ResolutionState.UNINITIALIZED, servers: [], activeServer: null };
+                case 'locked':
+                    return { state: ResolutionState.LOCKED, servers: [], activeServer: null };
+                case 'corrupted':
+                    return { state: ResolutionState.CORRUPTED, servers: [], activeServer: null };
             }
 
             servers = await VaultService.getServers();
         } catch (e: unknown) {
-            // Classify error type for better diagnostics
-            const errorMsg = e instanceof Error ? e.message : String(e);
-
-            if (errorMsg.includes('Vault is locked') || errorMsg.includes('session key')) {
-                console.warn('[ServerResolver] Vault is locked (no session key)');
-                return { state: ResolutionState.LOCKED, servers: [], activeServer: null };
+            if (e instanceof VaultCorruptedError) {
+                console.error('[ServerResolver] Vault is corrupted:', e);
+                return { state: ResolutionState.CORRUPTED, servers: [], activeServer: null };
             }
-
-            if (errorMsg.includes('decrypt')) {
-                console.error('[ServerResolver] Decryption failed - vault may be corrupted:', e);
-                return { state: ResolutionState.LOCKED, servers: [], activeServer: null };
-            }
-
-            console.error('[ServerResolver] Unexpected vault access error:', e);
+            // A session key that cannot decrypt the data behaves as locked: the
+            // user must re-enter the password, which either works or reports
+            // the real problem.
+            console.error('[ServerResolver] Vault access error, treating as locked:', e);
             return { state: ResolutionState.LOCKED, servers: [], activeServer: null };
         }
 
         if (servers.length === 0) {
-            // Double-check: is vault truly empty, or just read failure?
-            const vaultData = await storage.getItem('local:vaultData');
-            if (!vaultData) {
-                if (typeof __UI_DEBUG_MODE__ !== 'undefined' && __UI_DEBUG_MODE__) console.log('[ServerResolver] Vault is empty (no vaultData key)');
-            } else {
-                if (typeof __UI_DEBUG_MODE__ !== 'undefined' && __UI_DEBUG_MODE__) console.log('[ServerResolver] Vault has data but decrypted to 0 servers');
-            }
             return { state: ResolutionState.NO_SERVERS, servers: [], activeServer: null };
         }
 

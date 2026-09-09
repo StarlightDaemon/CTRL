@@ -18,9 +18,12 @@ export class ClientFactory {
             return false;
         }
 
-        // Hostname must be a valid URL (at least starts with http/https/ws/wss)
+        // Hostname must be an absolute http(s) URL. Other schemes (javascript:,
+        // file:, ws:) are rejected so an imported backup cannot smuggle one into
+        // tabs.create or fetch.
         try {
-            new URL(config.hostname);
+            const url = new URL(config.hostname);
+            if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
         } catch (e) {
             return false;
         }

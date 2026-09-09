@@ -7,7 +7,7 @@ import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
 import { TorrentDashboard } from '../../features/torrent-control/ui/TorrentDashboard';
 import { CommandPalette } from '@/shared/ui/ui/CommandPalette';
 import { Lock } from 'lucide-react';
-import { useTorrentPoller } from '../../features/torrent-control/model/useTorrentPoller';
+import { useTorrentSubscription } from '../../features/torrent-control/model/useTorrentSubscription';
 import { Utilities } from '../../features/torrent-control/ui/Utilities';
 import { AppearanceSettings } from '../../features/torrent-control/ui/AppearanceSettings';
 import { SystemSettings } from '@/shared/ui/SystemSettings';
@@ -38,8 +38,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
     const [activeView, setActiveView] = useState('dashboard');
 
-    // Start polling for torrents
-    useTorrentPoller();
+    // Live queue subscription for this window (own viewport, auto-reconnect)
+    const subscription = useTorrentSubscription();
 
     const [previewContextMenu, setPreviewContextMenu] = useState(1);
     const [previewCustomOptions, setPreviewCustomOptions] = useState(defaultCustomOptions);
@@ -132,7 +132,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <div className="h-full flex flex-col bg-[var(--cds-background)]">
                         <div className="flex-1 overflow-y-auto scrollbar-thin">
                             <div className="p-8 max-w-7xl mx-auto">
-                                <TorrentDashboard />
+                                <TorrentDashboard onViewportChange={subscription.setViewport} />
                             </div>
                         </div>
                     </div>

@@ -1,4 +1,3 @@
-import { injectable } from 'tsyringe';
 import { ITorrentClient, AddTorrentOptions } from '@/entities/client/model/ITorrentClient';
 import { Torrent, TorrentStatus } from '@/entities/torrent/model/Torrent';
 import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
@@ -28,7 +27,6 @@ const QB_ERROR_MESSAGES = {
  * - CSRF header injection for browser extension compatibility
  * - Request timeout handling
  */
-@injectable()
 export class QBittorrentAdapter implements ITorrentClient {
     private client: FetchHttpClient;
     private baseUrl: string;
@@ -250,6 +248,10 @@ export class QBittorrentAdapter implements ITorrentClient {
         const start = Date.now();
         await this.makeAuthenticatedRequest('app/version');
         return Date.now() - start;
+    }
+
+    classifyError(error: unknown): QBittorrentAdapterError {
+        return QBittorrentAdapterError.from(error);
     }
 
     async getCategories(): Promise<string[]> {

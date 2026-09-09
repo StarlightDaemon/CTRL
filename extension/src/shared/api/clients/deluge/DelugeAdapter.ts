@@ -1,4 +1,3 @@
-import { injectable } from 'tsyringe';
 import { ITorrentClient, AddTorrentOptions } from '@/entities/client/model/ITorrentClient';
 import { Torrent, TorrentStatus } from '@/entities/torrent/model/Torrent';
 import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
@@ -22,7 +21,6 @@ export const DelugeErrorCodes = {
 
 export type DelugeErrorCode = typeof DelugeErrorCodes[keyof typeof DelugeErrorCodes];
 
-@injectable()
 export class DelugeAdapter implements ITorrentClient {
     private client: FetchHttpClient;
     private baseUrl: string;

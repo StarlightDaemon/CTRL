@@ -31,7 +31,8 @@ vi.mock('@/shared/api/server/ServerResolver', () => ({
         UNINITIALIZED: 'UNINITIALIZED',
         NO_SERVERS: 'NO_SERVERS',
         NO_ACTIVE_SERVER: 'NO_ACTIVE_SERVER',
-        INVALID_CONFIG: 'INVALID_CONFIG'
+        INVALID_CONFIG: 'INVALID_CONFIG',
+        CORRUPTED: 'CORRUPTED'
     }
 }));
 
@@ -89,9 +90,9 @@ describe('ContextMenuService Gating', () => {
 
         await (service as any).doRebuild('test');
 
-        // Should have basic add
+        // Should have basic add. Page scanning is not part of v1, so no scan item.
         expect(chrome.contextMenus.create).toHaveBeenCalledWith(expect.objectContaining({ id: 'add-torrent' }), expect.any(Function));
-        expect(chrome.contextMenus.create).toHaveBeenCalledWith(expect.objectContaining({ id: 'scan-page' }), expect.any(Function));
+        expect(chrome.contextMenus.create).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'scan-page' }), expect.any(Function));
 
         // Should NOT have paused
         expect(chrome.contextMenus.create).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'add-torrent-paused' }), expect.any(Function));

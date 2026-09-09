@@ -1,5 +1,6 @@
 import { Torrent } from '@/entities/torrent/model/Torrent';
 import { AdapterConnectionResult } from '@/shared/api/clients/shared/AdapterConnectionResult';
+import type { AdapterError } from '@/shared/api/clients/shared/AdapterError';
 
 export interface AddTorrentOptions {
     paused?: boolean;
@@ -89,4 +90,11 @@ export interface ITorrentClient {
      * Removes tags from a specific torrent.
      */
     removeTags(hash: string, tags: string[]): Promise<void>;
+
+    /**
+     * Optional: classify an arbitrary failure thrown by any method of this
+     * client into the adapter's typed error, so the background can report
+     * "authentication failed" versus "unreachable" truthfully.
+     */
+    classifyError?(error: unknown): AdapterError;
 }

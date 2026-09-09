@@ -1,4 +1,3 @@
-import { injectable } from 'tsyringe';
 import { ITorrentClient, AddTorrentOptions } from '@/entities/client/model/ITorrentClient';
 import { Torrent, TorrentStatus } from '@/entities/torrent/model/Torrent';
 import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
@@ -44,7 +43,6 @@ import { withAdapterRetry, RetryConfig, DEFAULT_RETRY_CONFIG } from '@/shared/li
  * - Task 1.3: Enhanced error handling (401, 403, 409, 5xx differentiation)
  * - Task 1.4: Extended schema with queue, stats, and hash fields
  */
-@injectable()
 export class TransmissionAdapter implements ITorrentClient {
     private httpClient: FetchHttpClient;
     private sessionId: string | null = null;
@@ -201,6 +199,10 @@ export class TransmissionAdapter implements ITorrentClient {
         const start = Date.now();
         await this.call('session-get');
         return Date.now() - start;
+    }
+
+    classifyError(error: unknown): TransmissionAdapterError {
+        return TransmissionAdapterError.from(error);
     }
 
     /**
