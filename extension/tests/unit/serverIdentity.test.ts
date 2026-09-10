@@ -49,4 +49,16 @@ describe('serverIdentity', () => {
         expect(serverFingerprint(base({ id: 'x', password: 'a', hostname: 'http://other/' }))).not.toBe(original);
         expect(serverFingerprint(base({ id: 'x', password: 'a', name: 'renamed' }))).toBe(original);
     });
+
+    it('keeps the legacy id derivation byte-for-byte stable (golden values)', () => {
+        // Recorded from the original implementation, whose field separator was a raw
+        // NUL byte in the source; the separator is now the '\0' escape and must
+        // hash identically, otherwise every stored legacy id would change.
+        expect(legacyServerId(base(), 0)).toBe('legacy-f15fb539');
+        expect(legacyServerId(base({ name: 'Seedbox', application: 'qbittorrent', type: 'qbittorrent', hostname: 'https://box.example/', username: 'ctrl' }), 1)).toBe('legacy-bdac00b4');
+        expect(legacyServerId(base({ name: '', application: 'aria2', type: 'aria2', hostname: 'http://127.0.0.1:6800/jsonrpc' }), 2)).toBe('legacy-a05f7431');
+        // An empty field in different slots must not collide: the separator carries position.
+        expect(legacyServerId(base({ name: 'x', hostname: 'http://h/', username: '' }), 0)).toBe('legacy-e9a57f78');
+        expect(legacyServerId(base({ name: '', hostname: 'http://h/', username: 'x' }), 0)).toBe('legacy-babcbca8');
+    });
 });

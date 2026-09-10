@@ -2,14 +2,42 @@
 
 ## Checkpoint
 
-- timestamp: 2026-09-09 (Phases F, G and H close-out — end of the unattended batch)
+- timestamp: 2026-09-09 (pre-push correction wave, after the read-only pre-push reconciliation returned NOT SAFE TO PUSH)
 - repository: `E:\Citadel\CTRL`
-- branch: `main` (tracks `origin/main`; 26 local commits ahead after this checkpoint, nothing pushed)
-- ending HEAD: the commit that adds this checkpoint file, child of `0e6742b` (see Local Commits)
+- branch: `main` (tracks `origin/main` at `f088c5f`; 27 local commits ahead after this checkpoint, nothing pushed)
+- ending HEAD: the correction commit that also updates this file, child of `06c8c65` (see Local Commits)
 - version: `0.2.0-beta.1` (unchanged; manifest `version` `0.2.0.1`; not eligible for 1.0.0 — gates not all passed)
 - working tree at checkpoint: only the pre-existing operator files under `.raiden/` and `.serena/` remain modified/untracked (11 modified or deleted, 2 untracked). No staged changes. Stash `stash@{0}` (obsolete buildInfo.ts stamp) untouched.
 - toolchain: Node v24.18.0, npm 11.16.0 (`.nvmrc` 24; CI 24), addons-linter 10.11.0, Chrome 152.0.7977.83, Firefox 155.0.1
 - disposable environment: the session scratchpad `live/` directory held Transmission 4.1.3, qBittorrent 5.2.3, aria2 1.37.0 and geckodriver 0.37.1; all client processes and harness browsers were **stopped at the end of the batch** (binaries and downloads remain only in the session scratchpad). Reproducible from scratch with `node tests/live/env.mjs fetch && extract && start all` (default root `%LOCALAPPDATA%\Temp\ctrl-live`).
+
+## Pre-Push Correction Wave — COMPLETE — COMMITTED (child of `06c8c65`)
+
+The read-only pre-push reconciliation of `06c8c65` found the outbound range coherent, scoped, secret-free, free of operator state and non-publishing, but returned **NOT SAFE TO PUSH** because the retained CI `e2e` job still asserted UI removed by the product-surface reduction. The `e2e` job had not been considered by the batch (Playwright's bundled Chromium does not start on this host) and would have failed on the first remote run. Corrections, kept to the smallest set:
+
+| Item | Change |
+|---|---|
+| `extension/tests/e2e/popup.spec.ts` | The test expected the removed `dashboardSetupNow` / `dashboardEmptyState` strings ("Setup Now", "Extension not configured."). It now asserts the current first-run prompt by accessible role and name: heading "Set up CTRL", the master-password sentence, button "Set up now", and that no add-torrent field renders before a vault exists. |
+| `extension/tests/e2e/options.spec.ts` | "should display version in footer/header" expected a `v\d+.\d+.\d+` string on the fresh (uninitialized-vault) profile; it came from the deleted `VersionOverlay`. Replaced by "should show the version on the About page once the vault exists": creates the vault through the real `SetupVault` form (labels "Master Password" / "Confirm Password", button "Create Vault", waits for the "Dashboard" tab), opens the "About" secondary-nav button and asserts the manifest version tag. The other three tests were re-checked against the current UI and left unchanged (load, navigate-with-skip-when-locked, unconfigured-state). |
+| `extension/src/entities/server/lib/serverIdentity.ts` | The legacy-id field separator was a raw NUL byte in the source, so git and text tools treated the file as binary. It is now the `'\0'` escape: same string value, same hash. Golden regression added to `tests/unit/serverIdentity.test.ts` with five ids recorded from the original bytes before the change (`legacy-f15fb539`, `legacy-bdac00b4`, `legacy-a05f7431`, `legacy-e9a57f78`, `legacy-babcbca8`). The compiled package already emitted `join("\0")` and contains no raw NUL byte, so packaged output is unaffected. |
+| `extension/BUILD.md` | Node row no longer claims CI builds on Node 22; it states 24.x (`.nvmrc` 24, CI 24). |
+| `extension/.gitignore` (pre-existing, unchanged) | Line 2 reads `web-ext-ar# Build outputs` and the file ends with a stray `ea/`, both from the initial commit. The intended entry is presumably `web-ext-artifacts/` (which the root `.gitignore` already carries), but the `ea/` fragment cannot be established unambiguously, and neither line matches anything in the tree. Left unchanged; recorded as a non-blocking pre-existing issue. |
+| this file | Gate H wording corrected (remote CI pending, no "expected green"); addons-linter warning count reconciled. |
+
+Verification on the corrected tree (Node 24.18 / npm 11.16, Windows host):
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | clean |
+| `npx eslint src --ext .ts,.tsx` | 0 errors, 13 warnings (unchanged) |
+| `npx vitest run` | **32 files, 717 tests passed** (716 + the golden regression) |
+| `npm run zip:chrome` / `zip:firefox` | success; 14 files each; `_locales/en` only; 0 fonts; 0 remote font/CDN refs; 0 removed-feature strings; manifests `0.2.0.1` (Chrome `version_name` `0.2.0-beta.1`), reviewed permission set |
+| Determinism | both targets byte-identical across two consecutive builds (14/14) |
+| Build side effects | none (only the five intended edits in `git status`) |
+| addons-linter 10.11.0 | 0 errors, 3 warnings: 1 × `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION` (manifest `data_collection_permissions` vs. Firefox for Android min version; desktop-only listing) + 2 × `UNSAFE_VAR_ASSIGNMENT` (React DOM production bundle) |
+| Playwright non-integration e2e | **not runtime-verified locally**: `browserType.launchPersistentContext: spawn UNKNOWN` — Playwright's bundled Chromium (`chromium-1200`) cannot start on this host, the limitation already recorded in `tests/live/README.md`. The corrected assertions were verified statically against `Dashboard.tsx` (popup prompt), `SetupVault.tsx` (labels, button), `OptionsLayout.tsx` (Carbon `Tab` role, secondary-nav `<button>`), and `AboutTab.tsx` (`v{manifest.version}` tag). The `e2e` job's runtime result comes from the first remote CI run. |
+
+Not changed: product code, CI workflow, dossier (its §9 checksums remain those of the `0e6742b` pre-release build; the release artefacts and `SHA256SUMS.txt` come from CI), evidence files, `.raiden/` / `.serena/` operator files, the stash.
 
 ## Phases F, G, H — CI/reviewer-build gates, documentation, store dossier — COMPLETE — COMMITTED
 
@@ -92,7 +120,7 @@ Decision recorded: qBittorrent support relies on the DNR header rule rather than
 | Determinism | Chrome and Firefox builds byte-identical across two consecutive builds |
 | Zips | Chrome 326,607 B; Firefox 326,684 B (+~0.9 KB for HeaderRewriter/controller changes) |
 | Manifests | permissions `storage, contextMenus, notifications, alarms, declarativeNetRequestWithHostAccess`; optional hosts unchanged; gecko block unchanged |
-| addons-linter 10.11.0 | 0 errors, 3 warnings (unchanged set) |
+| addons-linter 10.11.0 | 0 errors, 3 warnings (unchanged set: 1 × `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION`, 2 × `UNSAFE_VAR_ASSIGNMENT`) |
 | Package scans | `_locales/en` only; 0 fonts; 0 remote font refs; 0 native dialogs in `src/` |
 | Build side effects | none |
 
@@ -115,7 +143,7 @@ Carbon-based `ServerForm`/`ServerConfigPanel` (labels, stable ids, keyboard, foc
 | E — Chrome | **PASS (runtime, single host)** | all three clients, all scenarios, real Chrome 152 with the real permission prompt; caveat A (harness reinstall on restart) |
 | F — Firefox | **PASS (runtime, single host)** | all three clients, real Firefox 155 headless; validator 0 errors; caveat B (restart not exercised) |
 | G — Build/package | **PASS** | deterministic (both targets, consecutive builds); reviewer-style rebuild from the source archive byte-identical (14/14); archive contamination-free; ~327 KB zips; one justified permission addition |
-| H — Automated verification | **PASS (STATIC — CI workflow not yet executed)** | unit + component suite 716 green; CI now gates lint, typecheck, tests, both builds, build-twice diff, source mutation, addons-linter, content scans, version/permission consistency, size threshold, checksums; runs only after a push (operator) |
+| H — Automated verification | **PARTIAL — local/static gates verified; remote CI pending** | locally: typecheck, lint, unit + component suite (717), both builds, build-twice determinism, source-mutation check, addons-linter, content scans, version/permission consistency all green on the corrected tree; the `e2e` job (Playwright Chromium smoke, non-integration specs) is statically reconciled with the current UI but cannot run on this host. Remote CI has not run: nothing is pushed. Gate H becomes PASS only when the first remote run of all four jobs (`lint`, `test`, `package`, `e2e`) completes green |
 | I — UX/accessibility | PASS (STATIC) | 8B; live runs exercised the keyboard-driven form in both browsers (typed, tabbed, submitted) |
 | J — Documentation/store dossier | **PASS (prepared; operator items open)** | README, privacy (md+html), guides, changelog reconciled to the verified v1; dossier drafted with listing text, justifications, disclosures, reviewer notes, screenshots; open: gecko id confirmation, publisher/trader/contact/privacy URL, promo tile |
 | K — Final manual acceptance | NOT YET EVALUATED | operator's own pass on a real install (store-signed or unpacked) — not something the batch can do |
@@ -124,14 +152,16 @@ Carbon-based `ServerForm`/`ServerConfigPanel` (labels, stable ids, keyboard, foc
 
 1. **OPERATOR DECISION REQUIRED:** confirm the permanent gecko add-on id `{2d629a61-d2b9-45d9-8f88-d58e8b43e9fb}` before the first AMO upload (it cannot change afterwards).
 2. **OPERATOR DECISION REQUIRED:** publisher account, trader/non-trader declaration, support contact, hosted privacy-policy URL, Chrome promo tile (design asset).
-3. Push to `origin` so the new CI package gates actually run (Gate H is static until then); then Gate K (operator's manual acceptance on a real install).
+3. Re-run the read-only pre-push reconciliation against the new HEAD; if it returns SAFE, the operator may separately authorize the push so the CI jobs actually run (Gate H stays PARTIAL until they complete green); then Gate K (operator's manual acceptance on a real install).
 4. Version stays `0.2.0-beta.1`; bump to `1.0.0` only after Gates H (CI green) and K.
 5. `.raiden/state/` still reflects the pre-run state (operator-owned dirty files left untouched by instruction); `.raiden/state/OPEN_LOOPS.md` OL-013 (CSRF headers) can be closed with reference to `CLIENT_VERIFICATION.md` §Defects #2.
 6. Residual evidence limits: single Windows host; Firefox browser-restart not exercised (temporary add-on); Chrome restart needed a re-grant only because the harness reloads the unpacked build; HTTPS/sub-path/DNS addresses unit-tested only.
 
 ## Exact Next Execution Wave
 
-**Operator wave:** (1) confirm the gecko id and the account/legal items above; (2) `git push origin main` and watch the CI `package` job (expected green; it reproduces the local gates); (3) manual acceptance (Gate K) on a real install in both browsers; (4) then bump to `1.0.0` (`package.json` → manifests via `toManifestVersion`), tag, and submit using `STORE_DOSSIER.md`. No engineering wave is pending.
+**Next action:** rerun the read-only CTRL v1 pre-push reconciliation against the new HEAD (the correction commit). No push has been authorized by this wave.
+
+**Operator wave (after a SAFE reconciliation):** (1) confirm the gecko id and the account/legal items above; (2) separately authorize `git push origin main` (branch only; no tags) and observe the CI run — all four jobs, including `e2e`, must complete; the `package` job reproduces the local gates, the `e2e` job has no local runtime evidence; (3) manual acceptance (Gate K) on a real install in both browsers; (4) then bump to `1.0.0` (`package.json` → manifests via `toManifestVersion`), tag, and submit using `STORE_DOSSIER.md`. No further engineering wave is pending.
 
 (Superseded plans kept for the record) **Phase F — CI and reviewer-build gates:** CI jobs for addons-linter, package contamination/remote-resource scans, build-twice diff, version consistency, checksums, internal size threshold; `extension/BUILD.md` with the verified environment (Node 24 / npm 11, exact commands, expected output); include `BUILD.md` and `LICENSE` in `zip:source`; run `zip:source` from the clean tree and perform a reviewer-style rebuild from the archive, comparing the generated `firefox-mv3` contents byte-for-byte. Then G (docs/privacy), H (dossier).
 
@@ -166,7 +196,8 @@ Carbon-based `ServerForm`/`ServerConfigPanel` (labels, stable ids, keyboard, foc
 | `fa687e0` | build(release): reproducible source archive bytes; store dossier draft |
 | `efef03d` | docs(release): store screenshots captured from the actual UI, with the capture script |
 | `0e6742b` | fix(popup): remove the empty header band and stop marking paused torrents as finished |
-| (this file) | docs(release): checkpoint CI, documentation and store-dossier waves |
+| `06c8c65` | docs(release): checkpoint CI, documentation and store-dossier waves |
+| (this file) | test(release): reconcile pre-push CI assertions — e2e specs, BUILD.md Node row, serverIdentity NUL normalization + golden test, Gate H wording |
 
 Repository rule observed: the RAIDEN `commit-msg` hook forbids `Co-Authored-By` trailers; commits carry the operator identity only.
 
@@ -177,3 +208,5 @@ Repository rule observed: the RAIDEN `commit-msg` hook forbids `Co-Authored-By` 
 - Browser-harness research (Playwright Chromium, BiDi, auto-confirm switch): rejected paths documented in `extension/tests/live/README.md`.
 - qBittorrent CSRF decision: taken (DNR header rule, CSRF on). Do not reopen unless a store review objects.
 - Carbon-in-jsdom quirks and the Firefox typing/port-pattern findings: recorded in tests and comments.
+- Playwright e2e on this host: the bundled Chromium cannot spawn (`spawn UNKNOWN`); do not modify product or fixture code to work around it. The e2e specs are reconciled statically; their runtime result is CI's.
+- `serverIdentity.ts` legacy-id separator: `'\0'` escape with golden ids pinned in the unit test. Do not change the separator or the field order.

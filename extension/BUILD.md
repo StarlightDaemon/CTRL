@@ -10,7 +10,7 @@ used to produce the release artefacts; nothing else is required.
 | Requirement | Version used for the release build | Notes |
 |---|---|---|
 | Operating system | Windows 11 (build host); Ubuntu 24.04 LTS is equally supported | The build is pure Node/npm and has no native or platform-specific steps |
-| Node.js | 24.x (24.18.0 on the build host) | Node 22.x also builds identical output (continuous integration uses it); Node 24.14.0 as used by the Mozilla reviewer environment is fine |
+| Node.js | 24.x (24.18.0 on the build host; `.nvmrc` pins 24; continuous integration uses 24) | Node 24.14.0 as used by the Mozilla reviewer environment is fine |
 | npm | 11.x (11.16.0 on the build host; 11.9.0 in the reviewer environment) | `npm ci` installs the exact dependency tree from `package-lock.json` |
 | Network | needed only for `npm ci` (public npm registry) | the build itself makes no network requests |
 | Disk | ~600 MB for `node_modules` | |
