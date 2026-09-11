@@ -1,0 +1,4 @@
+# Files copied verbatim into the extension package must not depend on the checkout platform:
+# reviewers rebuild from the git archive (LF), so the working tree must match it byte for byte.
+extension/src/public/**/*.json text eol=lf
+*.png binary

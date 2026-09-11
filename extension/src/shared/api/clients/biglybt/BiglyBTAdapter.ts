@@ -1,4 +1,3 @@
-import { injectable } from 'tsyringe';
 import { ITorrentClient, AddTorrentOptions } from '@/entities/client/model/ITorrentClient';
 import { Torrent, TorrentStatus } from '@/entities/torrent/model/Torrent';
 import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
@@ -48,7 +47,6 @@ import { withAdapterRetry } from '@/shared/lib/retry/withAdapterRetry';
  * - mapPerFile handling for large torrents
  * - Robust error handling for Java stack traces
  */
-@injectable()
 export class BiglyBTAdapter implements ITorrentClient {
     private httpClient: FetchHttpClient;
     private sessionId: string | null = null;

@@ -1,0 +1,80 @@
+import type { ServerConfig } from '../model/types';
+
+/**
+ * Stable server identity.
+ *
+ * Servers used to be addressed by their position in the configuration array.
+ * A position is not an identity: reordering, removing or importing servers
+ * silently retargets every in-flight poll and every queued command. Each
+ * server therefore carries an `id` that never changes for the life of the
+ * entry.
+ *
+ * New servers get a random UUID. Entries written by older versions have no
+ * id; they receive a deterministic one derived from their stable fields so
+ * that every extension context (background, popup, options page) computes the
+ * same value before the next save persists it.
+ */
+
+const LEGACY_PREFIX = 'legacy-';
+
+/** FNV-1a 32-bit hash, hex encoded. Deterministic and dependency free. */
+function fnv1a(input: string): string {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < input.length; i++) {
+        hash ^= input.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return hash.toString(16).padStart(8, '0');
+}
+
+export function newServerId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    // Fallback for very old runtimes: 128 random bits, hex encoded.
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Deterministic id for a legacy entry that was saved without one. */
+export function legacyServerId(server: ServerConfig, index: number): string {
+    const material = [
+        server.type ?? '',
+        server.hostname ?? '',
+        server.username ?? '',
+        server.name ?? '',
+        String(index),
+    ].join('\0');
+    return `${LEGACY_PREFIX}${fnv1a(material)}`;
+}
+
+/**
+ * Returns a copy of the list in which every server has a non-empty, unique id.
+ * Existing ids are preserved; duplicates are disambiguated by position.
+ */
+export function ensureServerIds(servers: ServerConfig[]): ServerConfig[] {
+    const seen = new Set<string>();
+    return servers.map((server, index) => {
+        let id = typeof server.id === 'string' && server.id.trim() ? server.id : legacyServerId(server, index);
+        if (seen.has(id)) {
+            id = `${id}-${index}`;
+        }
+        seen.add(id);
+        return server.id === id ? server : { ...server, id };
+    });
+}
+
+/**
+ * Identity-relevant configuration fingerprint. Used to detect when a cached
+ * client instance no longer matches the stored configuration for its server.
+ */
+export function serverFingerprint(server: ServerConfig): string {
+    return JSON.stringify({
+        type: server.type,
+        hostname: server.hostname,
+        username: server.username ?? '',
+        password: server.password ?? '',
+        httpAuth: server.httpAuth ?? null,
+        clientOptions: server.clientOptions ?? {},
+    });
+}

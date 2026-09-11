@@ -2,7 +2,30 @@ import { defineConfig } from 'wxt';
 import path from 'path';
 import packageJson from './package.json';
 import react from '@vitejs/plugin-react';
-import Inspector from 'vite-plugin-react-inspector';
+
+/**
+ * Permanent Firefox add-on identity. AMO binds signing to this id from the
+ * first submission onward; it must never change. GUID form is used so the id
+ * does not assert ownership of a domain.
+ */
+export const GECKO_ADDON_ID = '{2d629a61-d2b9-45d9-8f88-d58e8b43e9fb}';
+
+/** Browser floors. See docs/release/v1/V1_SCOPE.md §2. */
+export const MINIMUM_CHROME_VERSION = '120';
+export const MINIMUM_FIREFOX_VERSION = '140.0';
+
+/**
+ * Store manifests only accept dotted integers. `1.0.0` stays `1.0.0`;
+ * a pre-release such as `1.0.0-rc.2` becomes `1.0.0.2` so it sorts before
+ * the final `1.0.0` build in neither store (both compare `1.0.0.2 > 1.0.0`),
+ * which is why pre-release tags are only used for internal builds.
+ */
+export function toManifestVersion(version: string): string {
+  const [base, preRelease] = version.split('-');
+  if (!preRelease) return base;
+  const suffix = preRelease.split('.').pop() ?? '';
+  return /^\d+$/.test(suffix) ? `${base}.${suffix}` : `${base}.0`;
+}
 
 export default defineConfig({
   srcDir: 'src',
@@ -10,34 +33,31 @@ export default defineConfig({
   // `<rootDir>/public`; pin the old location where _locales lives.
   publicDir: 'src/public',
   outDir: 'builds',
+  zip: {
+    // The reviewer source archive is produced by scripts/zip-source.ts from a
+    // clean git tree. WXT's automatic "-sources.zip" would sweep in local
+    // artefacts (backups, logs, reports), so it is disabled for every target.
+    zipSources: false,
+  },
   manifest: (env) => {
-    const permissions = ['storage', 'contextMenus', 'notifications', 'activeTab', 'alarms', 'scripting'];
-
-    // Normalize version for Chrome compatibility (e.g., "0.2.0-beta.1" -> "0.2.0.1")
-    const [baseVersion, preRelease] = packageJson.version.split('-');
-    let numericVersion = baseVersion;
-    if (preRelease) {
-      const parts = preRelease.split('.');
-      const suffix = parts[parts.length - 1];
-      numericVersion = /^\d+$/.test(suffix) ? `${baseVersion}.${suffix}` : `${baseVersion}.0`;
-    }
+    const isFirefox = env.browser === 'firefox';
+    const version = toManifestVersion(packageJson.version);
 
     return {
-      name: `CTRL v${packageJson.version}`,
-      description: 'Manage your torrents from the browser',
-      version: numericVersion,
-      version_name: packageJson.version,
+      name: 'CTRL - Torrent Control',
+      short_name: 'CTRL',
+      description: 'Send magnet links to your own BitTorrent client and control its queue from the browser.',
+      version,
+      ...(isFirefox ? {} : { version_name: packageJson.version, minimum_chrome_version: MINIMUM_CHROME_VERSION }),
       default_locale: 'en',
-      permissions: permissions,
-      optional_host_permissions: [
-        'http://*/*',
-        'https://*/*',
-        'ws://*/*',
-        'wss://*/*',
-      ],
-
+      // declarativeNetRequestWithHostAccess: session rules that set Origin/Referer
+      // on requests to a configured qBittorrent server so its default CSRF check
+      // accepts the extension (see shared/api/network/HeaderRewriter.ts). It
+      // applies only to hosts the user granted and carries no extra warning.
+      permissions: ['storage', 'contextMenus', 'notifications', 'alarms', 'declarativeNetRequestWithHostAccess'],
+      optional_host_permissions: ['http://*/*', 'https://*/*'],
       action: {
-        default_title: 'Torrent Control',
+        default_title: 'CTRL',
         default_popup: 'popup.html',
         default_icon: {
           '16': 'icon/default-16.png',
@@ -58,30 +78,37 @@ export default defineConfig({
         page: 'options.html',
         open_in_tab: true,
       },
+      // No remote code, no remote resources. `connect-src http:` is required
+      // because users run torrent clients over plain HTTP on their LAN.
+      // Firefox's default MV3 policy adds upgrade-insecure-requests, which
+      // would silently break those clients, so the policy is explicit here.
       content_security_policy: {
-        extension_pages: "script-src 'self'; object-src 'self'; connect-src http: https: ws: wss:;",
+        extension_pages:
+          "default-src 'self'; script-src 'self'; object-src 'none'; connect-src http: https:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none';",
       },
-
+      ...(isFirefox
+        ? {
+          browser_specific_settings: {
+            gecko: {
+              id: GECKO_ADDON_ID,
+              strict_min_version: MINIMUM_FIREFOX_VERSION,
+              // Credentials the user enters are transmitted to the user's own
+              // torrent client. Mozilla's taxonomy classifies that as
+              // authentication information leaving the extension.
+              data_collection_permissions: {
+                required: ['authenticationInfo'],
+              },
+            },
+          },
+        }
+        : {}),
     };
   },
   vite: (env) => {
     const isDev = env.mode === 'development';
 
     return {
-      plugins: [
-        // Only include Inspector in development
-        ...(isDev ? [Inspector({
-          toggleButtonVisibility: 'never',
-        })] : []),
-        react({
-          babel: {
-            plugins: [
-              ['@babel/plugin-proposal-decorators', { legacy: true }],
-              ['react-component-data-attribute', { onlyRootComponents: false }]
-            ]
-          }
-        })
-      ],
+      plugins: [react()],
       build: {
         // Disable sourcemaps in production
         sourcemap: isDev,
@@ -90,7 +117,6 @@ export default defineConfig({
       },
       define: {
         __UI_DEBUG_MODE__: JSON.stringify(isDev),
-        __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
         __APP_VERSION__: JSON.stringify(packageJson.version),
       },
       resolve: {
@@ -99,12 +125,5 @@ export default defineConfig({
         },
       },
     };
-  },
-  hooks: {
-    'build:manifestGenerated': (wxt, manifest) => {
-      if (manifest.options_ui) {
-        manifest.options_ui.open_in_tab = true;
-      }
-    },
   },
 });

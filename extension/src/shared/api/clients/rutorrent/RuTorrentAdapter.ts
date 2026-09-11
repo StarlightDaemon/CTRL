@@ -1,4 +1,3 @@
-import { injectable } from 'tsyringe';
 import { ITorrentClient, AddTorrentOptions } from '@/entities/client/model/ITorrentClient';
 import { Torrent, TorrentStatus } from '@/entities/torrent/model/Torrent';
 import { ServerConfig } from '@/shared/lib/types';
@@ -18,7 +17,6 @@ import { parse } from 'txml';
 type XmlRpcParam = string | number | boolean | XmlRpcParam[] | { type: string; value: string };
 type XmlRpcResult = unknown;
 
-@injectable()
 export class RuTorrentAdapter implements ITorrentClient {
     private client: FetchHttpClient;
     private retryConfig: RetryConfig;

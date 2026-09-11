@@ -31,7 +31,8 @@ vi.mock('@/shared/api/server/ServerResolver', () => ({
         UNINITIALIZED: 'UNINITIALIZED',
         NO_SERVERS: 'NO_SERVERS',
         NO_ACTIVE_SERVER: 'NO_ACTIVE_SERVER',
-        INVALID_CONFIG: 'INVALID_CONFIG'
+        INVALID_CONFIG: 'INVALID_CONFIG',
+        CORRUPTED: 'CORRUPTED'
     }
 }));
 
@@ -89,9 +90,9 @@ describe('ContextMenuService Gating', () => {
 
         await (service as any).doRebuild('test');
 
-        // Should have basic add
+        // Should have basic add. Page scanning is not part of v1, so no scan item.
         expect(chrome.contextMenus.create).toHaveBeenCalledWith(expect.objectContaining({ id: 'add-torrent' }), expect.any(Function));
-        expect(chrome.contextMenus.create).toHaveBeenCalledWith(expect.objectContaining({ id: 'scan-page' }), expect.any(Function));
+        expect(chrome.contextMenus.create).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'scan-page' }), expect.any(Function));
 
         // Should NOT have paused
         expect(chrome.contextMenus.create).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'add-torrent-paused' }), expect.any(Function));
@@ -123,14 +124,13 @@ describe('ContextMenuService Gating', () => {
         expect(chrome.contextMenus.create).toHaveBeenCalledWith(expect.objectContaining({ id: 'path-selection' }), expect.any(Function));
     });
 
-    it('should respect custom options when mode is 3 (Custom)', async () => {
+    it('treats the removed custom mode (3) as the full menu', async () => {
         vi.mocked(storage.getItem).mockResolvedValue({
             globals: {
                 contextMenu: 3,
-                contextMenuCustomOptions: {
-                    addToClient: false,
-                    pauseResume: true
-                }
+                // Obsolete key from older versions; must be ignored, not honoured.
+                contextMenuCustomOptions: { addToClient: false, pauseResume: false, openWebUI: false },
+                labels: ['label1']
             }
         });
         vi.mocked(ServerResolver.resolve).mockResolvedValue({
@@ -141,17 +141,34 @@ describe('ContextMenuService Gating', () => {
 
         await (service as any).doRebuild('test');
 
-        // Add to client is disabled
-        expect(chrome.contextMenus.create).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'add-torrent' }), expect.any(Function));
+        expect(chrome.contextMenus.create).toHaveBeenCalledWith(expect.objectContaining({ id: 'add-torrent' }), expect.any(Function));
+        expect(chrome.contextMenus.create).toHaveBeenCalledWith(expect.objectContaining({ id: 'add-torrent-paused' }), expect.any(Function));
+        expect(chrome.contextMenus.create).toHaveBeenCalledWith(expect.objectContaining({ id: 'label-selection' }), expect.any(Function));
+    });
 
-        // Pause/Resume is enabled
+    it('normalises string and invalid modes (string "2" -> simple, garbage -> default full)', async () => {
+        vi.mocked(ServerResolver.resolve).mockResolvedValue({
+            state: ResolutionState.OK,
+            servers: [],
+            activeServer: null
+        });
+
+        vi.mocked(storage.getItem).mockResolvedValue({ globals: { contextMenu: '2' } });
+        await (service as any).doRebuild('test');
+        expect(chrome.contextMenus.create).toHaveBeenCalledWith(expect.objectContaining({ id: 'add-torrent' }), expect.any(Function));
+        expect(chrome.contextMenus.create).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'add-torrent-paused' }), expect.any(Function));
+
+        vi.clearAllMocks();
+        vi.mocked(chrome.contextMenus.removeAll).mockImplementation(() => Promise.resolve());
+        vi.mocked(storage.getItem).mockResolvedValue({ globals: { contextMenu: 'nonsense' } });
+        await (service as any).doRebuild('test');
         expect(chrome.contextMenus.create).toHaveBeenCalledWith(expect.objectContaining({ id: 'add-torrent-paused' }), expect.any(Function));
     });
 
-    it('should show unlock item even if custom says no items, but NOT if mode is Hidden', async () => {
-        // Case 1: Locked, Mode 3 (Custom), addToClient: false
+    it('should show unlock item in full mode, but NOT if mode is Hidden', async () => {
+        // Case 1: Locked, Mode 1 (Full)
         vi.mocked(storage.getItem).mockResolvedValue({
-            globals: { contextMenu: 3, contextMenuCustomOptions: { addToClient: false } }
+            globals: { contextMenu: 1 }
         });
         vi.mocked(ServerResolver.resolve).mockResolvedValue({
             state: ResolutionState.LOCKED,

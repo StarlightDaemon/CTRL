@@ -1,0 +1,115 @@
+{
+  "title": "State-integrity and vault runtime validation: Chrome",
+  "header": [
+    "browser: chrome Chrome/152.0.7977.83",
+    "extension: CTRL 0.2.0-beta.1 (working tree)",
+    "servers: two synthetic Transmission-compatible servers (tests/live/fake-transmission.mjs) at http://192.168.1.235:19191/ and http://192.168.1.235:19192/, overlapping torrent ids 1 and 2, harness-controlled delays and lists",
+    "harness: tests/live/verify-state.mjs; every claim checked against the servers' request logs and the controller's GET_STATE"
+  ],
+  "results": [
+    {
+      "name": "vault-setup",
+      "result": "PASS",
+      "observed": "vault created",
+      "ms": 1281
+    },
+    {
+      "name": "configure-two-servers",
+      "result": "PASS",
+      "observed": "A (http://192.168.1.235:19191/) and B (http://192.168.1.235:19192/) saved; A is the default",
+      "ms": 7223
+    },
+    {
+      "name": "list-shows-server-a",
+      "result": "PASS",
+      "observed": "rows [\"A-one, Downloading, 0%\",\"A-two, Downloading, 0%\"]; controller server=Server A status=connected",
+      "ms": 459
+    },
+    {
+      "name": "switch-to-b-while-a-is-slow",
+      "result": "PASS",
+      "observed": "B's queue shown 2860 ms after the switch: [\"B-one, Downloading, 0%\",\"B-two, Downloading, 0%\",\"B-three, Downloading, 0%\"]; still B after A's 6 s reply: [\"B-one, Downloading, 0%\",\"B-two, Downloading, 0%\",\"B-three, Downloading, 0%\"]; A polls answered late: 6",
+      "ms": 13528
+    },
+    {
+      "name": "command-targets-the-torrent-server-not-the-id",
+      "result": "PASS",
+      "observed": "torrent-stop ids [1] reached B only (A got none, although A also has id 1); resume restored Downloading",
+      "ms": 843
+    },
+    {
+      "name": "reorder-and-membership-changes",
+      "result": "PASS",
+      "observed": "rows followed the server order and membership: [\"B-three, Downloading, 0%\",\"B-four, Downloading, 0%\",\"B-one, Downloading, 0%\"]; restored",
+      "ms": 4084
+    },
+    {
+      "name": "second-options-window-mirrors-state",
+      "result": "PASS",
+      "observed": "window 2 showed the same queue and reflected a pause/resume issued from window 1",
+      "ms": 1704
+    },
+    {
+      "name": "popup-consistent-with-options",
+      "result": "PASS",
+      "observed": "popup shows Server B with B-one, B-two, B-three",
+      "ms": 113
+    },
+    {
+      "name": "background-restart-resubscribe",
+      "result": "PASS",
+      "observed": "service worker terminated and restarted (background.js); both windows resubscribed and received the new queue",
+      "ms": 3097
+    },
+    {
+      "name": "permission-revoked-and-recovered",
+      "result": "PASS",
+      "observed": "revoking http://192.168.1.235:19192/* → \"ACCESS REVOKED\"; Grant access in the server list → LIVE",
+      "ms": 17791
+    },
+    {
+      "name": "lock-redacts-every-window",
+      "result": "PASS",
+      "observed": "locking in window 1 redacted window 2 and the popup; no queue data remained visible",
+      "ms": 382
+    },
+    {
+      "name": "wrong-master-password",
+      "result": "PASS",
+      "observed": "wrong password refused (controller stays locked); correct password unlocked both windows",
+      "ms": 1241
+    },
+    {
+      "name": "import-failure-preserves-state",
+      "result": "PASS",
+      "observed": "import rejected (\"Import failed\"); both servers still listed; controller still on Server B",
+      "ms": 708
+    },
+    {
+      "name": "safe-export-has-no-secrets",
+      "result": "PASS",
+      "observed": "ctrl-servers-safe-2026-09-09_17-24-20.json: containsSecrets=false, 2 servers, addresses present, no password field or value",
+      "ms": 1371
+    },
+    {
+      "name": "sensitive-export-is-labelled",
+      "result": "PASS",
+      "observed": "ctrl-servers-full-2026-09-09_17-24-21.json: containsSecrets=true and both passwords present (as the label says)",
+      "ms": 933
+    },
+    {
+      "name": "legacy-vault-migration",
+      "result": "PASS",
+      "observed": "legacy salt+data unlocked with the old password, rewritten as a v2 envelope, legacy keys removed, server usable (LIVE)",
+      "ms": 1661
+    },
+    {
+      "name": "corrupt-vault-fails-closed-and-resets",
+      "result": "PASS",
+      "observed": "corrupt envelope → \"Vault damaged\" in options and popup, no data shown; explicit reset → setup screen, vault keys removed",
+      "ms": 482
+    }
+  ],
+  "notes": [],
+  "ranAt": "2026-09-09T23:24:26.222Z"
+}

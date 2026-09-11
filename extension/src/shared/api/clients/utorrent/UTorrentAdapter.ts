@@ -1,4 +1,3 @@
-import { injectable } from 'tsyringe';
 import { ITorrentClient, AddTorrentOptions } from '@/entities/client/model/ITorrentClient';
 import { Torrent, TorrentStatus } from '@/entities/torrent/model/Torrent';
 import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
@@ -23,18 +22,18 @@ export interface TorrentFile {
 /** Maximum retry attempts for session recovery */
 const MAX_RETRY_ATTEMPTS = 2;
 
-@injectable()
 export class UTorrentAdapter implements ITorrentClient {
     private httpClient: FetchHttpClient;
     private token: string | null = null;
-    private guid: string | null = null;
     private cacheId: string | null = null;
     private torrentCache: Map<string, (string | number)[]> = new Map();
     private baseUrl: string;
     private retryConfig: RetryConfig;
 
     constructor(private config: ServerConfig) {
-        this.httpClient = new FetchHttpClient(config.hostname);
+        // The GUID session cookie is HttpOnly and browser-managed; JavaScript can
+        // neither read Set-Cookie nor send Cookie, so the cookie jar carries it.
+        this.httpClient = new FetchHttpClient(config.hostname, { credentials: 'include' });
         this.baseUrl = 'gui/';
         // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
         this.retryConfig = {
@@ -45,22 +44,17 @@ export class UTorrentAdapter implements ITorrentClient {
 
     async login(): Promise<void> {
         const headers = this.getAuthHeaders();
-        const { body, headers: respHeaders } = await this.httpClient.getRaw<string>('gui/token.html', {
+        const { body } = await this.httpClient.getRaw<string>('gui/token.html', {
             headers,
         });
 
         this.token = extractUTorrentToken(body);
-
-        // Capture the GUID session cookie required by the uTorrent three-legged handshake.
-        // Without it, all subsequent requests receive HTTP 400 Invalid Request.
-        const setCookie = respHeaders.get('set-cookie') ?? '';
-        const guidMatch = setCookie.match(/GUID=([^;]+)/i);
-        this.guid = guidMatch ? guidMatch[1] : null;
+        // The GUID session cookie set alongside the token is stored by the browser
+        // and sent automatically with every later request (credentials: 'include').
     }
 
     async logout(): Promise<void> {
         this.token = null;
-        this.guid = null;
         this.cacheId = null;
         this.torrentCache.clear();
     }
@@ -391,7 +385,6 @@ export class UTorrentAdapter implements ITorrentClient {
 
         const url = `${this.baseUrl}?${params.toString()}`;
         const headers = this.getAuthHeaders();
-        if (this.guid) headers['Cookie'] = `GUID=${this.guid}`;
 
         try {
             if (method === 'POST') {

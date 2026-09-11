@@ -2,99 +2,94 @@ import React from 'react';
 import { Tile, Grid, Column } from '@carbon/react';
 import { BentoCard } from '@/shared/ui/layout/BentoGrid';
 import { VirtualizedTorrentList } from './VirtualizedTorrentList';
-import { Activity, HardDrive, Network } from 'lucide-react';
-import { useDebugId } from '@/shared/lib/hooks/useDebugId';
+import { Activity, Network } from 'lucide-react';
 import { useTorrentStore } from '../../../stores/useTorrentStore';
+import { describeConnection } from './ConnectionBanner';
+import { formatSpeed } from '@/shared/lib/format';
 
-const formatSpeed = (bytes: number) => {
-    if (bytes === 0) return '0.0 B/s';
-    const k = 1024;
-    const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+interface Props {
+    onViewportChange: (start: number, end: number) => void;
+}
+
+const formatAgo = (timestamp: number | null): string => {
+    if (!timestamp) return 'never';
+    const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
+    if (seconds < 5) return 'just now';
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return `${minutes} min ago`;
+    return `${Math.round(minutes / 60)} h ago`;
 };
 
-export const TorrentDashboard = () => {
-    // Debug IDs
-    const globalTransferDebug = useDebugId('torrent-dashboard', 'stats', 'global-transfer');
-    const storageHealthDebug = useDebugId('torrent-dashboard', 'stats', 'storage-health');
-    const systemStatusDebug = useDebugId('torrent-dashboard', 'stats', 'system-status');
-
-    const { globalStats } = useTorrentStore();
+export const TorrentDashboard: React.FC<Props> = ({ onViewportChange }) => {
+    const globalStats = useTorrentStore((s) => s.globalStats);
+    const connection = useTorrentStore((s) => s.connection);
+    const presentation = describeConnection(connection);
+    const live = connection.status === 'connected';
 
     return (
-
         <Grid className="h-[calc(100vh-140px)]">
-            {/* Main Torrent List - 11/16 cols (approx 2/3) */}
+            {/* Main Torrent List */}
             <Column lg={11} md={5} sm={4} className="h-full">
                 <Tile className="h-full flex flex-col p-0 overflow-hidden border-none">
                     <div className="p-3 border-b border-subtle bg-layer-01 flex justify-between items-center">
-                        <span className="font-medium text-sm text-text-secondary">Active Torrents</span>
-                        <span className="text-xs text-text-disabled font-mono">LIVE</span>
+                        <span className="font-medium text-sm text-text-secondary">
+                            {connection.serverName ? `Torrents on ${connection.serverName}` : 'Torrents'}
+                        </span>
+                        <span
+                            className={`text-xs font-mono ${live ? 'text-status-success' : 'text-text-disabled'}`}
+                            role="status"
+                            aria-live="polite"
+                        >
+                            {live ? 'LIVE' : presentation.title.toUpperCase()}
+                        </span>
                     </div>
-                    <div className="flex-1 min-h-[300px] relative bg-layer-01">
-                        <VirtualizedTorrentList />
+                    <div className="flex-1 min-h-[300px] relative bg-layer-01 p-2">
+                        <VirtualizedTorrentList onViewportChange={onViewportChange} />
                     </div>
                 </Tile>
             </Column>
 
-            {/* Stats Column - 5/16 cols (approx 1/3) */}
+            {/* Stats Column */}
             <Column lg={5} md={3} sm={4} className="flex flex-col gap-4 h-full">
                 <BentoCard
-                    title="Global Transfer"
-                    icon={<Activity className="h-4 w-4 text-interactive" />}
+                    title="Transfer"
+                    icon={<Activity className="h-4 w-4 text-interactive" aria-hidden="true" />}
                     description={
                         <div className="flex flex-col gap-1 mt-2">
                             <div className="text-xs text-text-secondary uppercase">Download</div>
-                            <div className="text-xl font-mono text-text-primary transition-all duration-300">
-                                {formatSpeed(globalStats.downloadSpeed)}
+                            <div className="text-xl font-mono text-text-primary">
+                                {live ? formatSpeed(globalStats.downloadSpeed) : '—'}
                             </div>
                             <div className="text-xs text-text-secondary uppercase mt-2">Upload</div>
-                            <div className="text-lg font-mono text-text-primary transition-all duration-300">
-                                {formatSpeed(globalStats.uploadSpeed)}
-                            </div>
-                        </div>
-                    }
-                    className="flex-1" // Distribute height
-                    {...globalTransferDebug}
-                />
-
-                <BentoCard
-                    title="Storage Health"
-                    icon={<HardDrive className="h-4 w-4 text-status-success" />}
-                    description={
-                        <div className="mt-2 text-xs text-text-secondary">
-                            <div className="flex justify-between mb-1">
-                                <span>Used</span>
-                                <span>Unknown</span>
-                            </div>
-                            <div className="h-1.5 w-full bg-layer-03 rounded-full overflow-hidden">
-                                <div className="h-full bg-status-success w-[0%]" />
-                            </div>
-                            <div className="mt-2 font-mono">-- Free</div>
-                        </div>
-                    }
-                    className="flex-1"
-                    {...storageHealthDebug}
-                />
-
-                <BentoCard
-                    title="System Status"
-                    icon={<Network className="h-4 w-4 text-interactive-hover" />}
-                    description={
-                        <div className="mt-2 space-y-2">
-                            <div className="flex items-center gap-2 text-xs text-text-secondary">
-                                <div className={`w-1.5 h-1.5 rounded-full ${globalStats.activeCount > 0 ? 'bg-status-success' : 'bg-text-disabled'}`} />
-                                <span>Active Downloads: {globalStats.activeCount}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-text-secondary">
-                                <div className="w-1.5 h-1.5 rounded-full bg-status-success" />
-                                <span>Connection: Online</span>
+                            <div className="text-lg font-mono text-text-primary">
+                                {live ? formatSpeed(globalStats.uploadSpeed) : '—'}
                             </div>
                         </div>
                     }
                     className="flex-1"
-                    {...systemStatusDebug}
+                />
+
+                <BentoCard
+                    title="Connection"
+                    icon={<Network className="h-4 w-4 text-interactive-hover" aria-hidden="true" />}
+                    description={
+                        <div className="mt-2 space-y-2 text-xs text-text-secondary">
+                            <div className="flex items-center gap-2">
+                                <div
+                                    className={`w-1.5 h-1.5 rounded-full ${presentation.kind === 'success' ? 'bg-status-success' : presentation.kind === 'error' ? 'bg-status-error' : 'bg-text-disabled'}`}
+                                    aria-hidden="true"
+                                />
+                                <span>{presentation.title}</span>
+                            </div>
+                            {connection.status !== 'connected' && (
+                                <div className="text-text-helper">{presentation.detail}</div>
+                            )}
+                            <div>Active: {live ? globalStats.activeCount : '—'} · Total: {live ? globalStats.total : '—'}</div>
+                            <div>Last update: {formatAgo(connection.lastSuccessAt)}</div>
+                        </div>
+                    }
+                    className="flex-1"
                 />
             </Column>
         </Grid>

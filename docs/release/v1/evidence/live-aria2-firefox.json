@@ -1,0 +1,114 @@
+{
+  "client": "aria2",
+  "clientVersion": "1.37.0",
+  "serverSettings": "aria2: --rpc-secret token",
+  "browser": "firefox",
+  "browserVersion": "155.0.1",
+  "headless": true,
+  "extensionVersion": "0.2.0-beta.1",
+  "address": "http://192.168.1.235:16800/jsonrpc",
+  "lanAddress": "192.168.1.235",
+  "ranAt": "2026-09-09T23:08:50.860Z",
+  "results": [
+    {
+      "name": "vault-setup",
+      "result": "PASS",
+      "observed": "master password created; options dashboard shown",
+      "ms": 574
+    },
+    {
+      "name": "configure-server",
+      "result": "PASS",
+      "observed": "form filled (address http://192.168.1.235:16800/jsonrpc); credential disclosure shown; plain-http warning not shown (private host)",
+      "ms": 914
+    },
+    {
+      "name": "grant-permission",
+      "result": "PASS",
+      "observed": "granted (prompt disabled by extensions.webextOptionalPermissionPrompts=false)",
+      "ms": 68
+    },
+    {
+      "name": "test-connection",
+      "result": "PASS",
+      "observed": "Connection successful",
+      "ms": 70
+    },
+    {
+      "name": "save-server",
+      "result": "PASS",
+      "observed": "saved; list shows stored address verbatim: true",
+      "ms": 70
+    },
+    {
+      "name": "connected",
+      "result": "PASS",
+      "observed": "dashboard status: LIVE",
+      "ms": 498
+    },
+    {
+      "name": "add-magnet",
+      "result": "PASS",
+      "observed": "popup: Torrent added; server has [METADATA]ctrl-live-a.bin (638ceb8d793cd066ae854013514d1f32f95fb752) status=active",
+      "ms": 518
+    },
+    {
+      "name": "list-shows-torrent",
+      "result": "PASS",
+      "observed": "rows: [\"[METADATA]ctrl-live-a.bin, Downloading, 0%\"]",
+      "ms": 509
+    },
+    {
+      "name": "add-paused",
+      "result": "PASS",
+      "observed": "server shows [METADATA]ctrl-live-b.bin status=paused (paused)",
+      "ms": 1623
+    },
+    {
+      "name": "pause",
+      "result": "PASS",
+      "observed": "server: [METADATA]ctrl-live-a.bin status=paused",
+      "ms": 555
+    },
+    {
+      "name": "resume",
+      "result": "PASS",
+      "observed": "server: [METADATA]ctrl-live-a.bin status=active",
+      "ms": 78
+    },
+    {
+      "name": "remove-keep-files",
+      "result": "PASS",
+      "observed": "removed on server; other torrent untouched: true",
+      "ms": 879
+    },
+    {
+      "name": "bad-credentials",
+      "result": "PASS",
+      "observed": "test: Connection failed Authentication failed. Check the Aria2 RPC secret token.; dashboard: AUTHENTICATION FAILED; restored → LIVE",
+      "ms": 14164
+    },
+    {
+      "name": "server-unavailable",
+      "result": "PASS",
+      "observed": "dashboard: CONNECTION LOST",
+      "ms": 30054
+    },
+    {
+      "name": "reconnect-after-restart",
+      "result": "PASS",
+      "observed": "dashboard: LIVE; server lists 0 torrent(s) after restart",
+      "ms": 527
+    },
+    {
+      "name": "browser-restart-lock",
+      "result": "PASS",
+      "observed": "skipped by design: a temporary Firefox add-on does not survive a browser restart",
+      "ms": 0
+    }
+  ],
+  "notes": [
+    "controller state after saving wrong credentials: +7ms connecting/- → +1376ms auth_failed/UNAUTHORIZED",
+    "restored password field holds the expected value: true"
+  ]
+}

@@ -1,4 +1,3 @@
-import 'reflect-metadata';
 import '@testing-library/jest-dom';
 import { vi, beforeEach } from 'vitest';
 import { fakeBrowser } from '@webext-core/fake-browser';
@@ -32,3 +31,14 @@ Object.defineProperty(window, 'matchMedia', {
         dispatchEvent: vi.fn(),
     })),
 });
+
+// 5. ResizeObserver is not implemented by jsdom; Carbon's Modal observes its
+// content size. A no-op observer is enough for rendering in tests.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+    class ResizeObserverStub {
+        observe() { }
+        unobserve() { }
+        disconnect() { }
+    }
+    Object.defineProperty(globalThis, 'ResizeObserver', { writable: true, value: ResizeObserverStub });
+}

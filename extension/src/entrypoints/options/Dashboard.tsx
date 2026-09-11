@@ -5,13 +5,10 @@ import { FunctionSettings } from '../../features/torrent-control/ui/FunctionSett
 import { AboutTab } from '../../features/torrent-control/ui/AboutTab';
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
 import { TorrentDashboard } from '../../features/torrent-control/ui/TorrentDashboard';
-import { CommandPalette } from '@/shared/ui/ui/CommandPalette';
 import { Lock } from 'lucide-react';
-import { useTorrentPoller } from '../../features/torrent-control/model/useTorrentPoller';
-import { Utilities } from '../../features/torrent-control/ui/Utilities';
-import { AppearanceSettings } from '../../features/torrent-control/ui/AppearanceSettings';
+import { useTorrentSubscription } from '../../features/torrent-control/model/useTorrentSubscription';
 import { SystemSettings } from '@/shared/ui/SystemSettings';
-import { AppSettings } from '@/shared/lib/types';
+import { AppSettings, ContextMenuMode } from '@/shared/lib/types';
 import { Loading } from '@carbon/react';
 import { browser } from 'wxt/browser';
 
@@ -23,9 +20,8 @@ interface DashboardProps {
     exportServerConfig: (sanitize?: boolean) => void;
     importBackup: (file: File) => Promise<{ success: boolean; message: string }>;
     lockVault: () => Promise<void>;
+    resetVault: () => Promise<void>;
 }
-
-const defaultCustomOptions = { addToClient: true, pauseResume: true, openWebUI: true };
 
 export const Dashboard: React.FC<DashboardProps> = ({
     settings,
@@ -34,28 +30,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
     exportSystemBackup,
     exportServerConfig,
     importBackup,
-    lockVault
+    lockVault,
+    resetVault
 }) => {
     const [activeView, setActiveView] = useState('dashboard');
 
-    // Start polling for torrents
-    useTorrentPoller();
+    // Live queue subscription for this window (own viewport, auto-reconnect)
+    const subscription = useTorrentSubscription();
 
-    const [previewContextMenu, setPreviewContextMenu] = useState(1);
-    const [previewCustomOptions, setPreviewCustomOptions] = useState(defaultCustomOptions);
+    const [previewContextMenu, setPreviewContextMenu] = useState<ContextMenuMode>(1);
     const [previewServers, setPreviewServers] = useState<AppSettings['servers']>([]);
-
-    // Notification Preview State
-    const [previewNotification, setPreviewNotification] = useState(false);
-    const [previewNotificationLevel, setPreviewNotificationLevel] = useState('standard');
 
     useEffect(() => {
         if (settings) {
             setPreviewContextMenu(settings.globals.contextMenu);
-            setPreviewCustomOptions(settings.globals.contextMenuCustomOptions || defaultCustomOptions);
             setPreviewServers(settings.servers || []);
-            setPreviewNotification(settings.globals.enableNotifications);
-            setPreviewNotificationLevel(settings.globals.notificationLevel);
         }
     }, [settings]);
 
@@ -75,21 +64,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             globals: {
                 ...settings.globals,
                 contextMenu: previewContextMenu,
-                contextMenuCustomOptions: previewCustomOptions
             },
             servers: previewServers
-        });
-    };
-
-    const applyNotifications = async () => {
-        if (!settings) return;
-        await updateSettings({
-            ...settings,
-            globals: {
-                ...settings.globals,
-                enableNotifications: previewNotification,
-                notificationLevel: previewNotificationLevel as 'standard' | 'verbose' | 'error'
-            }
         });
     };
 
@@ -100,8 +76,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     ];
 
     const secondaryNavItems = [
-        { id: 'appearance', label: browser.i18n.getMessage('navAppearance') },
-        { id: 'utilities', label: browser.i18n.getMessage('navUtilities') },
         { id: 'system', label: browser.i18n.getMessage('navSystem') },
         { id: 'about', label: browser.i18n.getMessage('navAbout') },
     ];
@@ -132,7 +106,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <div className="h-full flex flex-col bg-[var(--cds-background)]">
                         <div className="flex-1 overflow-y-auto scrollbar-thin">
                             <div className="p-8 max-w-7xl mx-auto">
-                                <TorrentDashboard />
+                                <TorrentDashboard onViewportChange={subscription.setViewport} />
                             </div>
                         </div>
                     </div>
@@ -146,16 +120,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 updateSettings={(s) => updateSettings(s as AppSettings)}
                                 previewContextMenu={previewContextMenu}
                                 setPreviewContextMenu={setPreviewContextMenu}
-                                previewCustomOptions={previewCustomOptions}
-                                setPreviewCustomOptions={setPreviewCustomOptions}
                                 applyContextMenu={applyContextMenu}
                                 previewServers={previewServers}
                                 setPreviewServers={setPreviewServers}
-                                previewNotification={previewNotification}
-                                setPreviewNotification={setPreviewNotification}
-                                previewNotificationLevel={previewNotificationLevel}
-                                setPreviewNotificationLevel={setPreviewNotificationLevel}
-                                applyNotifications={applyNotifications}
                             />
                         </div>
                     </div>
@@ -173,38 +140,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                     </div>
                 );
-            case 'appearance':
-                return (
-                    <div className="h-full flex flex-col bg-[var(--cds-background)]">
-                        <div className="flex-1 overflow-y-auto scrollbar-thin">
-                            <AppearanceSettings
-                                settings={settings}
-                                updateSettings={(s) => updateSettings(s as AppSettings)}
-                            />
-                        </div>
-                    </div>
-                );
-            case 'utilities':
-                return (
-                    <div className="h-full flex flex-col bg-[var(--cds-background)]">
-                        <div className="flex-1 overflow-y-auto scrollbar-thin">
-                            <Utilities
-                                settings={settings}
-                                exportSystemBackup={exportSystemBackup}
-                                importBackup={importBackup}
-                            />
-                        </div>
-                    </div>
-                );
             case 'system':
                 return (
                     <div className="h-full flex flex-col bg-[var(--cds-background)]">
                         <div className="flex-1 overflow-y-auto scrollbar-thin">
                             <SystemSettings
                                 settings={settings}
-                                updateSettings={(s) => updateSettings(s as AppSettings)}
                                 exportSystemBackup={exportSystemBackup}
                                 importBackup={importBackup}
+                                resetVault={resetVault}
                             />
                         </div>
                     </div>
@@ -231,18 +175,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     return (
         <ErrorBoundary>
-            <>
-                <CommandPalette />
-                <OptionsLayout
-                    primaryItems={primaryNavItems}
-                    secondaryItems={secondaryNavItems}
-                    headerContent={LockButton}
-                    activeView={activeView === 'lock' ? 'dashboard' : activeView}
-                    onViewChange={setActiveView}
-                >
-                    {renderContent()}
-                </OptionsLayout>
-            </>
+            <OptionsLayout
+                primaryItems={primaryNavItems}
+                secondaryItems={secondaryNavItems}
+                headerContent={LockButton}
+                activeView={activeView === 'lock' ? 'dashboard' : activeView}
+                onViewChange={setActiveView}
+            >
+                {renderContent()}
+            </OptionsLayout>
         </ErrorBoundary>
     );
 };

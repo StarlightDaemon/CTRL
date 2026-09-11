@@ -53,7 +53,7 @@ export const BackupCards: React.FC<Props> = ({ settings, exportSystemBackup, imp
             <SettingsCard title="System Backup" className="flex flex-col h-full">
                 <Stack gap={4} className="flex-1">
                     <p className="text-xs text-[var(--cds-text-secondary)]">
-                        Export your entire extension state, including site integrations and global preferences.
+                        Export your servers and global preferences.
                         <br /><br />
                         <em>Passwords are removed by default unless you choose otherwise.</em>
                     </p>
@@ -101,7 +101,7 @@ export const BackupCards: React.FC<Props> = ({ settings, exportSystemBackup, imp
             <SettingsCard title="Configuration Only" className="flex flex-col h-full">
                 <Stack gap={4} className="flex-1">
                     <p className="text-xs text-[var(--cds-text-secondary)]">
-                        Export only your appearance and behavior settings. Does not include any server details or accounts.
+                        Export only your behavior settings. Does not include any server details or accounts.
                     </p>
                     <Button
                         kind="secondary"

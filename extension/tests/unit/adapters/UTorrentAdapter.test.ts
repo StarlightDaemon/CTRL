@@ -161,7 +161,7 @@ describe('UTorrentAdapter', () => {
             await expect(adapter.login()).rejects.toThrow('Failed to retrieve uTorrent token');
         });
 
-        it('should capture GUID from Set-Cookie response header', async () => {
+        it('relies on browser-managed cookies for the GUID session', async () => {
             const mockResponse = createTorrentListResponse([{
                 hash: 'ABC123', status: 201, name: 'Test', size: 100,
                 percent: 500, downSpeed: 100, upSpeed: 0, eta: 100, label: ''
@@ -182,7 +182,10 @@ describe('UTorrentAdapter', () => {
             const cookieHeader = apiCallInit?.headers instanceof Headers
                 ? apiCallInit.headers.get('Cookie')
                 : (apiCallInit?.headers as Record<string, string>)?.['Cookie'];
-            expect(cookieHeader).toBe('GUID=TESTGUID123');
+            // Browsers never expose Set-Cookie nor send a JavaScript-set Cookie header;
+            // the session rides on the browser cookie jar via credentials: 'include'.
+            expect(cookieHeader).toBeNull();
+            expect(apiCallInit.credentials).toBe('include');
         });
 
         it('should not send Cookie header when Set-Cookie is absent', async () => {
@@ -206,7 +209,7 @@ describe('UTorrentAdapter', () => {
             expect(cookieHeader).toBeNull();
         });
 
-        it('should re-capture GUID on session recovery re-login', async () => {
+        it('re-logs in on session recovery using browser-managed cookies', async () => {
             const mockResponse = createTorrentListResponse([{
                 hash: 'ABC123', status: 201, name: 'Test', size: 100,
                 percent: 500, downSpeed: 100, upSpeed: 0, eta: 100, label: ''
@@ -232,7 +235,8 @@ describe('UTorrentAdapter', () => {
             const cookieHeader = retryInit?.headers instanceof Headers
                 ? retryInit.headers.get('Cookie')
                 : (retryInit?.headers as Record<string, string>)?.['Cookie'];
-            expect(cookieHeader).toBe('GUID=GUID_B');
+            expect(cookieHeader).toBeNull();
+            expect(retryInit.credentials).toBe('include');
         });
     });
 
@@ -663,7 +667,7 @@ describe('UTorrentSettingsService', () => {
     });
 
     describe('GUID cookie handling', () => {
-        it('should capture GUID from Set-Cookie response header', async () => {
+        it('relies on browser-managed cookies for the GUID session', async () => {
             const fetchSpy = createMockFetchWithHeaders([
                 {
                     ok: true, status: 200, body: tokenHtml,
@@ -678,7 +682,8 @@ describe('UTorrentSettingsService', () => {
             const cookieHeader = apiCallInit?.headers instanceof Headers
                 ? apiCallInit.headers.get('Cookie')
                 : (apiCallInit?.headers as Record<string, string>)?.['Cookie'];
-            expect(cookieHeader).toBe('GUID=SETTINGSGUID123');
+            expect(cookieHeader).toBeNull();
+            expect(apiCallInit.credentials).toBe('include');
         });
 
         it('should not send Cookie header when Set-Cookie is absent', async () => {
@@ -710,7 +715,7 @@ describe('UTorrentRssService', () => {
     });
 
     describe('GUID cookie handling', () => {
-        it('should capture GUID from Set-Cookie response header', async () => {
+        it('relies on browser-managed cookies for the GUID session', async () => {
             const fetchSpy = createMockFetchWithHeaders([
                 {
                     ok: true, status: 200, body: tokenHtml,
@@ -725,7 +730,8 @@ describe('UTorrentRssService', () => {
             const cookieHeader = apiCallInit?.headers instanceof Headers
                 ? apiCallInit.headers.get('Cookie')
                 : (apiCallInit?.headers as Record<string, string>)?.['Cookie'];
-            expect(cookieHeader).toBe('GUID=RSSGUID123');
+            expect(cookieHeader).toBeNull();
+            expect(apiCallInit.credentials).toBe('include');
         });
 
         it('should not send Cookie header when Set-Cookie is absent', async () => {

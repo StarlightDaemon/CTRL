@@ -1,24 +1,24 @@
 import { test, expect } from './fixtures';
 
+/**
+ * Popup first-run smoke test.
+ *
+ * On a fresh profile the vault is uninitialized, so the popup renders the
+ * "Set up CTRL" prompt from src/features/torrent-control/ui/Dashboard.tsx:
+ * a heading, one sentence about the master password, and a single action
+ * that opens the options page. Assertions use the prompt's accessible roles
+ * and names, not markup.
+ */
 test.describe('Popup UI - First Run', () => {
-    test('should display setup prompt when unconfigured', async ({ page, extensionId }) => {
-        // 1. Navigate to the popup
+    test('shows the set-up prompt when the vault is uninitialized', async ({ page, extensionId }) => {
         await page.goto(`chrome-extension://${extensionId}/popup.html`);
 
-        // 2. Assert Initial State
-        // Wait for loading to finish
-        const loadingSpinner = page.getByText('Loading settings...');
-        await expect(loadingSpinner).not.toBeVisible({ timeout: 10000 });
+        // The vault status is resolved asynchronously; the heading appears once it is known.
+        await expect(page.getByRole('heading', { name: 'Set up CTRL' })).toBeVisible({ timeout: 10000 });
+        await expect(page.getByText(/master password/i)).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Set up now' })).toBeVisible();
 
-        const setupButton = page.getByRole('button', { name: 'Setup Now' });
-        await expect(setupButton).toBeVisible();
-
-        const statusMessage = page.getByText('Extension not configured.');
-        await expect(statusMessage).toBeVisible();
-
-        // 3. Verify Version Overlay (shows app loaded)
-        // Using data-component attribute as per project standards
-        const versionOverlay = page.locator('[data-component="VersionOverlay"]');
-        await expect(versionOverlay).toBeVisible();
+        // Nothing from the live dashboard may render before a vault exists.
+        await expect(page.getByPlaceholder(/magnet:/i)).toHaveCount(0);
     });
 });

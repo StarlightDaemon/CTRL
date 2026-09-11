@@ -1,4 +1,3 @@
-import { injectable } from 'tsyringe';
 import { ITorrentClient, AddTorrentOptions } from '@/entities/client/model/ITorrentClient';
 import { Torrent, TorrentStatus } from '@/entities/torrent/model/Torrent';
 import { FetchHttpClient } from '@/shared/api/network/FetchHttpClient';
@@ -22,7 +21,6 @@ export const DelugeErrorCodes = {
 
 export type DelugeErrorCode = typeof DelugeErrorCodes[keyof typeof DelugeErrorCodes];
 
-@injectable()
 export class DelugeAdapter implements ITorrentClient {
     private client: FetchHttpClient;
     private baseUrl: string;
@@ -43,7 +41,9 @@ export class DelugeAdapter implements ITorrentClient {
     constructor(config: ServerConfig) {
         this.config = config;
         this.baseUrl = `${config.hostname.replace(/\/$/, '')}/json`;
-        this.client = new FetchHttpClient(this.baseUrl);
+        // Deluge authenticates with an HttpOnly _session_id cookie; the browser's
+        // cookie jar carries it when credentials: 'include' is set.
+        this.client = new FetchHttpClient(this.baseUrl, { credentials: 'include' });
         // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
         this.retryConfig = {
             ...DEFAULT_RETRY_CONFIG,

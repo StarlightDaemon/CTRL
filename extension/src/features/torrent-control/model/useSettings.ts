@@ -2,77 +2,20 @@ import { useState, useEffect, useCallback } from 'react';
 import { storage } from 'wxt/utils/storage';
 import { AppOptions, ServerConfig } from '@/shared/lib/types';
 import { DEFAULT_OPTIONS } from '@/shared/lib/constants';
-
-import { z } from 'zod'; // Add Zod import
+import { z } from 'zod';
+import { VaultService } from '@/shared/api/security/VaultService';
+import { sanitizeServersForExport } from './exportSanitizer';
+import {
+    AppOptionsSchema,
+    BackupSchema,
+    GlobalOptionsSchema,
+    ServerConfigSchema,
+    mergeGlobals,
+    normalizeSettings,
+} from './settingsSchema';
 
 export const settingsStorage = storage.defineItem<AppOptions>('local:options', {
     defaultValue: DEFAULT_OPTIONS,
-});
-
-import { VaultService } from '@/shared/api/security/VaultService';
-
-// Zod Schemas for Validation
-const ServerConfigSchema = z.object({
-    name: z.string().default('New Server'),
-    application: z.string(),
-    type: z.string(),
-    hostname: z.string(),
-    username: z.string().optional(),
-    password: z.string().optional(),
-    directories: z.array(z.string()).default([]),
-    clientOptions: z.record(z.unknown()).default({}),
-    httpAuth: z.object({
-        username: z.string(),
-        password: z.string().optional()
-    }).optional()
-}).passthrough();
-
-const GlobalOptionsSchema = z.object({
-    contextMenu: z.number().optional(),
-    addPaused: z.boolean().optional(),
-    addAdvanced: z.boolean().optional(),
-    enableNotifications: z.boolean().optional(),
-    notificationLevel: z.enum(['standard', 'verbose', 'error']).optional(),
-    debugMode: z.boolean().optional(),
-    matchRegExp: z.array(z.string()).optional(),
-    labels: z.array(z.string()).optional(),
-    currentServer: z.number().optional(),
-    showDiagnostics: z.boolean().optional(),
-    badgeInfo: z.enum(['none', 'count', 'speed']).optional(),
-    notificationStyle: z.enum(['toast', 'banner', 'modal']).optional(),
-    contextMenuCustomOptions: z.object({
-        addToClient: z.boolean(),
-        pauseResume: z.boolean(),
-        openWebUI: z.boolean(),
-    }).optional(),
-}).passthrough();
-
-const AppearanceSchema = z.object({
-    theme: z.string().optional(),
-    performance: z.enum(['low', 'standard', 'fancy']).optional(),
-}).passthrough();
-
-const LayoutSchema = z.object({
-    sidebar: z.array(z.object({
-        id: z.string(),
-        visible: z.boolean(),
-        order: z.number(),
-    })).optional()
-}).passthrough();
-
-const AppOptionsSchema = z.object({
-    globals: GlobalOptionsSchema.optional(),
-    appearance: AppearanceSchema.optional(),
-    layout: LayoutSchema.optional(),
-    servers: z.array(ServerConfigSchema).optional(),
-}).passthrough();
-
-const BackupSchema = z.object({
-    version: z.number().optional(),
-    type: z.enum(['system_backup', 'server_config']).optional(),
-    subtype: z.enum(['full', 'settings']).optional(),
-    timestamp: z.string().optional(),
-    data: z.record(z.unknown())
 });
 
 export function useSettings() {
@@ -81,14 +24,8 @@ export function useSettings() {
 
     const load = useCallback(async () => {
         const val = await settingsStorage.getValue();
-        // Deep merge logic
-        const merged = {
-            ...DEFAULT_OPTIONS,
-            ...val,
-            globals: { ...DEFAULT_OPTIONS.globals, ...val?.globals },
-            appearance: { ...DEFAULT_OPTIONS.appearance, ...val?.appearance },
-            layout: { ...DEFAULT_OPTIONS.layout, ...val?.layout }
-        } as AppOptions;
+        // Retained keys over defaults; obsolete keys from older versions are dropped.
+        const merged = normalizeSettings(val);
 
         // Try to load servers from Vault
         try {
@@ -128,9 +65,6 @@ export function useSettings() {
         const unwatch = settingsStorage.watch(() => {
             load(); // Reload on change
         });
-
-        // Listen for vault unlock (custom event or polling? For now, we rely on parent re-render or polling)
-        // Ideally we'd watch a Vault state but WXT storage watch covers session key if we used storage.
 
         return () => unwatch();
     }, [load]);
@@ -172,35 +106,20 @@ export function useSettings() {
             type: 'system_backup',
             subtype: type,
             timestamp: new Date().toISOString(),
+            /** Marks whether credentials are present so the file is self-describing. */
+            containsSecrets: type === 'full' && !sanitize,
             data: {} as Partial<AppOptions>
         };
 
-        const dataToExport = { ...settings };
-
-        // Remove servers from generic backup if sanitizing or if it's settings only
-        if (sanitize || type === 'settings') {
-            // For 'settings' type we might want to strip servers anyway, but lets be explicit
-            // Actually, 'settings' type usually implies no servers. 
-            // If type is 'full' and sanitize is true, we should probably strip sensitive fields from servers or remove them entirely?
-            // The user wanted "clearly different parts". 
-            // Let's decide: System Backup (Full) includes everything. Sanitize strips passwords.
-        }
-
         if (type === 'full') {
-            exportData.data = dataToExport;
+            exportData.data = { ...settings };
             if (sanitize && exportData.data.servers) {
-                exportData.data.servers = exportData.data.servers.map((s: ServerConfig) => ({
-                    ...s,
-                    password: '', // Clear password
-                    httpAuth: s.httpAuth ? { ...s.httpAuth, password: '' } : undefined
-                }));
+                // Allowlist-based: only known non-secret fields survive.
+                exportData.data.servers = sanitizeServersForExport(exportData.data.servers) as unknown as ServerConfig[];
             }
         } else {
-            // Settings Only (Global + Appearance)
-            exportData.data = {
-                globals: settings.globals,
-                appearance: settings.appearance
-            };
+            // Settings only: global preferences, never servers.
+            exportData.data = { globals: settings.globals };
         }
 
         downloadJson(exportData, `ctrl-backup-${type}-${new Date().toISOString().split('T')[0]}.json`);
@@ -217,20 +136,16 @@ export function useSettings() {
             return;
         }
 
-        let serversToExport = [...serversToUse];
-
-        if (sanitize) {
-            serversToExport = serversToExport.map(s => ({
-                ...s,
-                password: '', // Clear main password
-                httpAuth: s.httpAuth ? { ...s.httpAuth, password: '' } : undefined
-            }));
-        }
+        const serversToExport: unknown[] = sanitize
+            ? sanitizeServersForExport(serversToUse)
+            : [...serversToUse];
 
         const exportData = {
             version: 2,
             type: 'server_config',
             timestamp: new Date().toISOString(),
+            /** Marks whether credentials are present so the file is self-describing. */
+            containsSecrets: !sanitize,
             data: {
                 servers: serversToExport
             }
@@ -266,8 +181,6 @@ export function useSettings() {
                         type?: unknown;
                         subtype?: unknown;
                         globals?: unknown;
-                        appearance?: unknown;
-                        layout?: unknown;
                         servers?: unknown;
                         data?: unknown;
                     };
@@ -285,50 +198,37 @@ export function useSettings() {
                         throw new Error('Unrecognized or malformed backup format.');
                     }
 
-                    // 2. Full Validation (Zero state changes until this completes)
+                    // 2. Full Validation (Zero state changes until this completes).
+                    // Obsolete preference keys (appearance, layout, notification
+                    // level/style, ...) are stripped by the schemas rather than rejected.
                     let serversToImport: ServerConfig[] | undefined;
-                    let settingsToImport: Partial<AppOptions> | undefined; // Collector for validated settings
+                    let globalsToImport: Partial<AppOptions['globals']> | undefined;
                     let successMessage = '';
 
                     const isVaultInitialized = await VaultService.isInitialized();
                     const isVaultLocked = await VaultService.isLocked();
 
                     if (isLegacy) {
-                        // Validate legacy payload
-                        const validatedGlobals = GlobalOptionsSchema.parse(raw.globals);
-                        const validatedServers = z.array(ServerConfigSchema).parse(raw.servers);
-
-                        const validatedAppearance = raw.appearance ? AppearanceSchema.parse(raw.appearance) : undefined;
-                        const validatedLayout = raw.layout ? LayoutSchema.parse(raw.layout) : undefined;
-
-                        settingsToImport = {
-                            globals: validatedGlobals as AppOptions['globals'],
-                            appearance: validatedAppearance as AppOptions['appearance'],
-                            layout: validatedLayout as AppOptions['layout']
-                        };
-                        serversToImport = validatedServers;
+                        globalsToImport = GlobalOptionsSchema.parse(raw.globals);
+                        serversToImport = z.array(ServerConfigSchema).parse(raw.servers) as ServerConfig[];
                         successMessage = 'Legacy full backup imported.';
                     } else {
-                        // Validate modern payload
                         const meta = BackupSchema.parse(raw);
 
                         if (meta.type === 'server_config') {
                             if (!meta.data || !Array.isArray(meta.data.servers)) {
                                 throw new Error('Invalid server config: missing servers data.');
                             }
-                            serversToImport = z.array(ServerConfigSchema).parse(meta.data.servers);
+                            serversToImport = z.array(ServerConfigSchema).parse(meta.data.servers) as ServerConfig[];
                             successMessage = 'Server configuration imported.';
                         } else if (meta.type === 'system_backup') {
                             const validatedData = AppOptionsSchema.parse(meta.data);
+                            globalsToImport = validatedData.globals;
                             if (meta.subtype === 'full') {
-                                settingsToImport = validatedData as Partial<AppOptions>;
-                                serversToImport = validatedData.servers;
+                                serversToImport = validatedData.servers as ServerConfig[] | undefined;
                                 successMessage = 'System backup imported.';
                             } else {
-                                // Settings only - explicitly ensure servers are NOT in the import payload
-                                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                const { servers: _, ...rest } = validatedData;
-                                settingsToImport = rest as Partial<AppOptions>;
+                                // Settings only - servers are never taken from this payload
                                 successMessage = 'System settings imported.';
                             }
                         } else {
@@ -347,9 +247,6 @@ export function useSettings() {
                     }
 
                     // 4. ATOMIC COMMIT (Mutation Phase)
-                    // If we reach here, validation passed and state is ready for mutation.
-
-                    // Snapshot current state for rollback on partial failure
                     const vaultSnapshot = isVaultInitialized && !isVaultLocked
                         ? await VaultService.getServers()
                         : [];
@@ -362,20 +259,12 @@ export function useSettings() {
                         }
 
                         // B. Update settings in local storage
-                        if (settingsToImport) {
-                            const current = await settingsStorage.getValue() || DEFAULT_OPTIONS;
-                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                            const { servers: _, ...safeIncoming } = settingsToImport;
-
-                            const merged = {
-                                ...current,
-                                ...safeIncoming,
-                                globals: safeIncoming.globals ? { ...current.globals, ...safeIncoming.globals } : current.globals,
-                                appearance: safeIncoming.appearance ? { ...current.appearance, ...safeIncoming.appearance } : current.appearance,
-                                layout: safeIncoming.layout ? { ...current.layout, ...safeIncoming.layout } : current.layout,
+                        if (globalsToImport) {
+                            const current = normalizeSettings(await settingsStorage.getValue());
+                            const merged: AppOptions = {
+                                globals: mergeGlobals(current.globals, globalsToImport),
                                 servers: [] // Always empty in local storage
-                            } as AppOptions;
-
+                            };
                             await settingsStorage.setValue(merged);
                         }
 
@@ -383,7 +272,6 @@ export function useSettings() {
                         await load();
                         resolve({ success: true, message: successMessage });
                     } catch (importError) {
-                        // Rollback on failure
                         if (__UI_DEBUG_MODE__) {
                             console.error('[Import] Atomic commit failed, rolling back:', importError);
                         }

@@ -1,18 +1,29 @@
 /**
  * Options Page E2E Tests
- * 
- * Tests the options/settings page functionality including
- * navigation, theme switching, and settings persistence.
- * 
+ *
+ * Smoke tests for the options page on a fresh profile: it loads, offers the
+ * vault set-up, and — once a vault exists — shows the retained navigation and
+ * the product version on the About page.
+ *
  * These tests run without any @integration tag and should pass in CI.
  */
-import { test, expect, waitForExtensionReady } from './fixtures';
+import { test, expect, waitForExtensionReady, type Page } from './fixtures';
 
 test.describe('Options Page', () => {
     // Helper to navigate to options page with proper waits
-    const gotoOptions = async (page: any, extensionId: string) => {
+    const gotoOptions = async (page: Page, extensionId: string) => {
         await page.goto(`chrome-extension://${extensionId}/options.html`);
         await waitForExtensionReady(page);
+    };
+
+    // Create the vault through the real SetupVault form (fresh profile ⇒ uninitialized vault).
+    // The password is a throwaway value for this temporary test profile.
+    const createVault = async (page: Page) => {
+        await page.getByLabel('Master Password', { exact: true }).fill('e2e-master-password');
+        await page.getByLabel('Confirm Password', { exact: true }).fill('e2e-master-password');
+        await page.getByRole('button', { name: 'Create Vault' }).click();
+        // The unlocked options page mounts the global navigation.
+        await expect(page.getByRole('tab', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });
     };
 
     test('should load options page correctly', async ({ page, extensionId }) => {
@@ -26,15 +37,14 @@ test.describe('Options Page', () => {
         await expect(page.getByText(/error|crash|failed to load/i)).not.toBeVisible();
     });
 
-    test('should display version in footer/header', async ({ page, extensionId }) => {
+    test('should show the version on the About page once the vault exists', async ({ page, extensionId }) => {
         await gotoOptions(page, extensionId);
+        await createVault(page);
 
-        // Version should be displayed somewhere (e.g., "v0.2.0-beta.1")
-        const versionPattern = /v\d+\.\d+\.\d+/;
-        const versionLocator = page.getByText(versionPattern);
-
-        // Wait with explicit timeout for version to appear
-        await expect(versionLocator.first()).toBeVisible({ timeout: 10000 });
+        // "About" is a secondary navigation button (OptionsLayout.tsx); the
+        // About page shows the manifest version as a tag, e.g. "v0.2.0.1".
+        await page.getByRole('button', { name: 'About', exact: true }).click();
+        await expect(page.getByText(/^v\d+\.\d+\.\d+/)).toBeVisible({ timeout: 10000 });
     });
 
     test('should navigate between tabs', async ({ page, extensionId }) => {
@@ -95,39 +105,3 @@ test.describe('Options Page', () => {
         expect(foundSetup).toBeTruthy();
     });
 });
-
-test.describe('Options Page - Theme', () => {
-
-    test('should have theme options visible', async ({ page, extensionId }) => {
-        await page.goto(`chrome-extension://${extensionId}/options.html`);
-        await waitForExtensionReady(page);
-
-        // Navigate to appearance/theme section if available
-        const appearanceLink = page.getByRole('link', { name: /appearance|theme/i })
-            .or(page.getByRole('button', { name: /appearance|theme/i }))
-            .or(page.locator('[data-tab="appearance"]'));
-
-        // Same gating as the "About" tab above: "Appearance" is a
-        // Dashboard.tsx secondaryNavItem, so it only exists post-unlock. A
-        // locked/uninitialized vault on a fresh e2e profile is the expected
-        // reason this is absent, not evidence the theme section was removed.
-        if (await appearanceLink.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-            await appearanceLink.first().click();
-            await page.waitForTimeout(300);
-
-            // Theme options should be present (buttons, radios, or select)
-            const themeControls = page.getByRole('button')
-                .or(page.getByRole('radio'))
-                .or(page.locator('[data-theme]'));
-
-            const count = await themeControls.count();
-            expect(count).toBeGreaterThan(0);
-        } else {
-            // Vault locked/uninitialized in this run - Dashboard never
-            // mounted, so the Appearance nav item can't exist yet. Skip
-            // rather than fail; this is a valid pre-unlock state.
-            test.skip();
-        }
-    });
-});
-

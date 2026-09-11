@@ -78,6 +78,8 @@ type TorrentStatus =
 
 ## Supported Clients
 
+> **v1 note (2026-09-09):** this table describes every adapter present in the code. Only **Transmission, qBittorrent and aria2** are offered in the v1 release and verified against real servers (`docs/release/v1/CLIENT_VERIFICATION.md`); the others are hidden and unverified.
+
 | Adapter | Protocol | Auth | Categories | Tags |
 |---------|----------|------|------------|------|
 | **qBittorrent** | REST | Cookie | ✅ | ✅ |

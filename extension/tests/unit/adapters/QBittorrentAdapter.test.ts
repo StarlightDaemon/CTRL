@@ -86,20 +86,16 @@ describe('QBittorrentAdapter', () => {
             await expect(adapter.login()).rejects.toThrow('IP has been banned');
         });
 
-        it('should track login attempts and warn about lockout protection', async () => {
-            mockFetch('Fails.');
+        it('contacts the server once for rejected credentials and never again with the same settings', async () => {
+            // qBittorrent bans the IP after repeated failed logins (live-verified on 5.2.3
+            // with the background poll loop); a wrong password must fail exactly once.
+            const fetchSpy = mockFetch('Fails.');
 
-            // First attempt
-            await expect(adapter.login()).rejects.toThrow('2 attempts remaining');
-
-            // Second attempt
-            await expect(adapter.login()).rejects.toThrow('1 attempts remaining');
-
-            // Third attempt
-            await expect(adapter.login()).rejects.toThrow('0 attempts remaining');
-
-            // Fourth attempt should fail due to lockout protection
-            await expect(adapter.login()).rejects.toThrow('Login attempts exhausted');
+            await expect(adapter.login()).rejects.toThrow('Authentication Failed (Invalid Credentials)');
+            await expect(adapter.login()).rejects.toThrow('Authentication Failed (Invalid Credentials)');
+            await expect(adapter.getTorrents()).rejects.toThrow('Authentication Failed');
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
+            expect(adapter.classifyError(await adapter.login().catch((e) => e)).type).toBe('AUTH_FAILED');
         });
 
         it('should throw error on 401 Unauthorized response', async () => {
@@ -107,39 +103,34 @@ describe('QBittorrentAdapter', () => {
             await expect(adapter.login()).rejects.toThrow('Authentication Failed (401 Unauthorized)');
         });
 
-        it('should track 401 failures and trigger lockout guard', async () => {
-            mockFetch('', false, 401);
+        it('latches a 401 rejection until the adapter is recreated for new settings', async () => {
+            const fetchSpy = mockFetch('', false, 401);
 
-            // First attempt
-            await expect(adapter.login()).rejects.toThrow('2 attempts remaining');
+            await expect(adapter.login()).rejects.toThrow('Authentication Failed (401 Unauthorized)');
+            await expect(adapter.login()).rejects.toThrow('Authentication Failed (401 Unauthorized)');
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
 
-            // Second attempt
-            await expect(adapter.login()).rejects.toThrow('1 attempts remaining');
-
-            // Third attempt
-            await expect(adapter.login()).rejects.toThrow('0 attempts remaining');
-
-            // Fourth attempt should fail due to lockout protection
-            await expect(adapter.login()).rejects.toThrow('Login attempts exhausted');
+            // The controller builds a new instance when the configuration changes: one more try.
+            const fresh = new QBittorrentAdapter(mockConfig);
+            await expect(fresh.login()).rejects.toThrow('Authentication Failed');
+            expect(fetchSpy).toHaveBeenCalledTimes(2);
         });
 
-        it('should inject CSRF headers (Origin and Referer)', async () => {
+        it('uses browser-managed cookies and never sets browser-controlled headers', async () => {
             const fetchSpy = mockFetch('Ok.');
 
             await adapter.login();
 
-            expect(fetchSpy).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.objectContaining({
-                    headers: expect.any(Headers),
-                })
-            );
-
-            // Check headers contain Origin
             const callArgs = fetchSpy.mock.calls[0][1] as RequestInit;
+            // The SID cookie is HttpOnly and owned by the browser's cookie jar.
+            expect(callArgs.credentials).toBe('include');
+            // Origin/Referer/Cookie are forbidden request headers: the browser sets
+            // its own extension Origin and silently drops anything we put here.
             const headers = callArgs.headers as Headers;
-            expect(headers.get('Origin')).toBe('http://localhost:8080');
-            expect(headers.get('Referer')).toBe('http://localhost:8080/');
+            expect(headers.get('Origin')).toBeNull();
+            expect(headers.get('Referer')).toBeNull();
+            expect(headers.get('Cookie')).toBeNull();
+            expect(fetchSpy.mock.calls[0][0]).toBe('http://localhost:8080/api/v2/auth/login');
         });
     });
 
@@ -279,7 +270,12 @@ describe('QBittorrentAdapter', () => {
             });
 
             expect(fetchSpy).toHaveBeenCalledTimes(2);
-            // FormData will contain the sequential options
+            const form = fetchSpy.mock.calls[1][1]?.body as FormData;
+            // qBittorrent 4.x reads `paused`, 5.x (Web API 2.11+) only `stopped`; both are sent.
+            expect(form.get('paused')).toBe('true');
+            expect(form.get('stopped')).toBe('true');
+            expect(form.get('category')).toBe('movies');
+            expect(form.get('savepath')).toBe('/downloads/movies');
         });
     });
 
@@ -346,9 +342,27 @@ describe('QBittorrentAdapter', () => {
     });
 
     describe('pauseTorrent', () => {
-        it('should pause torrent by hash', async () => {
+        it('uses torrents/stop on Web API 2.11+ (qBittorrent 5.x)', async () => {
+            const fetchSpy = mockFetchSequence([
+                { response: 'Ok.' },      // auth/login
+                { response: '2.11.2' },   // app/webapiVersion
+                { response: 'Ok.' },      // torrents/stop
+            ]);
+
+            await adapter.login();
+            await adapter.pauseTorrent('abc123');
+
+            expect(fetchSpy).toHaveBeenLastCalledWith(
+                expect.stringContaining('torrents/stop'),
+                expect.objectContaining({ method: 'POST' })
+            );
+            expect(fetchSpy).not.toHaveBeenCalledWith(expect.stringContaining('torrents/pause'), expect.anything());
+        });
+
+        it('uses torrents/pause on Web API < 2.11 (qBittorrent 4.x)', async () => {
             const fetchSpy = mockFetchSequence([
                 { response: 'Ok.' },
+                { response: '2.8.3' },
                 { response: 'Ok.' },
             ]);
 
@@ -360,12 +374,45 @@ describe('QBittorrentAdapter', () => {
                 expect.objectContaining({ method: 'POST' })
             );
         });
+
+        it('reads the Web API version once per adapter instance', async () => {
+            const fetchSpy = mockFetchSequence([
+                { response: 'Ok.' },
+                { response: '2.11.2' },
+                { response: 'Ok.' },
+                { response: 'Ok.' },
+            ]);
+
+            await adapter.login();
+            await adapter.pauseTorrent('a');
+            await adapter.pauseTorrent('b');
+
+            const versionCalls = fetchSpy.mock.calls.filter(([url]) => String(url).includes('webapiVersion'));
+            expect(versionCalls).toHaveLength(1);
+        });
     });
 
     describe('resumeTorrent', () => {
-        it('should resume torrent by hash', async () => {
+        it('uses torrents/start on Web API 2.11+', async () => {
             const fetchSpy = mockFetchSequence([
                 { response: 'Ok.' },
+                { response: '2.11.2' },
+                { response: 'Ok.' },
+            ]);
+
+            await adapter.login();
+            await adapter.resumeTorrent('abc123');
+
+            expect(fetchSpy).toHaveBeenLastCalledWith(
+                expect.stringContaining('torrents/start'),
+                expect.objectContaining({ method: 'POST' })
+            );
+        });
+
+        it('uses torrents/resume on Web API < 2.11', async () => {
+            const fetchSpy = mockFetchSequence([
+                { response: 'Ok.' },
+                { response: '2.9.3' },
                 { response: 'Ok.' },
             ]);
 
@@ -407,14 +454,27 @@ describe('QBittorrentAdapter', () => {
 
     describe('testConnection', () => {
         it('should return true on successful connection', async () => {
-            mockFetchSequence([
-                { response: 'Ok.' },
-                { response: 'v4.5.0' },
+            const fetchSpy = mockFetchSequence([
+                { response: '' },        // auth/logout: end any session the browser already holds
+                { response: 'Ok.' },     // auth/login with the entered credentials
+                { response: 'v4.5.0' },  // app/webapiVersion
             ]);
 
             const result = await adapter.testConnection();
 
             expect(result).toEqual({ connected: true });
+            expect(fetchSpy.mock.calls[0][0]).toContain('auth/logout');
+            expect(fetchSpy.mock.calls[1][0]).toContain('auth/login');
+        });
+
+        it('rejects wrong credentials even when the browser already had a session', async () => {
+            mockFetchSequence([
+                { response: '' },                          // logout
+                { response: '', ok: false, status: 401 },  // login with the wrong password
+            ]);
+            const result = await adapter.testConnection();
+            expect(result.connected).toBe(false);
+            expect(result.error?.type).toBe('AUTH_FAILED');
         });
 
         it('should return { connected: false } on connection failure', async () => {
@@ -596,7 +656,7 @@ describe('QBittorrentAdapter.testConnection', () => {
     it('returns { connected: true } on success', async () => {
         const adapter = new QBittorrentAdapter(makeConfig());
         vi.spyOn(adapter, 'login').mockResolvedValue(undefined);
-        vi.spyOn(adapter, 'getAppVersion').mockResolvedValue('v4.6.0');
+        vi.spyOn(adapter, 'getApiVersion').mockResolvedValue('2.11.2');
         await expect(adapter.testConnection()).resolves.toEqual({ connected: true });
     });
 

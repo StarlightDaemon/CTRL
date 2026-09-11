@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, Unlock } from 'lucide-react';
-import { VaultService } from '@/shared/api/security/VaultService';
+import { VaultService, VaultCorruptedError } from '@/shared/api/security/VaultService';
 import {
     Button,
     PasswordInput,
@@ -9,15 +9,25 @@ import {
     Loading,
     InlineNotification
 } from '@carbon/react';
+import { ResetVaultDialog } from './ResetVaultDialog';
 
 interface UnlockVaultProps {
     onUnlock: () => void;
+    /** Popup-sized layout: no full-height centering. */
+    compact?: boolean;
+    /**
+     * When provided, offers "Forgot your master password?" which resets the
+     * vault after explicit confirmation. Omitted in the popup, which points
+     * to the settings page instead.
+     */
+    onReset?: () => Promise<void>;
 }
 
-export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock }) => {
+export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock, compact = false, onReset }) => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [resetOpen, setResetOpen] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -32,7 +42,11 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock }) => {
                 setError('Incorrect password');
             }
         } catch (err) {
-            setError('An error occurred');
+            if (err instanceof VaultCorruptedError) {
+                setError('The stored vault data is incomplete or damaged and cannot be unlocked. Open CTRL settings to reset it.');
+            } else {
+                setError('Unlock failed. Please try again.');
+            }
             console.error(err);
         } finally {
             setLoading(false);
@@ -40,8 +54,8 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock }) => {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center h-screen bg-[var(--cds-background)] p-4">
-            <Tile className="w-full max-w-sm p-8 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
+        <div className={`flex flex-col items-center justify-center bg-[var(--cds-background)] p-4 ${compact ? 'min-h-full' : 'h-screen'}`}>
+            <Tile className={`w-full max-w-sm bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] ${compact ? 'p-5' : 'p-8'}`}>
                 <Stack gap={6}>
                     <div className="flex flex-col items-center">
                         <div className="w-16 h-16 bg-[var(--cds-layer-03)] rounded-full flex items-center justify-center mb-4 text-[var(--cds-link-primary)]">
@@ -64,6 +78,7 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock }) => {
                                 placeholder="Master Password"
                                 required
                                 autoFocus
+                                autoComplete="current-password"
                             />
 
                             {error && (
@@ -89,8 +104,23 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({ onUnlock }) => {
                             </div>
                         </Stack>
                     </form>
+
+                    {onReset && (
+                        <div className="text-center">
+                            <Button kind="ghost" size="sm" onClick={() => setResetOpen(true)}>
+                                Forgot your master password?
+                            </Button>
+                            <p className="text-xs text-[var(--cds-text-helper)] mt-1 m-0">
+                                The password cannot be recovered. Resetting deletes the saved servers so you can start again.
+                            </p>
+                        </div>
+                    )}
                 </Stack>
             </Tile>
+
+            {onReset && (
+                <ResetVaultDialog open={resetOpen} onClose={() => setResetOpen(false)} onConfirm={onReset} />
+            )}
         </div>
     );
 };

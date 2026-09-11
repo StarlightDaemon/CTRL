@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 try {
   const extensionDir = process.cwd();
@@ -11,7 +11,8 @@ try {
     encoding: 'utf8',
   }).trim();
 
-  if (repoRoot !== join(extensionDir, '..')) {
+  // git prints forward slashes; normalise both sides so the check also holds on Windows.
+  if (resolve(repoRoot) !== resolve(extensionDir, '..')) {
     throw new Error(`Expected to run inside the extension workspace, but repo root resolved to ${repoRoot}`);
   }
 
@@ -52,6 +53,8 @@ try {
   const archivePath = join(outDir, archiveName);
 
   const includePathspecs = [
+    'LICENSE',
+    'extension/BUILD.md',
     'extension/.gitignore',
     'extension/CHANGELOG.md',
     'extension/LINUX_SETUP.md',
@@ -75,8 +78,11 @@ try {
   console.log(`Creating AMO source archive for v${version} from clean HEAD...`);
 
   const quotedPathspecs = includePathspecs.map((pathspec) => `"${pathspec}"`).join(' ');
+  // Export blobs exactly as stored (LF): with core.autocrlf=true a Windows host
+  // would otherwise write CRLF into the archive and reviewers building on
+  // Linux would get different bytes than a Linux checkout produces.
   execSync(
-    `git archive --format=zip --output "${relativeArchiveOutPath}" HEAD ${quotedPathspecs}`,
+    `git -c core.autocrlf=false archive --format=zip --output "${relativeArchiveOutPath}" HEAD ${quotedPathspecs}`,
     {
       cwd: repoRoot,
       stdio: 'inherit',

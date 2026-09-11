@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { useSettings } from '../../features/torrent-control/model/useSettings';
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
-import { VersionOverlay } from '@/shared/ui/VersionOverlay';
 import { VaultGuard } from '@/shared/ui/security/VaultGuard';
 import { Dashboard } from './Dashboard';
 import { AppSettings, ServerConfig } from '@/shared/lib/types';
@@ -12,6 +11,7 @@ const SecureContent: React.FC<{
     vaultServers: ServerConfig[];
     saveServers: (servers: ServerConfig[]) => Promise<void>;
     lock: () => Promise<void>;
+    reset: () => Promise<void>;
     settings: AppSettings | null;
     updateSettings: (settings: AppSettings) => Promise<void>;
     loading: boolean;
@@ -22,6 +22,7 @@ const SecureContent: React.FC<{
     vaultServers,
     saveServers,
     lock,
+    reset,
     settings,
     updateSettings,
     loading,
@@ -63,6 +64,7 @@ const SecureContent: React.FC<{
                 exportServerConfig={(sanitize) => exportServerConfig(sanitize, mergedSettings?.servers)}
                 importBackup={importBackup}
                 lockVault={lock}
+                resetVault={reset}
             />
         );
     };
@@ -80,11 +82,12 @@ const App = () => {
     return (
         <ErrorBoundary>
             <VaultGuard>
-                {({ servers: vaultServers, saveServers, lock }) => (
+                {({ servers: vaultServers, saveServers, lock, reset }) => (
                     <SecureContent
                         vaultServers={vaultServers}
                         saveServers={saveServers}
                         lock={lock}
+                        reset={reset}
                         settings={settings}
                         updateSettings={updateSettings}
                         loading={loading}
@@ -94,7 +97,6 @@ const App = () => {
                     />
                 )}
             </VaultGuard>
-            <VersionOverlay />
         </ErrorBoundary>
     );
 };

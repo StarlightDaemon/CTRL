@@ -1,4 +1,3 @@
-import { injectable } from 'tsyringe';
 import { ITorrentClient, AddTorrentOptions } from '@/entities/client/model/ITorrentClient';
 import { Torrent, TorrentStatus } from '@/entities/torrent/model/Torrent';
 import { JsonRpcClient } from '@/shared/api/network/JsonRpcClient';
@@ -10,6 +9,7 @@ import { blobToBase64 } from '@/shared/lib/helpers';
 import { Aria2AdapterError } from './Aria2AdapterError';
 import { AdapterConnectionResult } from '@/shared/api/clients/shared/AdapterConnectionResult';
 import { withAdapterRetry, RetryConfig, RetryExhaustedError, DEFAULT_RETRY_CONFIG } from '@/shared/lib/retry/withAdapterRetry';
+import { resolveClientEndpoint } from '@/shared/lib/endpoint';
 
 /** Version information from aria2.getVersion */
 interface Aria2VersionInfo {
@@ -20,7 +20,13 @@ interface Aria2VersionInfo {
 /** Request timeout in milliseconds */
 const REQUEST_TIMEOUT_MS = 30000;
 
-@injectable()
+/** RPC methods that only read state and may be retried safely. */
+const READ_ONLY_METHODS = new Set([
+    'aria2.getVersion', 'aria2.tellActive', 'aria2.tellWaiting', 'aria2.tellStopped', 'aria2.tellStatus',
+    'aria2.getGlobalStat', 'aria2.getGlobalOption', 'aria2.getOption', 'aria2.getFiles', 'aria2.getPeers',
+    'aria2.getUris', 'aria2.getServers', 'aria2.getSessionInfo', 'system.listMethods',
+]);
+
 export class Aria2Adapter implements ITorrentClient {
     private rpcClient: JsonRpcClient;
     private secret: string;
@@ -29,8 +35,11 @@ export class Aria2Adapter implements ITorrentClient {
     private retryConfig: RetryConfig;
 
     constructor(config: ServerConfig) {
-        // Aria2 usually runs on /jsonrpc
-        this.rpcClient = new JsonRpcClient(config.hostname);
+        // aria2 serves JSON-RPC at /jsonrpc; appended unless the address already names it.
+        this.rpcClient = new JsonRpcClient(resolveClientEndpoint('aria2', config.hostname), undefined, {
+            credentials: 'omit',
+            timeoutMs: REQUEST_TIMEOUT_MS,
+        });
         // Aria2 uses 'token:secret' as the first param in methods if using --rpc-secret
         this.secret = config.password || '';
         // Allow per-server retry overrides (defaults to the shared DEFAULT_RETRY_CONFIG)
@@ -158,6 +167,10 @@ export class Aria2Adapter implements ITorrentClient {
         const start = Date.now();
         await this.call('aria2.getVersion', []);
         return Date.now() - start;
+    }
+
+    classifyError(error: unknown): Aria2AdapterError {
+        return Aria2AdapterError.from(error);
     }
 
     // =====================
@@ -407,8 +420,8 @@ export class Aria2Adapter implements ITorrentClient {
         const secureParams = this.secret ? [`token:${this.secret}`, ...params] : params;
 
         return this.callWithRetry(async () => {
-            return this.rpcClient.call(method, secureParams);
-        }, method);
+            return this.rpcClient.call(method, secureParams, { idempotent: READ_ONLY_METHODS.has(method) });
+        }, method, READ_ONLY_METHODS.has(method));
     }
 
     /**
@@ -433,9 +446,10 @@ export class Aria2Adapter implements ITorrentClient {
             };
         });
 
+        const allReadOnly = calls.every(({ method }) => READ_ONLY_METHODS.has(method));
         const result = await this.callWithRetry(async () => {
-            return this.rpcClient.call('system.multicall', [multicallParams]);
-        }, 'system.multicall');
+            return this.rpcClient.call('system.multicall', [multicallParams], { idempotent: allReadOnly });
+        }, 'system.multicall', allReadOnly);
 
         // Multicall wraps each result in an array, unwrap them
         // Result format: [[result1], [result2], ...] or [{error: {...}}] for errors
@@ -445,10 +459,14 @@ export class Aria2Adapter implements ITorrentClient {
             if (Array.isArray(r)) {
                 return r[0]; // Unwrap the result
             }
-            // Handle per-call errors
-            const error = r as { error?: { code: number; message: string } };
-            if (error.error) {
-                throw Aria2Error.fromRpcError(error.error, calls[i].method);
+            // Handle per-call errors. aria2 reports a failed inner call as a bare
+            // struct { code, message } in place of the wrapped result (live-verified
+            // on 1.37.0: a wrong --rpc-secret fails every inner call with code 1
+            // "Unauthorized"); tolerate the { error: {...} } shape as well.
+            const wrapped = r as { error?: { code: number; message: string } } | null;
+            const fault = wrapped && typeof wrapped === 'object' && wrapped.error ? wrapped.error : (r as { code?: unknown; message?: unknown } | null);
+            if (fault && typeof fault === 'object' && typeof fault.code === 'number') {
+                throw Aria2Error.fromRpcError({ code: fault.code, message: String(fault.message ?? '') }, calls[i].method);
             }
             return r;
         });
@@ -476,11 +494,12 @@ export class Aria2Adapter implements ITorrentClient {
      */
     private async callWithRetry(
         fn: () => Promise<unknown>,
-        context: string
+        context: string,
+        idempotent: boolean
     ): Promise<unknown> {
         const run = async () => {
             try {
-                return await this.withTimeout(fn(), REQUEST_TIMEOUT_MS);
+                return await fn();
             } catch (error) {
                 throw this.wrapError(error, context);
             }
@@ -489,7 +508,9 @@ export class Aria2Adapter implements ITorrentClient {
         try {
             return await run();
         } catch (error) {
-            if (!(error instanceof Aria2Error) || !error.retryable) {
+            // Only read-only calls are retried. A mutation that failed with a
+            // network error or timeout may already have been applied.
+            if (!idempotent || !(error instanceof Aria2Error) || !error.retryable) {
                 throw error;
             }
             try {
@@ -533,20 +554,6 @@ export class Aria2Adapter implements ITorrentClient {
             context,
             retryable: false,
         });
-    }
-
-    /**
-     * Add timeout to a promise
-     */
-    private withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-        return Promise.race([
-            promise,
-            new Promise<never>((_, reject) => {
-                setTimeout(() => {
-                    reject(new Error(`Request timeout after ${ms}ms`));
-                }, ms);
-            }),
-        ]);
     }
 
     /**

@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import type { PersistedSnapshot } from '@/shared/api/messaging/protocol';
 
 const STORAGE_KEY = 'session:torrent_state';
 
@@ -13,19 +14,28 @@ function debounce<Args extends unknown[]>(func: (...args: Args) => void, wait: n
     };
 }
 
+function isPersistedSnapshot(value: unknown): value is PersistedSnapshot {
+    if (!value || typeof value !== 'object') return false;
+    const v = value as Record<string, unknown>;
+    return typeof v.serverId === 'string' && Array.isArray(v.torrents) && typeof v.savedAt === 'number';
+}
+
 /**
- * Service to handle "Write-Through Hydration".
- * Ensures the extension state survives Service Worker termination (Safari/Firefox/Chrome).
+ * Write-through persistence of the last good queue snapshot to
+ * `storage.session`, so a restarted background can show recent data (marked
+ * stale) while the first fresh poll runs. The snapshot carries the server id
+ * it belongs to; the controller ignores it when the active server differs.
  */
 export const StateHydrator = {
     /**
-     * Reads the last known state from session storage.
-     * Call this on Service Worker startup.
+     * Reads the last known snapshot from session storage. Returns null when
+     * nothing usable is stored (including legacy shapes from older builds).
      */
-    hydrate: async <T>(): Promise<T | null> => {
+    hydrate: async (): Promise<PersistedSnapshot | null> => {
         try {
             const data = await browser.storage.session.get(STORAGE_KEY);
-            return data[STORAGE_KEY] as T || null;
+            const value = data[STORAGE_KEY];
+            return isPersistedSnapshot(value) ? value : null;
         } catch (error) {
             console.warn('[StateHydrator] Failed to hydrate:', error);
             return null;
@@ -33,15 +43,18 @@ export const StateHydrator = {
     },
 
     /**
-     * Persists the state to session storage.
-     * Debounced to prevent thrashing storage on every single update.
+     * Persists the snapshot (or clears it when null). Debounced to avoid
+     * thrashing storage on every poll.
      */
-    persist: debounce((state: unknown) => {
+    persist: debounce((snapshot: PersistedSnapshot | null) => {
         try {
-            browser.storage.session.set({ [STORAGE_KEY]: state });
-            console.debug('[StateHydrator] State persisted to session storage.');
+            if (snapshot) {
+                void browser.storage.session.set({ [STORAGE_KEY]: snapshot });
+            } else {
+                void browser.storage.session.remove(STORAGE_KEY);
+            }
         } catch (error) {
             console.error('[StateHydrator] Failed to persist state:', error);
         }
-    }, 1000) // 1 second debounce
+    }, 1000),
 };

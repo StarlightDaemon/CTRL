@@ -1,8 +1,16 @@
+/** Release classification of a client adapter for the v1 program. */
+export type ClientV1Status =
+    /** Offered in the server type selector. Not proof of verification. */
+    | 'candidate'
+    /** Adapter code is retained and existing configurations keep loading, but the client is not offered for new configurations. */
+    | 'experimental';
+
 export interface ClientCapability {
     id: string;
     name: string;
     addressPlaceholder: string;
     defaultPort: string;
+    v1Status: ClientV1Status;
     clientCapabilities?: string[];
     clientOptions?: ClientOptionDefinition[];
 }
@@ -17,45 +25,22 @@ export interface ClientOptionDefinition {
 import { ServerConfig } from '@/entities/server/model/types';
 export type { ServerConfig };
 
+/** 0 = hidden, 1 = full menu, 2 = simple (add only). */
+export type ContextMenuMode = 0 | 1 | 2;
+
 export interface GlobalOptions {
-    contextMenu: number;
+    contextMenu: ContextMenuMode;
     addPaused: boolean;
     addAdvanced: boolean;
     enableNotifications: boolean;
-    notificationLevel: 'standard' | 'verbose' | 'error';
-    debugMode: boolean;
-    matchRegExp: string[];
     labels: string[];
     currentServer: number;
-    showDiagnostics: boolean;
     badgeInfo: 'none' | 'count' | 'speed';
-
-    notificationStyle: 'toast' | 'banner' | 'modal';
-    contextMenuCustomOptions?: {
-        addToClient: boolean;
-        pauseResume: boolean;
-        openWebUI: boolean;
-    };
-}
-
-export interface LayoutOptions {
-    sidebar: SidebarItem[];
-}
-
-export interface SidebarItem {
-    id: string;
-    visible: boolean;
-    order: number;
 }
 
 export interface AppOptions {
     servers: ServerConfig[];
     globals: GlobalOptions;
-    appearance: {
-        theme: string;
-        performance: 'low' | 'standard' | 'fancy';
-    };
-    layout: LayoutOptions;
 }
 
 export type AppSettings = AppOptions; // Alias for consistency

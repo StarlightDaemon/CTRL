@@ -1,173 +1,136 @@
-# Privacy Policy
+# CTRL Privacy Policy
 
-**Last Updated**: April 2026  
-**Effective Date**: January 2026
+**Last updated**: September 2026 (applies to CTRL 0.2.0-beta.1 and later)
 
----
+CTRL is a browser extension that sends magnet links and torrent URLs to a
+BitTorrent client you run yourself and shows and controls that client's
+queue. This policy describes exactly what CTRL stores, what it transmits, to
+whom, and what it never does. It is written to match the extension's
+behaviour as verified in the release program; the source is public.
 
-## Introduction
+## The short version
 
-CTRL (Torrent Control) is a browser extension that provides a unified interface for managing BitTorrent clients directly from your browser. This privacy policy explains how CTRL handles your data.
+- CTRL has **no servers of its own**, no analytics, no telemetry, no crash
+  reporting and no advertising. The CTRL developer receives nothing from the
+  extension.
+- The only network destination is the **torrent client address you
+  configured**. CTRL sends that client your login (to sign in) and the
+  torrent links and commands you issue, and reads the queue back.
+- Your server addresses, usernames and passwords are **encrypted on your
+  device** with a master password before being stored, and are only ever
+  sent to the client they belong to.
 
-## Data Collection
+## What CTRL stores on your device
 
-**CTRL does not collect, store, or transmit any personal data to external servers.**
+All storage uses the browser's extension storage; nothing leaves the device
+by being stored.
 
-We believe in privacy by design. All data processing occurs locally on your device, and nothing is sent to us or any third-party services.
+| Data | Where | Encrypted | Lifetime |
+|---|---|---|---|
+| Server list: name, client type, address, username, password, per-server options | `storage.local`, key `vault` | Yes — AES-GCM with a key derived from your master password (PBKDF2-SHA256, 300,000 iterations, random salt). The master password itself is never stored. | Until you remove the server, reset the vault or uninstall |
+| Preferences: context-menu mode, add-paused default, advanced-add dialog, notifications on/off, labels, default server, badge mode | `storage.local` | No (they contain no secrets) | Until changed or uninstall |
+| Session key (the derived encryption key while the vault is unlocked) | `storage.session` (memory-backed, cleared when the browser closes) | Held by the browser in memory | Until you lock CTRL or the browser closes — after a browser restart CTRL is locked and asks for the master password |
+| Queue snapshot: the last torrent list received from your client (names, sizes, progress, speeds, ids) | `storage.session` | No | Browser session; discarded when the active server changes |
 
-## What Data is Stored Locally
+Locking CTRL (toolbar or settings) discards the session key in every window
+at once. A damaged vault is never "half-opened": CTRL refuses to unlock and
+offers a reset that deletes the stored servers.
 
-CTRL stores the following data **locally** on your device using your browser's built-in storage API (`chrome.storage.local` or `browser.storage.local`):
+## What CTRL transmits, and to whom
 
-### 1. Torrent Client Credentials
-- **What**: Server URLs, usernames, and passwords for your torrent clients
-- **Purpose**: To connect to and manage your torrent clients (qBittorrent, Transmission, Deluge, etc.)
-- **Security**: All credentials are encrypted using AES-GCM encryption before being stored locally
-- **Location**: Browser's local storage on your device only
-- **Transmission**: Credentials are never transmitted outside your device
+CTRL makes network requests **only to the torrent client addresses you
+configured**, and only after you granted the browser's host permission for
+that address.
 
-### 2. User Preferences
-- **What**: Your settings and preferences (theme, language, notification settings, etc.)
-- **Purpose**: To provide a personalized experience
-- **Location**: Browser's local storage on your device only
+| What | When | To |
+|---|---|---|
+| Username and password (Transmission: HTTP Basic; qBittorrent: login form; aria2: RPC secret) | When signing in, testing a connection, or re-authenticating after a session expired | The configured client only |
+| Magnet links / torrent URLs you add, with the options you chose (paused, label, folder) | When you add a torrent | The configured client only |
+| Queue commands (pause, resume, remove) and queue polling requests | While a CTRL window is open (every few seconds) and, if the toolbar badge is enabled, about once a minute in the background | The configured client only |
 
-### 3. Extension State
-- **What**: Active server selection, UI state, feature toggles
-- **Purpose**: To maintain your workspace across browser sessions
-- **Location**: Browser's local storage on your device only
+Nothing is sent to the CTRL developer or to any third party. CTRL does not
+read web pages, does not inject anything into websites, and does not react to
+page loads; the right-click menu acts only on the link you right-clicked.
 
-## What Data is NOT Collected
+### Unencrypted connections
 
-CTRL explicitly does **NOT** collect, store, or transmit:
+If you configure a client with `http://` rather than `https://`, the login
+and the commands travel unencrypted. That is a normal choice on a private
+network and CTRL allows it, but it warns you when the address is outside
+loopback and private ranges, because anyone on the network path could read or
+alter that traffic. Use `https://` wherever the client or a reverse proxy
+offers it.
 
-- ❌ Browsing history
-- ❌ Personal information (name, email, address)
-- ❌ Torrent content or metadata
-- ❌ Magnet links or torrent hashes to external servers
-- ❌ Usage analytics or telemetry
-- ❌ Crash reports
-- ❌ IP addresses
-- ❌ Any data to advertising networks
+### qBittorrent and the `Origin` header
 
-## How CTRL Works
+Browsers label every request an extension makes with the extension's own
+origin, which qBittorrent's default cross-site protection rejects. To work
+with qBittorrent without asking you to switch that protection off, CTRL
+installs a browser rule (`declarativeNetRequestWithHostAccess`) that applies
+**only to the qBittorrent server address you configured** and sets the
+`Origin` and `Referer` headers of CTRL's own requests to that server's
+address. The rule touches no other site and reads no traffic. It exists for
+the current browser session and only for hosts you granted access to.
 
-### User-Initiated Actions
-CTRL operates only when you explicitly interact with it. It does not automatically modify web pages or background-monitor your browsing activity.
+## Backups and exports
 
-**How you interact with CTRL**:
-1. **Context Menus**: You can right-click on a magnet link or a page to send torrents directly to your client.
-2. **Scan Page**: You can manually trigger a "Scan Page for Magnets" action from the context menu. This generically scans the current page for magnet links (`magnet:?xt=...`) and adds them to your selected client.
-3. **Manual Addition**: You can add torrents by pasting URLs or magnet links directly into the extension popup.
+- **Safe export** (default) contains server names, types, addresses and
+  options — never passwords — and is marked `containsSecrets: false`.
+- **Full export** contains passwords in plain text so it can be imported
+  elsewhere. It is marked `containsSecrets: true` and labelled as such in the
+  interface. Keep such a file private.
+- Exports are files saved by your browser; CTRL does not upload them.
 
-**What happens**:
-1. When you initiate an action, CTRL processes the request **locally**.
-2. If scanning a page, it identifies links matching the magnet protocol.
-3. The link is sent directly to **your configured torrent client** (on your local network or remote server).
+## Permissions
 
-**What does NOT happen**:
-- CTRL does not automatically inject UI components or buttons into websites.
-- CTRL does not detect magnet links on page load; it only scans when you tell it to.
-- CTRL does not track which torrents you view or download.
-- CTRL does not send any data about your browsing to external servers.
+| Permission | Purpose |
+|---|---|
+| `storage` | the encrypted vault, preferences, the session key and the queue snapshot |
+| `contextMenus` | the right-click entries |
+| `notifications` | optional local notifications when a torrent was added or adding failed (switchable in Settings) |
+| `alarms` | the one-minute background badge refresh (only while the badge is enabled) |
+| `declarativeNetRequestWithHostAccess` | the per-server header rule described above |
+| Optional host access (`http://*/*`, `https://*/*`) | granted by you per server address when you add a server; used only to reach that client |
 
-### Protocol Handling
-CTRL is **content-agnostic**. It processes magnet URI hashes (strings) without knowledge of what content they represent. The extension does not know if a magnet link points to a Linux ISO, open-source software, or any other type of file.
+Firefox shows this in the add-on's data-collection consent as
+*authentication information*: CTRL sends your client login to the client you
+configured (Mozilla's taxonomy counts any transmission outside the extension,
+even to your own server).
 
-### Communication with Torrent Clients
-When you initiate a download:
-1. CTRL sends the magnet link to **your configured torrent client** using HTTP/HTTPS requests
-2. Communication is **direct** between your browser and your client (localhost or your specified server)
-3. No intermediary servers are involved
-4. No data is sent to CTRL developers or third parties
+## What CTRL never does
 
-## Third-Party Services
+- collect or transmit browsing history, page content, IP addresses or any
+  personal information;
+- send torrent links, hashes or queue contents anywhere other than your
+  configured client;
+- use analytics, telemetry, crash reporting or advertising;
+- load remote code or remote resources (fonts are the system's; the package
+  makes no third-party requests).
 
-CTRL does **NOT** use any third-party services for:
-- Analytics (e.g., Google Analytics)
-- Crash reporting (e.g., Sentry)
-- Advertising networks
-- Cloud storage or sync
+## Your control
 
-## Permissions Explained
+- Change or remove servers at any time in Settings → Servers.
+- Lock CTRL to discard the session key immediately.
+- Reset the vault (Settings → System) to delete every stored server and the
+  master password from the device.
+- Uninstalling the extension removes all its stored data.
 
-CTRL requests the following browser permissions:
+## Children
 
-### `storage`
-**Purpose**: To store your encrypted credentials and preferences locally on your device.  
-**Data Access**: Only data created by CTRL (your settings and server configurations).
+CTRL does not knowingly collect any information from anyone.
 
-### `contextMenus`
-**Purpose**: To add right-click menu options for sending magnet links to your torrent clients.  
-**Data Access**: Only the text/URL you right-clicked on.
+## Changes
 
-### `notifications`
-**Purpose**: To notify you when downloads complete or errors occur.  
-**Data Access**: None. Notifications are created locally.
+Changes to this policy are published here with a new "last updated" date.
 
-### `activeTab`
-**Purpose**: To generically scan the current page for magnet links when you manually select the "Scan Page" option from the context menu.  
-**Data Access**: Only the ability to identify magnet link URLs (`href` attributes) on the page you are currently viewing and have interacted with.
+## Contact and source
 
-### `optional_host_permissions`
-**Purpose**: To allow communication with your self-hosted torrent client (e.g., qBittorrent, Transmission).  
-**Data Access**: Permissions are only requested for the specific URL of your torrent client. No data from other websites is accessed using these permissions.
+- Source code: https://github.com/StarlightDaemon/CTRL
+- Questions: https://github.com/StarlightDaemon/CTRL/discussions
+- Issues: https://github.com/StarlightDaemon/CTRL/issues
 
-## Your Rights
+## Legal note
 
-Since CTRL does not collect any personal data, there is no data for you to request, correct, or delete from our servers (because we don't have servers).
-
-However, you have full control over locally stored data:
-- **View**: Inspect your browser's extension storage using developer tools
-- **Delete**: Uninstall the extension to remove all local data
-- **Export**: Use CTRL's built-in export feature to backup your settings
-- **Modify**: Change settings at any time in the Options page
-
-## Children's Privacy
-
-CTRL does not knowingly collect any information from anyone, including children under the age of 13.
-
-## Changes to This Privacy Policy
-
-We may update this privacy policy from time to time. Changes will be posted on this page with an updated "Last Updated" date. Continued use of CTRL after changes constitutes acceptance of the updated policy.
-
-## Open Source Transparency
-
-CTRL is open-source software. You can inspect the source code to verify our privacy claims:
-
-**GitHub Repository**: https://github.com/StarlightDaemon/CTRL
-
-The code shows:
-- No analytics libraries
-- No network requests to external servers (except to your configured torrent clients)
-- All storage operations use local browser APIs
-- Encryption implementation for credential storage
-
-## Legal Disclaimer
-
-CTRL is a remote control utility for BitTorrent clients. The extension does not provide, host, index, or distribute any files, media, or content. Users are solely responsible for the content they choose to transfer using their local torrent clients.
-
-BitTorrent is a legitimate protocol used for distributing open-source software, public domain content, and other legal files. CTRL developers do not endorse or encourage copyright infringement.
-
-## Contact
-
-If you have questions about this privacy policy or CTRL's data practices:
-
-- **GitHub Discussions**: https://github.com/StarlightDaemon/CTRL/discussions
-- **GitHub Issues**: https://github.com/StarlightDaemon/CTRL/issues
-
----
-
-## Summary (TL;DR)
-
-✅ **Zero data collection** - Nothing is sent to external servers  
-✅ **Local encryption** - Credentials encrypted with AES-GCM  
-✅ **No tracking** - No analytics, no telemetry  
-✅ **Open source** - Code is publicly auditable  
-✅ **Content agnostic** - Extension doesn't know what you download  
-✅ **Direct communication** - Browser → Your Client (no middleman)  
-
-**Your privacy is our priority.**
-
----
-
-*This privacy policy is effective as of January 2026 and applies to CTRL version 0.2.0 and later.*
+CTRL is a remote control for BitTorrent clients. It does not provide, host,
+index or distribute files. Users are responsible for the content they
+transfer with their own clients.

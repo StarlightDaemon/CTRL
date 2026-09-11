@@ -2,147 +2,176 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
+
+# Every job runs in the extension workspace from the tracked lockfile.
+# Release-gate jobs (package) check what the store submissions depend on:
+# a clean, deterministic, remote-free package with the expected version and
+# recorded checksums. Store submission itself is never automated.
+
+env:
+  NODE_VERSION: '24'
 
 jobs:
-  # Job 1: Lint
   lint:
     runs-on: ubuntu-latest
-    
     defaults:
       run:
         working-directory: extension
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: extension/package-lock.json
+      - run: npm ci
+      - run: npm run lint
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run ESLint
-        run: npm run lint
-
-  # Job 2: Type Check, Unit Tests
   test:
     runs-on: ubuntu-latest
     needs: lint
-    
     defaults:
       run:
         working-directory: extension
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: extension/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
+      - run: npm ci
       - name: Type check
         run: npm run compile
+      - name: Unit and component tests
+        run: npm test
 
-      - name: Run unit tests
-        run: npm run test
-
-  # Job 2: Build Extensions
-  build:
+  package:
     runs-on: ubuntu-latest
     needs: test
-    
     defaults:
       run:
         working-directory: extension
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: extension/package-lock.json
+      - run: npm ci
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Build Chrome and Firefox packages
+        run: |
+          npm run zip:chrome
+          npm run zip:firefox
 
-      - name: Build Chrome extension
-        run: npm run build:chrome
+      - name: Build twice and require byte-identical output
+        run: |
+          set -e
+          (cd builds/chrome-mv3 && find . -type f | sort | xargs sha256sum) > /tmp/chrome-1.txt
+          (cd builds/firefox-mv3 && find . -type f | sort | xargs sha256sum) > /tmp/firefox-1.txt
+          npm run build:chrome
+          npm run build:firefox
+          (cd builds/chrome-mv3 && find . -type f | sort | xargs sha256sum) > /tmp/chrome-2.txt
+          (cd builds/firefox-mv3 && find . -type f | sort | xargs sha256sum) > /tmp/firefox-2.txt
+          diff /tmp/chrome-1.txt /tmp/chrome-2.txt
+          diff /tmp/firefox-1.txt /tmp/firefox-2.txt
+          echo "deterministic: $(wc -l < /tmp/firefox-1.txt) files"
 
-      - name: Build Firefox extension
-        run: npm run build:firefox
+      - name: No tracked source mutated by the build
+        run: |
+          cd "$(git rev-parse --show-toplevel)"
+          git status --porcelain
+          test -z "$(git status --porcelain)"
 
-      - name: Upload Chrome build
-        uses: actions/upload-artifact@v4
+      - name: Mozilla validator (addons-linter, errors fail the build)
+        run: npx --yes addons-linter builds/firefox-mv3
+
+      - name: Package content gates
+        run: |
+          set -e
+          for dir in builds/chrome-mv3 builds/firefox-mv3; do
+            echo "== $dir"
+            # Only the English locale is shipped.
+            test "$(ls $dir/_locales | tr '\n' ' ' | xargs)" = "en"
+            # No bundled fonts and no remote font or CDN references.
+            test "$(find $dir -iname '*.woff*' -o -iname '*.ttf' -o -iname '*.otf' | wc -l)" = "0"
+            ! grep -rEl 's81c\.com|fonts\.googleapis|fonts\.gstatic|@font-face' "$dir"
+            # Strings from removed features must not reappear.
+            ! grep -rEl 'iknowwhatyoudownload|btcache|torrage|itorrents|openwebtorrent' "$dir"
+            # Only the expected set of files.
+            test "$(find $dir -type f | wc -l)" = "14"
+          done
+
+      - name: Version consistency
+        run: |
+          set -e
+          PKG=$(node -p "require('./package.json').version")
+          MAN_CHROME=$(node -p "require('./builds/chrome-mv3/manifest.json').version")
+          MAN_FIREFOX=$(node -p "require('./builds/firefox-mv3/manifest.json').version")
+          # Same rule as toManifestVersion() in wxt.config.ts: a pre-release tag becomes a fourth integer.
+          EXPECTED=$(node -p "const [b,p]=process.argv[1].split('-'); if(!p) b; else { const s=p.split('.').pop(); /^\d+$/.test(s)? b+'.'+s : b+'.0' }" "$PKG")
+          echo "package $PKG → manifest $EXPECTED; chrome $MAN_CHROME; firefox $MAN_FIREFOX"
+          test "$MAN_CHROME" = "$EXPECTED"
+          test "$MAN_FIREFOX" = "$EXPECTED"
+          test "$(node -p "require('./builds/chrome-mv3/manifest.json').version_name")" = "$PKG"
+          ls builds/ctrl-extension-$PKG-chrome.zip builds/ctrl-extension-$EXPECTED-firefox.zip
+          # Permissions must stay the reviewed set.
+          for m in builds/chrome-mv3/manifest.json builds/firefox-mv3/manifest.json; do
+            test "$(node -p "JSON.stringify(require('./$m').permissions)")" = '["storage","contextMenus","notifications","alarms","declarativeNetRequestWithHostAccess"]'
+            test "$(node -p "JSON.stringify(require('./$m').optional_host_permissions)")" = '["http://*/*","https://*/*"]'
+          done
+
+      - name: Package size (internal regression threshold)
+        run: |
+          set -e
+          for z in builds/*.zip; do
+            SIZE=$(stat -c %s "$z"); echo "$z: $SIZE bytes"
+            # Well above the current ~327 KB; a jump past this means something unintended was bundled.
+            test "$SIZE" -lt 600000
+          done
+
+      - name: Checksums
+        run: |
+          (cd builds && sha256sum *.zip | tee SHA256SUMS.txt)
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: chrome-extension
-          path: extension/builds/chrome-mv3/
-          retention-days: 7
+          name: packages
+          path: |
+            extension/builds/*.zip
+            extension/builds/SHA256SUMS.txt
+            extension/builds/chrome-mv3/
+            extension/builds/firefox-mv3/
+          retention-days: 14
 
-      - name: Upload Firefox build
-        uses: actions/upload-artifact@v4
-        with:
-          name: firefox-extension
-          path: extension/builds/firefox-mv3/
-          retention-days: 7
-
-  # Job 3: E2E Tests (Chrome only)
   e2e:
     runs-on: ubuntu-latest
-    needs: build
-    
+    needs: test
     defaults:
       run:
         working-directory: extension
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: extension/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
-
-      - name: Build Chrome extension
-        run: npm run build:chrome
-
-      - name: Run E2E tests
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps
+      - run: npm run build:chrome
+      - name: E2E smoke (Playwright Chromium)
         run: npm run test:e2e -- --grep-invert "@integration"
         env:
           CI: true
-
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: playwright-report
           path: extension/playwright-report/
           retention-days: 7
-

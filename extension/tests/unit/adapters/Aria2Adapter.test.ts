@@ -651,8 +651,8 @@ describe('Aria2Adapter', () => {
         it('should surface structured RPC Aria2Error from getTorrents, not a plain NETWORK_ERROR', async () => {
             // When system.multicall returns a JSON-RPC error (code 1), the structured
             // error path via JsonRpcError → wrapError() → fromRpcError() is exercised.
-            // Context is 'system.multicall', which maps to GID_NOT_FOUND for code 1 —
-            // but crucially: it is NOT a plain NETWORK_ERROR and is NOT retryable.
+            // "Unauthorized" maps to UNAUTHORIZED whatever the context (a wrong RPC
+            // secret fails every method), and it is NOT retryable.
             // This proves the structured propagation path (not the network-error fallback) is active.
             createMockFetch([
                 { ok: true, status: 200, body: rpcError(1, 'Unauthorized') }
@@ -674,6 +674,47 @@ describe('Aria2Adapter', () => {
             expect(aria2Err.code).not.toBe('NETWORK_ERROR');
             // Must NOT be retryable (RPC errors are not retried)
             expect(aria2Err.retryable).toBe(false);
+        });
+
+        it('classifies a wrong RPC secret answered with HTTP 400 + JSON-RPC error as UNAUTHORIZED (aria2 1.37 single call)', async () => {
+            createMockFetch([
+                { ok: false, status: 400, body: rpcError(1, 'Unauthorized') }
+            ]);
+            const result = await adapter.testConnection();
+            expect(result.connected).toBe(false);
+            expect(result.error?.type).toBe('UNAUTHORIZED');
+        });
+
+        it('classifies a wrong RPC secret reported per multicall entry as UNAUTHORIZED (aria2 1.37 shape)', async () => {
+            // aria2 answers system.multicall with HTTP 200 and a bare fault struct per failed inner call.
+            createMockFetch([
+                { ok: true, status: 200, body: rpcResponse([{ code: 1, message: 'Unauthorized' }, { code: 1, message: 'Unauthorized' }, { code: 1, message: 'Unauthorized' }]) }
+            ]);
+            let caughtError: unknown;
+            try {
+                await adapter.getTorrents();
+            } catch (e) {
+                caughtError = e;
+            }
+            expect(caughtError).toBeInstanceOf(Aria2Error);
+            expect((caughtError as Aria2Error).code).toBe('UNAUTHORIZED');
+            expect(adapter.classifyError(caughtError).type).toBe('UNAUTHORIZED');
+        });
+
+        it('classifies a wrong RPC secret during polling as UNAUTHORIZED so the UI reports an authentication failure', async () => {
+            createMockFetch([
+                { ok: true, status: 200, body: rpcError(1, 'Unauthorized') }
+            ]);
+            let caughtError: unknown;
+            try {
+                await adapter.getTorrents();
+            } catch (e) {
+                caughtError = e;
+            }
+            expect((caughtError as Aria2Error).code).toBe('UNAUTHORIZED');
+            expect(adapter.classifyError(caughtError).type).toBe('UNAUTHORIZED');
+            // A genuine missing-GID answer keeps its meaning.
+            expect(Aria2Error.fromRpcError({ code: 1, message: 'GID abc is not found' }, 'system.multicall').code).toBe('GID_NOT_FOUND');
         });
     });
 });

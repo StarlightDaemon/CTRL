@@ -59,11 +59,10 @@ export const SETTINGS_KEYS = {
 export class UTorrentSettingsService {
     private httpClient: FetchHttpClient;
     private token: string | null = null;
-    private guid: string | null = null;
     private baseUrl: string;
 
     constructor(private config: ServerConfig) {
-        this.httpClient = new FetchHttpClient(config.hostname);
+        this.httpClient = new FetchHttpClient(config.hostname, { credentials: 'include' });
         this.baseUrl = 'gui/';
     }
 
@@ -72,13 +71,10 @@ export class UTorrentSettingsService {
      */
     async login(): Promise<void> {
         const headers = this.getAuthHeaders();
-        const { body, headers: respHeaders } = await this.httpClient.getRaw<string>('gui/token.html', { headers });
+        const { body } = await this.httpClient.getRaw<string>('gui/token.html', { headers });
 
         this.token = extractUTorrentToken(body);
 
-        const setCookie = respHeaders.get('set-cookie') ?? '';
-        const guidMatch = setCookie.match(/GUID=([^;]+)/i);
-        this.guid = guidMatch ? guidMatch[1] : null;
     }
 
     /**
@@ -184,7 +180,6 @@ export class UTorrentSettingsService {
 
         const url = `${this.baseUrl}?${params.toString()}`;
         const headers = this.getAuthHeaders();
-        if (this.guid) headers['Cookie'] = `GUID=${this.guid}`;
 
         return this.httpClient.get(url, { headers });
     }

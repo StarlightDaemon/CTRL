@@ -1,91 +1,135 @@
 import { create } from 'zustand';
-import { Torrent } from '../entities/torrent/model/Torrent';
-import { applyTorrentPatches, JsonPatchOperation } from '../shared/lib/diff/TorrentDiffer';
+import type { Torrent } from '../entities/torrent/model/Torrent';
+import {
+    emptyStats,
+    initialConnectionState,
+    type ConnectionState,
+    type GlobalStats,
+    type SnapshotMessage,
+    type StatusMessage,
+} from '@/shared/api/messaging/protocol';
 
-interface GlobalStats {
-    downloadSpeed: number;
-    uploadSpeed: number;
-    activeCount: number;
-}
+export type PendingAction = 'pause' | 'resume' | 'remove';
 
-interface TorrentState {
-    torrents: Record<number, Torrent>; // Normalized sparse storage
+interface TorrentWindowState {
+    /** Server the visible window belongs to; null when nothing is shown. */
+    serverId: string | null;
+    generation: number;
+    revision: number;
+    /** Total number of torrents on the server. */
     totalCount: number;
+    /** Absolute index of `ids[0]`. */
+    windowStart: number;
+    /** Ordered torrent ids for the visible window. */
+    ids: string[];
+    /** Torrents keyed by id. Only the visible window is held. */
+    byId: Record<string, Torrent>;
+    connection: ConnectionState;
     globalStats: GlobalStats;
+    /** Commands awaiting a result, keyed by torrent id. */
+    pending: Record<string, PendingAction>;
+    /** Last command failure per torrent id. */
+    failures: Record<string, string>;
+    /** True until the first message from the background arrives. */
     isLoading: boolean;
-    error: string | null;
 
-    // Actions
-    setViewportData: (items: Torrent[], total: number, start: number) => void;
-    applyPatchData: (patches: JsonPatchOperation[], total: number, start: number) => void;
-    setGlobalStats: (stats: GlobalStats) => void;
-    optimisticUpdate: (id: number | string, changes: Partial<Torrent>) => void;
-    setLoading: (isLoading: boolean) => void;
-    setError: (error: string | null) => void;
+    applySnapshot: (message: SnapshotMessage) => void;
+    applyStatus: (message: StatusMessage) => void;
+    setPending: (torrentId: string, action: PendingAction | null) => void;
+    setFailure: (torrentId: string, message: string | null) => void;
+    reset: () => void;
 }
 
-export const useTorrentStore = create<TorrentState>((set) => ({
-    torrents: {},
+const initialState = () => ({
+    serverId: null as string | null,
+    generation: 0,
+    revision: 0,
     totalCount: 0,
-    globalStats: { downloadSpeed: 0, uploadSpeed: 0, activeCount: 0 },
-    isLoading: false,
-    error: null,
+    windowStart: 0,
+    ids: [] as string[],
+    byId: {} as Record<string, Torrent>,
+    connection: initialConnectionState(),
+    globalStats: emptyStats(),
+    pending: {} as Record<string, PendingAction>,
+    failures: {} as Record<string, string>,
+    isLoading: true,
+});
 
-    setViewportData: (items, total, start) => set((state) => {
-        let newTorrents = { ...state.torrents };
+/**
+ * UI-side mirror of the background queue window.
+ *
+ * Rows are addressed by torrent id, never by array position, so reordering,
+ * insertion and removal on the server cannot make a row show another
+ * torrent's data. Every snapshot replaces the whole window; there is no
+ * client-side patching.
+ */
+export const useTorrentStore = create<TorrentWindowState>((set) => ({
+    ...initialState(),
 
-        if (state.totalCount !== total && total === 0) {
-            newTorrents = {};
+    applySnapshot: (message) => set((state) => {
+        const serverChanged = state.serverId !== message.serverId;
+        const byId: Record<string, Torrent> = {};
+        const ids: string[] = [];
+        for (const torrent of message.items) {
+            if (!torrent || typeof torrent.id !== 'string') continue;
+            const id = torrent.id;
+            if (byId[id]) continue; // defensive: adapters must not repeat ids
+            byId[id] = torrent;
+            ids.push(id);
         }
-
-        items.forEach((item, i) => {
-            // Preserve optimistic "pending" usage if the server hasn't caught up,
-            // BUT for simplicity, we assume server truth overwrites unless we track specific optimistic flags.
-            // For now, let's keep it simple: Server wins. 
-            // Optimistic UI is transient visual feedback.
-            newTorrents[start + i] = item;
-        });
-
         return {
-            torrents: newTorrents,
-            totalCount: total,
+            serverId: message.serverId,
+            generation: message.generation,
+            revision: message.revision,
+            totalCount: message.total,
+            windowStart: message.start,
+            ids,
+            byId,
+            connection: message.connection,
+            globalStats: message.stats,
+            pending: serverChanged ? {} : state.pending,
+            failures: serverChanged ? {} : state.failures,
             isLoading: false,
-            error: null
         };
     }),
 
-    applyPatchData: (patches, total, start) => set((state) => {
-        const newTorrents = applyTorrentPatches(state.torrents, patches, start);
-        return {
-            torrents: newTorrents,
-            totalCount: total,
-            isLoading: false,
-            error: null
-        };
-    }),
-
-    setGlobalStats: (stats) => set({ globalStats: stats }),
-
-    optimisticUpdate: (id, changes) => set((state) => {
-        // Find key for this ID (inefficient in sparse array-like object but ok for small viewports)
-        // Key is index, value is Torrent.
-        // We need to update the torrent object with matching ID.
-        const key = Object.keys(state.torrents).find(k => state.torrents[Number(k)].id === id);
-        if (key) {
-            const index = Number(key);
+    applyStatus: (message) => set((state) => {
+        if (message.cleared) {
             return {
-                torrents: {
-                    ...state.torrents,
-                    [index]: {
-                        ...state.torrents[index],
-                        ...changes
-                    }
-                }
+                ...initialState(),
+                connection: message.connection,
+                globalStats: message.stats,
+                isLoading: false,
             };
         }
-        return state;
+        return {
+            ...state,
+            connection: message.connection,
+            globalStats: message.stats,
+            isLoading: false,
+        };
     }),
 
-    setLoading: (isLoading) => set({ isLoading }),
-    setError: (error) => set({ error }),
+    setPending: (torrentId, action) => set((state) => {
+        const pending = { ...state.pending };
+        if (action) pending[torrentId] = action;
+        else delete pending[torrentId];
+        return { pending };
+    }),
+
+    setFailure: (torrentId, message) => set((state) => {
+        const failures = { ...state.failures };
+        if (message) failures[torrentId] = message;
+        else delete failures[torrentId];
+        return { failures };
+    }),
+
+    reset: () => set(initialState()),
 }));
+
+/** Selector: the torrent shown at an absolute row index, if it is in the window. */
+export const selectTorrentAtIndex = (index: number) => (state: TorrentWindowState): Torrent | undefined => {
+    const offset = index - state.windowStart;
+    if (offset < 0 || offset >= state.ids.length) return undefined;
+    return state.byId[state.ids[offset]];
+};

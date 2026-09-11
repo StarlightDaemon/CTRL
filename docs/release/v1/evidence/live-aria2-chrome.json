@@ -1,0 +1,114 @@
+{
+  "client": "aria2",
+  "clientVersion": "1.37.0",
+  "serverSettings": "aria2: --rpc-secret token",
+  "browser": "chrome",
+  "browserVersion": "Chrome/152.0.7977.83",
+  "headless": false,
+  "extensionVersion": "0.2.0-beta.1",
+  "address": "http://192.168.1.235:16800/jsonrpc",
+  "lanAddress": "192.168.1.235",
+  "ranAt": "2026-09-09T23:11:16.725Z",
+  "results": [
+    {
+      "name": "vault-setup",
+      "result": "PASS",
+      "observed": "master password created; options dashboard shown",
+      "ms": 1041
+    },
+    {
+      "name": "configure-server",
+      "result": "PASS",
+      "observed": "form filled (address http://192.168.1.235:16800/jsonrpc); credential disclosure shown; plain-http warning not shown (private host)",
+      "ms": 1576
+    },
+    {
+      "name": "grant-permission",
+      "result": "PASS",
+      "observed": "granted (invoked 'Allow' in window 'CTRL Settings - Google Chrome' (pid 15480))",
+      "ms": 1655
+    },
+    {
+      "name": "test-connection",
+      "result": "PASS",
+      "observed": "Connection successful",
+      "ms": 274
+    },
+    {
+      "name": "save-server",
+      "result": "PASS",
+      "observed": "saved; list shows stored address verbatim: true",
+      "ms": 265
+    },
+    {
+      "name": "connected",
+      "result": "PASS",
+      "observed": "dashboard status: LIVE",
+      "ms": 502
+    },
+    {
+      "name": "add-magnet",
+      "result": "PASS",
+      "observed": "popup: Torrent added; server has [METADATA]ctrl-live-a.bin (638ceb8d793cd066ae854013514d1f32f95fb752) status=active",
+      "ms": 1646
+    },
+    {
+      "name": "list-shows-torrent",
+      "result": "PASS",
+      "observed": "rows: [\"[METADATA]ctrl-live-a.bin, Downloading, 0%\"]",
+      "ms": 527
+    },
+    {
+      "name": "add-paused",
+      "result": "PASS",
+      "observed": "server shows [METADATA]ctrl-live-b.bin status=paused (paused)",
+      "ms": 2509
+    },
+    {
+      "name": "pause",
+      "result": "PASS",
+      "observed": "server: [METADATA]ctrl-live-a.bin status=paused",
+      "ms": 1234
+    },
+    {
+      "name": "resume",
+      "result": "PASS",
+      "observed": "server: [METADATA]ctrl-live-a.bin status=active",
+      "ms": 15
+    },
+    {
+      "name": "remove-keep-files",
+      "result": "PASS",
+      "observed": "removed on server; other torrent untouched: true",
+      "ms": 773
+    },
+    {
+      "name": "bad-credentials",
+      "result": "PASS",
+      "observed": "test: Connection failed Authentication failed. Check the Aria2 RPC secret token.; dashboard: AUTHENTICATION FAILED; restored → LIVE",
+      "ms": 14519
+    },
+    {
+      "name": "server-unavailable",
+      "result": "PASS",
+      "observed": "dashboard: CONNECTION LOST",
+      "ms": 24588
+    },
+    {
+      "name": "reconnect-after-restart",
+      "result": "PASS",
+      "observed": "dashboard: LIVE; server lists 0 torrent(s) after restart",
+      "ms": 537
+    },
+    {
+      "name": "browser-restart-lock",
+      "result": "PASS",
+      "observed": "locked after restart; unlocked → LIVE; host grant had to be repeated after the harness reloaded the unpacked extension (recovery flow via Servers → Grant access worked)",
+      "ms": 5290
+    }
+  ],
+  "notes": [
+    "controller state after saving wrong credentials: +3ms connecting/- → +1266ms auth_failed/UNAUTHORIZED",
+    "restored password field holds the expected value: true"
+  ]
+}

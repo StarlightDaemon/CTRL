@@ -1,0 +1,30 @@
+/*
+ * Single stylesheet for both the popup and the options page (imported from
+ * each entrypoint's main.tsx; kept outside src/entrypoints so WXT does not
+ * build it a second time as an unlisted CSS entrypoint).
+ *
+ * Carbon's prebuilt stylesheet is imported once here. Its @font-face rules
+ * point at IBM's font CDN; the PostCSS build (postcss.config.js) strips every
+ * remote @font-face so the shipped package makes no third-party requests, and
+ * the tokens below map Carbon's type to the user's system fonts instead.
+ */
+@import '@carbon/styles/css/styles.css';
+@import './global.css';
+
+:root {
+  --cds-font-family-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Ubuntu, 'Helvetica Neue', Arial, sans-serif;
+  --cds-font-family-serif: Georgia, 'Times New Roman', serif;
+  --cds-font-family-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, monospace;
+}
+
+body {
+  background-color: var(--cds-background, #161616);
+  color: var(--cds-text-primary, #f4f4f4);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+}

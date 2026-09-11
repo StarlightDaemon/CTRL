@@ -1,7 +1,7 @@
 # Current State
 
-**Active branch:** `main` @ `247f7b0` (PR #4 merged `next/main-rebuild`; in sync with `origin/main`, 0 ahead / 0 behind)
-**CI:** passing on `main` (GitHub CI: lint, test, build, e2e)
+**Active branch:** `main` (PR #4 merged `next/main-rebuild`). As of 2026-09-10 the v1 release lineage (see `docs/release/v1/EXECUTION_STATE.md`) is committed locally on top of `origin/main` and has **not been published**; the publication candidate is the local branch `release/v1-publication-candidate` (the release lineage plus the state reconciliation that records this entry). Publication and sync status are deliberately not recorded here — verify them from live git evidence (`git fetch origin`, then `git rev-list --left-right --count origin/main...<branch>` and `git ls-remote origin`) before acting. This file is not authoritative for ahead/behind counts.
+**CI:** last verified passing on the published `origin/main` (GitHub CI run `29472393892` for `f088c5f`; see OPEN_LOOPS.md OL-010). Remote CI has **not** run against the unpublished v1 release lineage; release Gate H stays PARTIAL until the first remote run of `lint`, `test`, `package` and `e2e` completes green.
 
 ---
 
@@ -32,7 +32,8 @@ CTRL is a browser extension for managing BitTorrent clients. Built with WXT, Rea
 - External repository audit performed 2026-07-02 (report at `.audits/CTRL_AUDIT_2026-07-02.md`, untracked); remediation pass conducted: dependency vulnerability fixes (3196b3c), extension attack-surface hardening (0e90490), CI Node version alignment and third-party action pinning (4adf272), governance/license-year sync (e909644).
 - LifecycleAdapter `parseDOM` serialization fixed and validated (2026-07-03, commit aaa99b3).
 - Synology Download Station support removed — breaking change (2026-07-03, commit f2e4a62); research documents archived (247f7b0).
-- `main` HEAD = `247f7b0`, in sync with `origin/main`. Full unit suite re-verified 2026-07-03: **512 passed / 0 failed** (15 test files).
+- As of 2026-07-03, `main` HEAD was `247f7b0` and in sync with `origin/main` (historical; for current sync status see the header). Full unit suite re-verified 2026-07-03: **512 passed / 0 failed** (15 test files).
+- v1 release program (2026-09-09): release lineage prepared locally — not published, not released, no store submission (version remains `0.2.0-beta.1`). Program state, release gates and evidence: `docs/release/v1/EXECUTION_STATE.md`, `docs/release/v1/CLIENT_VERIFICATION.md`. Gate H (remote CI) is PARTIAL and Gate K (operator acceptance) is not yet evaluated. OL-012, OL-013, OL-014 and OL-015 are closed against that lineage's evidence; OL-011 remains open (see OPEN_LOOPS.md).
 
 ## In Progress
 - 2026-06-13 — hook exec-bit fixed, .gitignore e2e noise cleared.
@@ -42,6 +43,7 @@ CTRL is a browser extension for managing BitTorrent clients. Built with WXT, Rea
 ## Non-Blocking Open Items
 
 - Secret scanning alert #1: RESOLVED (2026-06-16) — see Confirmed Current State. Flagged value was the public Chromium omnibox key in committed e2e cache, not a real credential; GitHub alert already resolved-as-revoked; stale Dependabot branch carrying the only reachable copy was deleted. Sole residual is GitHub's immutable `refs/pull/3/head` (PR #3), which cannot be removed client-side — acceptable: the key is public and the alert is already closed. No further action available or needed.
+- Superseded in part (2026-07-26): the "acceptable … no further action" judgement above predates DECISIONS.md D-005, which records that `refs/pull/3/head` is publicly reachable because the repository is PUBLIC. Provider-side revocation remains unverified and is tracked as OPEN_LOOPS.md OL-011 (Open, external gate).
 
 ## Not Yet Done
 

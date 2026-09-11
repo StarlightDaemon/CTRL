@@ -1,0 +1,114 @@
+{
+  "client": "qbittorrent",
+  "clientVersion": "v5.2.3 (web api 2.15.1)",
+  "serverSettings": "qBittorrent Web UI security: CSRF protection ON (default); Host header validation ON; clickjacking protection ON",
+  "browser": "firefox",
+  "browserVersion": "155.0.1",
+  "headless": true,
+  "extensionVersion": "0.2.0-beta.1",
+  "address": "http://192.168.1.235:18080/",
+  "lanAddress": "192.168.1.235",
+  "ranAt": "2026-09-09T23:09:25.563Z",
+  "results": [
+    {
+      "name": "vault-setup",
+      "result": "PASS",
+      "observed": "master password created; options dashboard shown",
+      "ms": 392
+    },
+    {
+      "name": "configure-server",
+      "result": "PASS",
+      "observed": "form filled (address http://192.168.1.235:18080/); credential disclosure shown; plain-http warning not shown (private host)",
+      "ms": 988
+    },
+    {
+      "name": "grant-permission",
+      "result": "PASS",
+      "observed": "granted (prompt disabled by extensions.webextOptionalPermissionPrompts=false)",
+      "ms": 68
+    },
+    {
+      "name": "test-connection",
+      "result": "PASS",
+      "observed": "Connection successful",
+      "ms": 277
+    },
+    {
+      "name": "save-server",
+      "result": "PASS",
+      "observed": "saved; list shows stored address verbatim: true",
+      "ms": 72
+    },
+    {
+      "name": "connected",
+      "result": "PASS",
+      "observed": "dashboard status: LIVE",
+      "ms": 494
+    },
+    {
+      "name": "add-magnet",
+      "result": "PASS",
+      "observed": "popup: Torrent added; server has ctrl-live-a.bin (638ceb8d793cd066ae854013514d1f32f95fb752) status=queuedDL",
+      "ms": 692
+    },
+    {
+      "name": "list-shows-torrent",
+      "result": "PASS",
+      "observed": "rows: [\"ctrl-live-a.bin, Queued, 0%\"]",
+      "ms": 505
+    },
+    {
+      "name": "add-paused",
+      "result": "PASS",
+      "observed": "server shows ctrl-live-b.bin status=stoppedDL (paused)",
+      "ms": 1638
+    },
+    {
+      "name": "pause",
+      "result": "PASS",
+      "observed": "server: ctrl-live-a.bin status=stoppedDL",
+      "ms": 2081
+    },
+    {
+      "name": "resume",
+      "result": "PASS",
+      "observed": "server: ctrl-live-a.bin status=metaDL",
+      "ms": 3185
+    },
+    {
+      "name": "remove-keep-files",
+      "result": "PASS",
+      "observed": "removed on server; other torrent untouched: true",
+      "ms": 890
+    },
+    {
+      "name": "bad-credentials",
+      "result": "PASS",
+      "observed": "test: Connection failed Authentication failed. Check your qBittorrent username and password.; dashboard: AUTHENTICATION FAILED; restored → LIVE",
+      "ms": 12536
+    },
+    {
+      "name": "server-unavailable",
+      "result": "PASS",
+      "observed": "dashboard: CONNECTION LOST",
+      "ms": 5770
+    },
+    {
+      "name": "reconnect-after-restart",
+      "result": "PASS",
+      "observed": "dashboard: LIVE; server lists 0 torrent(s) after restart",
+      "ms": 533
+    },
+    {
+      "name": "browser-restart-lock",
+      "result": "PASS",
+      "observed": "skipped by design: a temporary Firefox add-on does not survive a browser restart",
+      "ms": 0
+    }
+  ],
+  "notes": [
+    "controller state after saving wrong credentials: +6ms auth_failed/AUTH_FAILED",
+    "restored password field holds the expected value: true"
+  ]
+}

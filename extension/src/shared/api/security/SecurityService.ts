@@ -3,7 +3,7 @@ export class SecurityService {
     private static readonly KDF_ALGORITHM = 'PBKDF2';
     private static readonly SALT_LENGTH = 16;
     private static readonly IV_LENGTH = 12;
-    private static readonly ITERATIONS = 300000;
+    static readonly ITERATIONS = 300000;
 
     /**
      * Derives a cryptographic key from a user password and salt.

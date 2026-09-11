@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { browser } from 'wxt/browser';
 import { ServerConfig } from '@/shared/lib/types';
 import {
     Modal,
@@ -18,13 +19,15 @@ interface Props {
     initialUrl?: string;
     server: ServerConfig;
     labels: string[];
+    /** Global "add paused" default; the checkbox starts from it. */
+    defaultPaused?: boolean;
 }
 
-export const AddTorrentDialog: React.FC<Props> = ({ isOpen, onClose, onAdd, initialUrl = '', server, labels }) => {
+export const AddTorrentDialog: React.FC<Props> = ({ isOpen, onClose, onAdd, initialUrl = '', server, labels, defaultPaused = false }) => {
     const [url, setUrl] = useState(initialUrl);
     const [path, setPath] = useState(server.defaultDirectory || ((server.directories || []).length > 0 ? (server.directories || [])[0] : ''));
     const [label, setLabel] = useState(server.defaultLabel || '');
-    const [paused, setPaused] = useState(false);
+    const [paused, setPaused] = useState(defaultPaused);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -33,10 +36,10 @@ export const AddTorrentDialog: React.FC<Props> = ({ isOpen, onClose, onAdd, init
             setUrl(initialUrl);
             setPath(server.defaultDirectory || ((server.directories || []).length > 0 ? (server.directories || [])[0] : ''));
             setLabel(server.defaultLabel || '');
-            setPaused(false);
+            setPaused(defaultPaused);
             setError(null);
         }
-    }, [isOpen, initialUrl, server]);
+    }, [isOpen, initialUrl, server, defaultPaused]);
 
     const handleSubmit = async () => {
         if (!url) return;
@@ -44,10 +47,14 @@ export const AddTorrentDialog: React.FC<Props> = ({ isOpen, onClose, onAdd, init
         setIsSubmitting(true);
         setError(null);
         try {
-            await onAdd(url, { path, label, paused });
+            await onAdd(url, {
+                path: path || undefined,
+                label: label || undefined,
+                paused,
+            });
             onClose();
-        } catch (err: any) {
-            setError(err.message || 'Failed to add torrent');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Failed to add torrent');
         } finally {
             setIsSubmitting(false);
         }

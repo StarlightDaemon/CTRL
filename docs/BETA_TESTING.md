@@ -1,310 +1,80 @@
-# 🧪 CTRL Beta Program
-
-⚠️ **BETA SOFTWARE** - This is pre-release software for testing purposes.
-
-**Version**: v0.2.0-beta.1  
-**Release Date**: January 2026  
-**Status**: Public Beta Testing
-
-Authority note: This document is the public source of truth for current beta status, tester guidance, and validation-scope notes. `README.md` is the overview page, and `ROADMAP.md` is strategic direction rather than live status.
-
----
-
-## What is CTRL?
-
-CTRL (Torrent Control) is a browser extension that provides a **unified interface for managing BitTorrent clients** directly from your browser. Send magnet links to your torrent client with one click, monitor downloads, and manage your queue without leaving your browser.
-
----
-
-## 🎯 What's Working in Beta
-
-### ✅ Fully Functional Features
-
-#### Torrent Client Support (9 Clients)
-- ✅ **qBittorrent** - Full support with categories, tags, and sequential download
-- ✅ **Transmission** - Session management and directory support
-- ✅ **Deluge** - Multi-step authentication and label support
-- ✅ **Flood** - JWT authentication and tag management
-- ✅ **ruTorrent** - XML-RPC support with fast resume
-- ✅ **µTorrent** - Token-based auth with bitmask status
-- ✅ **BiglyBT** - Basic operations
-- ✅ **Vuze** - Basic operations
-- ✅ **Aria2** - JSON-RPC multicall support
-
-This list mirrors the public adapter matrix in `README.md`. Internal audit or stabilization priorities may focus on a subset of adapters without changing the product-level support matrix shown here.
-
-#### Site Integrations
-- ⛔ **Removed from CTRL** - Site-specific integrations were moved to a separate extension to keep CTRL focused and avoid a "kitchen sink" product scope.
-- ✅ **Supported alternative in CTRL** - Use Context Menu (Right-Click) integration instead.
-
-
-#### Core Features
-- ✅ **Multi-Server Support** - Manage multiple clients, switch instantly
-- ✅ **Secure Vault** - AES-GCM encrypted credential storage
-- ✅ **Queue Management** - Pause, resume, remove torrents
-- ✅ **Download Monitoring** - Real-time speed and progress
-- ✅ **Context Menu Integration** - Right-click to add magnets
-- ✅ **Notifications** - Completion alerts
-- ✅ **Theming** - Dark Mode, Light Mode, Low Power, Cyberpunk, Linux, Glass, Linear
-- ✅ **Internationalization** - 7 languages (en, de, es, fi, fr, ru, zh_CN)
-- ✅ **Import/Export** - Backup and restore settings
-
----
-
-## ⚠️ Known Limitations
-
-### Technical Debt
-- **No site-specific integrations in CTRL**: Site-integration work now belongs to the separate extension, not this repository's product scope.
-
-
-### Not Implemented Yet
-- **E2E Testing**: Playwright-based end-to-end tests exist under `./tests/e2e`. CI runs non-`@integration` tests only (`npm run test:e2e -- --grep-invert "@integration"`). Full E2E coverage is not yet claimed.
-- **Performance Optimization**: Diffing engine for large torrent lists (>5,000 torrents) not yet implemented
-- **Advanced i18n**: Build-time transformation pipeline planned
-
-### Browser Support
-- ✅ **Chrome/Edge**: Manifest V3, fully tested
-- ✅ **Firefox**: Manifest V3, fully tested
-- ❌ **Safari**: Not supported (requires native app)
-- ❌ **Mobile**: Desktop browsers only (mobile browsers have limited extension support)
-
----
-
-## 📦 How to Install (Beta)
-
-### Method 1: From GitHub Releases (Recommended)
-
-1. **Download the Extension**
-   - Visit [Releases](https://github.com/StarlightDaemon/CTRL/releases)
-   - Download `ctrl-chrome-v0.2.0-beta.1.zip` (for Chrome/Edge)
-   - OR download `ctrl-firefox-v0.2.0-beta.1.zip` (for Firefox)
-   - Extract the ZIP file
-
-2. **Install in Chrome/Edge**
-   - Open `chrome://extensions/` (or `edge://extensions/`)
-   - Enable "Developer mode" (toggle in top-right)
-   - Click "Load unpacked"
-   - Select the extracted folder
-   - ✅ Extension will appear in your toolbar
-
-3. **Install in Firefox**
-   - Open `about:debugging#/runtime/this-firefox`
-   - Click "Load Temporary Add-on"
-   - Navigate to extracted folder
-   - Select `manifest.json`
-   - ✅ Extension will appear in your toolbar
-   - **Note**: Temporary add-ons in Firefox are removed when browser restarts
-
-### Method 2: Build from Source
-
-```bash
-# Clone repository
-git clone https://github.com/StarlightDaemon/CTRL.git
-cd CTRL/extension
-
-# Install dependencies
-npm install
-
-# Build for Chrome
-npm run build:chrome
-
-# OR build for Firefox
-npm run build:firefox
-
-# Load from builds/chrome-mv3/ or builds/firefox-mv3/
-```
-
----
-
-## 🚀 Quick Start Guide
-
-### Step 1: Configure Your First Client
-
-1. Click the CTRL icon in your toolbar
-2. Click **"Add Server"** or go to Options
-3. Enter your torrent client details:
-   - **Name**: "Home qBittorrent" (or whatever you prefer)
-   - **Type**: Select your client (qBittorrent, Transmission, etc.)
-   - **URL**: Your client's WebUI URL (e.g., `http://localhost:8080`)
-   - **Username**: Your WebUI username
-   - **Password**: Your WebUI password
-4. Click **"Test Connection"**
-5. If successful, click **"Save"**
-
-### Step 2: Add a Torrent (Example with Ubuntu ISO)
-
-**Option A: From a Torrent Site**
-1. Visit any torrent site
-2. Find a magnet link
-3. Right-click the link -> "Add to [Client]"
-4. ✅ Torrent starts downloading!
-
-
-**Option B: Right-Click Context Menu**
-1. Right-click any magnet link on any webpage
-2. Select **"Add to qBittorrent"** (or your configured client)
-3. ✅ Torrent starts downloading!
-
-### Step 3: Monitor Downloads
-
-1. Click the CTRL icon
-2. See your active torrents, speeds, and progress
-3. Use controls to pause, resume, or remove torrents
-
----
-
-## 🐛 Known Issues & Workarounds
-
-### Issue: "Connection Failed" Error
-**Cause**: Client WebUI not accessible or wrong URL  
-**Fix**:
-1. Verify your client's WebUI is running
-2. Check URL format: `http://192.168.1.100:8080` (include `http://`)
-3. Try accessing the WebUI URL directly in your browser
-4. Check firewall/network settings
-
-### Issue: "Authentication Failed" Error
-**Cause**: Wrong username/password  
-**Fix**:
-1. Verify credentials by logging into WebUI manually
-2. Re-enter credentials in CTRL settings
-3. For qBittorrent: Ensure "Bypass authentication for localhost" is OFF
-
-### Issue: Extension Icon Greyed Out
-**Cause**: No active server configured  
-**Fix**: Add and test a server in Options
-
-
----
-
-## 🧪 What We Need from Beta Testers
-
-### Critical Testing Areas
-
-1. **Multi-Client Compatibility**
-   - Test with your specific torrent client version
-   - Report any authentication issues
-   - Verify torrent operations work (add, pause, resume, remove)
-
-2. **Context Menu Reliability**
-   - Test adding magnet links through the right-click context menu
-   - Report missing menu entries or wrong client targeting
-   - Check behavior across different sites and link types
-
-3. **Cross-Browser Testing**
-   - Test on Chrome, Edge, and Firefox
-   - Report browser-specific bugs
-
-4. **Edge Cases**
-   - Large torrent lists (>100 torrents)
-   - Slow/unreliable network connections
-   - Multiple servers switching rapidly
-
-### How to Report Bugs
-
-**GitHub Issues**: https://github.com/StarlightDaemon/CTRL/issues
-
-**Please include**:
-1. **Browser**: Chrome/Edge/Firefox + version
-2. **Extension Version**: v0.2.0-beta.1
-3. **Torrent Client**: Type + version (e.g., "qBittorrent 4.6.2")
-4. **Steps to Reproduce**: Detailed steps to trigger the bug
-5. **Expected Behavior**: What should happen
-6. **Actual Behavior**: What actually happens
-7. **Screenshots**: If applicable
-8. **Console Errors**: Open DevTools, check for red errors
-
----
-
-## 📊 Beta Testing Goals
-
-### Success Criteria for v1.0 Release
-
-- [ ] **10+ active beta testers** providing feedback
-- [ ] **<5 critical bugs** discovered
-- [ ] **All 9 clients** verified working
-- [ ] **Positive user feedback** on core functionality
-- [ ] **No data loss** or credential security issues
-
-### Roadmap to v1.0
-
-**Next Release: v0.3.x** (Timing TBD)
-- ✅ Continue post-beta stabilization and adapter hardening
-- ✅ Maintain Playwright E2E infrastructure (CI runs non-@integration subset)
-- ✅ Continue performance benchmarking and tuning
-
-**Production Release: v1.0** (Timing TBD)
-- ✅ Chrome Web Store submission
-- ✅ Firefox AMO submission
-- ✅ Code signing for installers
-- ⬜ Full E2E test coverage (not yet achieved)
-- ✅ Accessibility score >90
-
----
-
-## 🔒 Privacy & Security
-
-**CTRL does NOT collect any data.**
-
-- ✅ No analytics or tracking
-- ✅ No telemetry
-- ✅ No external servers (except your torrent clients)
-- ✅ Credentials encrypted with AES-GCM locally
-- ✅ Open source - code is auditable
-
-**Privacy Policy**: [View Full Policy](PRIVACY_POLICY.md)
-
----
-
-## 📝 Changelog (v0.2.0-beta.1)
-
-### New Features
-- 🎉 First public beta release
-- ✅ Multi-server management
-- ✅ 9 torrent client adapters
-- ✅ Encrypted credential vault
-- ✅ 7 language translations
-- ⛔ **Site Integrations**: Removed for stability and store compliance.
-
-### Testing
-- ✅ Unit and adapter test suites are part of the maintained validation baseline
-- ✅ Playwright E2E tests configured (CI runs non-@integration subset)
-
-
----
-
-## 💬 Community & Support
-
-**Questions?** Open a [Discussion](https://github.com/StarlightDaemon/CTRL/discussions)  
-**Bugs?** Create an [Issue](https://github.com/StarlightDaemon/CTRL/issues)
-
----
-
-## 📚 Additional Resources
-
-- [Main README](../README.md) - Project overview
-- [ROADMAP](../ROADMAP.md) - Strategic direction
-- [CONTRIBUTING](../CONTRIBUTING.md) - How to contribute
-- [Privacy Policy](PRIVACY_POLICY.md) - Full privacy details
-
----
-
-## ⚖️ Legal Disclaimer
-
-CTRL is a **remote control utility** for BitTorrent clients. It does not provide, host, index, or distribute any files, media, or content. Users are solely responsible for the content they choose to transfer using their local torrent clients.
-
-BitTorrent is a legitimate protocol used for distributing open-source software, public domain content, and other legal files. CTRL developers do not endorse or encourage copyright infringement.
-
----
-
-## ❤️ Thank You, Beta Testers!
-
-Your feedback is invaluable in making CTRL a production-ready extension. Thank you for being part of the beta program!
-
-**Happy Testing! 🚀**
-
----
-
-*CTRL v0.2.0-beta.1*  
-*Released: January 2026*  
-*Next Release: v0.3.x (Timing TBD)*
+# CTRL — testing guide (pre-release)
+
+This page is the public status of CTRL before its store release: what it
+supports, what has been verified, how to install a release package, and how
+to report problems. It replaces earlier beta notes that described features
+no longer in the product.
+
+## Status
+
+- Version: `0.2.0-beta.1` (manifest `0.2.0.1`)
+- Target: v1.0 on the Chrome Web Store and Firefox Add-ons; not yet submitted
+- Clients offered: **Transmission**, **qBittorrent**, **aria2** — each verified end-to-end in Chrome 152 and Firefox 155 against a real server (see [release/v1/CLIENT_VERIFICATION.md](release/v1/CLIENT_VERIFICATION.md))
+- Browsers: Chrome 120+ (desktop), Firefox 140+ (desktop)
+- Language: English
+
+Not in this release: Deluge, Flood, ruTorrent, µTorrent, BiglyBT and Vuze
+(adapters exist but are unverified and hidden; an existing configuration
+keeps working and is labelled experimental), page scanning for magnet links,
+themes, download-completion notifications, translations.
+
+## Install a release package
+
+1. Download the package for your browser from [GitHub Releases](https://github.com/StarlightDaemon/CTRL/releases).
+2. Chrome: unzip; `chrome://extensions` → Developer mode → *Load unpacked* → select the folder.
+3. Firefox: `about:debugging#/runtime/this-firefox` → *Load Temporary Add-on* → select the `.zip`. Temporary add-ons disappear when Firefox restarts (this is a Firefox rule for unsigned add-ons; the store version will not have it).
+
+## Set up
+
+1. Open the toolbar popup or the options page and choose a **master
+   password**. It encrypts your server logins on this device. It cannot be
+   recovered; if you forget it, reset the vault from Settings → System (this
+   deletes the saved servers).
+2. Settings → Servers → **Add server**: name, client type, the full address
+   of the client's web interface (for example `http://192.168.1.10:9091/`,
+   `http://nas.local:8080/`, `https://home.example/qbt/`), username and
+   password (aria2: put the RPC secret in the password field).
+3. **Grant access** when asked — the browser needs your permission to let
+   CTRL contact that address.
+4. **Test connection**, then **Save**.
+
+Client-side notes:
+
+- qBittorrent: leave *CSRF protection* and *Host header validation* at their
+  defaults; CTRL works with them on. Make sure the Web UI is enabled.
+- Transmission: enable the RPC interface and authentication; CTRL uses the
+  standard `…/transmission/rpc` path under the address you enter.
+- aria2: start it with `--enable-rpc` and, if you use `--rpc-secret`, enter
+  that token as the password.
+- Plain `http://` to an address outside your local network is allowed but
+  CTRL warns you that logins and commands can be read in transit.
+
+## What to try
+
+- Add a magnet link from the popup and from the right-click menu; with
+  "Add torrents paused" on, check it arrives paused.
+- Pause, resume and remove torrents from the options dashboard.
+- Enter a wrong password: Test connection must fail and the dashboard must
+  say *Authentication failed* rather than pretend to be connected.
+- Stop the client: the dashboard must say *Connection lost*; start it again
+  and CTRL must reconnect on its own.
+- Lock CTRL, restart the browser: it must ask for the master password.
+- Export the server list (safe export) and confirm the file contains no
+  password; the full export says it contains secrets.
+
+## Reporting a problem
+
+Open a [GitHub issue](https://github.com/StarlightDaemon/CTRL/issues) with:
+
+1. browser and version;
+2. client and version, and how CTRL is pointed at it (address form, HTTP or HTTPS, reverse proxy or not);
+3. what you did, what you expected, what happened (the status text CTRL showed);
+4. anything from the client's log around that time.
+
+Never paste passwords, tokens or a full export.
+
+## Legal
+
+CTRL is a remote control for BitTorrent clients. It does not provide, host,
+index or distribute files. Users are responsible for the content they
+transfer with their own clients.
