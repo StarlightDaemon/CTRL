@@ -2,6 +2,7 @@
 
 ## Checkpoint
 
+- **superseded 2026-09-11** — the git facts in this Checkpoint block (branch tracking `f088c5f`, 27 local commits ahead, nothing pushed) describe the 2026-09-09 pre-push state and are now historical. For current state see "Publication and Post-Merge Reconciliation" immediately below.
 - timestamp: 2026-09-09 (pre-push correction wave, after the read-only pre-push reconciliation returned NOT SAFE TO PUSH)
 - repository: `E:\Citadel\CTRL`
 - branch: `main` (tracks `origin/main` at `f088c5f`; 27 local commits ahead after this checkpoint, nothing pushed)
@@ -10,6 +11,40 @@
 - working tree at checkpoint: only the pre-existing operator files under `.raiden/` and `.serena/` remain modified/untracked (11 modified or deleted, 2 untracked). No staged changes. Stash `stash@{0}` (obsolete buildInfo.ts stamp) untouched.
 - toolchain: Node v24.18.0, npm 11.16.0 (`.nvmrc` 24; CI 24), addons-linter 10.11.0, Chrome 152.0.7977.83, Firefox 155.0.1
 - disposable environment: the session scratchpad `live/` directory held Transmission 4.1.3, qBittorrent 5.2.3, aria2 1.37.0 and geckodriver 0.37.1; all client processes and harness browsers were **stopped at the end of the batch** (binaries and downloads remain only in the session scratchpad). Reproducible from scratch with `node tests/live/env.mjs fetch && extract && start all` (default root `%LOCALAPPDATA%\Temp\ctrl-live`).
+
+## Publication and Post-Merge Reconciliation — 2026-09-11 — COMPLETE
+
+The v1 lineage is published to git. PR #5 (`release/v1-publication-candidate` → `main`) merged
+2026-09-11T02:03:42Z as merge commit `bdf2fb0a6d81d26480fb4a883bc5310db3b0c6d5`; all 28 candidate
+commits are ancestors of `origin/main`. **No release was made:** `gh release list` is empty,
+`git ls-remote --tags origin` is empty, the version stays `0.2.0-beta.1`, and no store submission
+has been attempted.
+
+| Evidence | Result |
+|---|---|
+| PR #5 | MERGED, merge commit `bdf2fb0` |
+| PR CI run `34551989324` (`01f57ee`) | `lint`, `test`, `package`, `e2e` — all success |
+| Post-merge CI run `34553140709` (`bdf2fb0`, push) | `lint`, `test`, `package`, `e2e` — all success |
+| Gate H | **PARTIAL → PASS** (success condition met by the above) |
+| Gate K | still NOT YET EVALUATED — operator acceptance on a real install |
+| Release / tag / store submission | none |
+
+Dependabot reanalysed the new default branch (alerts #55, #72 and #81 flipped to `fixed` at
+2026-09-11T02:03:46–47Z, i.e. the merge moment) and reported **17 open alerts — 7 high, 9 medium,
+1 low, every one development/build scope and 0 runtime**. That backlog is remediated on the local
+branch `security/dev-tooling-2026-09` (two commits, **not pushed**): `npm audit` 15 → 0,
+`npm audit --omit=dev` 0 → 0, no WXT major upgrade taken, and the built `chrome-mv3` / `firefox-mv3`
+trees verified byte-identical to the artefacts CI produced for `bdf2fb0` — so no dependency change
+reached the shipped output. Details in `.raiden/state/OPEN_LOOPS.md` OL-017.
+
+The previously recorded `adm-zip` residual (GHSA-vwc7-r8mq-g2x9, "no patched version exists") is
+**resolved, not waived**: adm-zip 0.6.1 was published 2026-09-11, after both GitHub and OSV last
+touched the advisory, and its tarball adds the lstat-based `Utils.assertPathSafe` symlink check at
+five extraction sites. The override moved 0.6.0 → 0.6.1.
+
+Local Playwright remains unavailable on this Windows host (`launchPersistentContext: spawn UNKNOWN`,
+bundled `chromium-1200`); that is a local environment gap, and the `e2e` job's authority stays with
+Linux CI, which is green.
 
 ## Pre-Push Correction Wave — COMPLETE — COMMITTED (child of `06c8c65`)
 
@@ -143,7 +178,7 @@ Carbon-based `ServerForm`/`ServerConfigPanel` (labels, stable ids, keyboard, foc
 | E — Chrome | **PASS (runtime, single host)** | all three clients, all scenarios, real Chrome 152 with the real permission prompt; caveat A (harness reinstall on restart) |
 | F — Firefox | **PASS (runtime, single host)** | all three clients, real Firefox 155 headless; validator 0 errors; caveat B (restart not exercised) |
 | G — Build/package | **PASS** | deterministic (both targets, consecutive builds); reviewer-style rebuild from the source archive byte-identical (14/14); archive contamination-free; ~327 KB zips; one justified permission addition |
-| H — Automated verification | **PARTIAL — local/static gates verified; remote CI pending** | locally: typecheck, lint, unit + component suite (717), both builds, build-twice determinism, source-mutation check, addons-linter, content scans, version/permission consistency all green on the corrected tree; the `e2e` job (Playwright Chromium smoke, non-integration specs) is statically reconciled with the current UI but cannot run on this host. Remote CI has not run: nothing is pushed. Gate H becomes PASS only when the first remote run of all four jobs (`lint`, `test`, `package`, `e2e`) completes green |
+| H — Automated verification | **PASS** | the local/static gates were green on the corrected tree (typecheck, lint, unit + component suite (717), both builds, build-twice determinism, source-mutation check, addons-linter, content scans, version/permission consistency). Remote CI has now run twice, green on all four jobs each time: PR run `34551989324` (`01f57ee`) and post-merge push run `34553140709` (`bdf2fb0`) — `lint`, `test`, `package`, `e2e`. The `e2e` job, which had no local runtime evidence on this Windows host, passed on Linux in both runs. The gate's stated success condition (first remote run of all four jobs completing green) is met |
 | I — UX/accessibility | PASS (STATIC) | 8B; live runs exercised the keyboard-driven form in both browsers (typed, tabbed, submitted) |
 | J — Documentation/store dossier | **PASS (prepared; operator items open)** | README, privacy (md+html), guides, changelog reconciled to the verified v1; dossier drafted with listing text, justifications, disclosures, reviewer notes, screenshots; open: gecko id confirmation, publisher/trader/contact/privacy URL, promo tile |
 | K — Final manual acceptance | NOT YET EVALUATED | operator's own pass on a real install (store-signed or unpacked) — not something the batch can do |
@@ -152,16 +187,16 @@ Carbon-based `ServerForm`/`ServerConfigPanel` (labels, stable ids, keyboard, foc
 
 1. **OPERATOR DECISION REQUIRED:** confirm the permanent gecko add-on id `{2d629a61-d2b9-45d9-8f88-d58e8b43e9fb}` before the first AMO upload (it cannot change afterwards).
 2. **OPERATOR DECISION REQUIRED:** publisher account, trader/non-trader declaration, support contact, hosted privacy-policy URL, Chrome promo tile (design asset).
-3. Re-run the read-only pre-push reconciliation against the new HEAD; if it returns SAFE, the operator may separately authorize the push so the CI jobs actually run (Gate H stays PARTIAL until they complete green); then Gate K (operator's manual acceptance on a real install).
+3. ~~Re-run the read-only pre-push reconciliation, then push so the CI jobs run.~~ **Done (2026-09-11):** the lineage was pushed and merged via PR #5 (merge commit `bdf2fb0`), and CI ran green on all four jobs in both the PR run `34551989324` and the post-merge run `34553140709`. Gate H is PASS. Gate K (operator's manual acceptance on a real install) is now the outstanding engineering-adjacent gate.
 4. Version stays `0.2.0-beta.1`; bump to `1.0.0` only after Gates H (CI green) and K.
-5. `.raiden/state/` still reflects the pre-run state (operator-owned dirty files left untouched by instruction); `.raiden/state/OPEN_LOOPS.md` OL-013 (CSRF headers) can be closed with reference to `CLIENT_VERIFICATION.md` §Defects #2.
+5. ~~`.raiden/state/` still reflects the pre-run state; OL-013 can be closed.~~ **Done:** `01f57ee` reconciled `.raiden/state/`, closing OL-012, OL-013 (CSRF headers, against `CLIENT_VERIFICATION.md` §Defects #2), OL-014 and OL-015. The operator-owned dirty files in the primary checkout remain untouched by instruction. OL-005, OL-006, OL-011 and OL-016 remain open; OL-017 tracks the 2026-09-11 dev-tooling advisory remediation.
 6. Residual evidence limits: single Windows host; Firefox browser-restart not exercised (temporary add-on); Chrome restart needed a re-grant only because the harness reloads the unpacked build; HTTPS/sub-path/DNS addresses unit-tested only.
 
 ## Exact Next Execution Wave
 
-**Next action:** rerun the read-only CTRL v1 pre-push reconciliation against the new HEAD (the correction commit). No push has been authorized by this wave.
+**Next action (2026-09-11):** open one PR for the local branch `security/dev-tooling-2026-09` (dev-tooling advisory remediation, two commits) against current `main`, let the full Gate H job set re-run on it, and observe Dependabot's reanalysis. That branch is **not pushed**; no push has been authorized by this wave. The v1 pre-push reconciliation and push are complete — superseded by the PR #5 merge.
 
-**Operator wave (after a SAFE reconciliation):** (1) confirm the gecko id and the account/legal items above; (2) separately authorize `git push origin main` (branch only; no tags) and observe the CI run — all four jobs, including `e2e`, must complete; the `package` job reproduces the local gates, the `e2e` job has no local runtime evidence; (3) manual acceptance (Gate K) on a real install in both browsers; (4) then bump to `1.0.0` (`package.json` → manifests via `toManifestVersion`), tag, and submit using `STORE_DOSSIER.md`. No further engineering wave is pending.
+**Operator wave (after a SAFE reconciliation):** (1) confirm the gecko id and the account/legal items above; (2) ~~separately authorize `git push origin main` (branch only; no tags) and observe the CI run~~ — **done 2026-09-11** via PR #5: all four jobs completed green, including `e2e`, in runs `34551989324` and `34553140709`; (3) manual acceptance (Gate K) on a real install in both browsers; (4) then bump to `1.0.0` (`package.json` → manifests via `toManifestVersion`), tag, and submit using `STORE_DOSSIER.md`. No further engineering wave is pending.
 
 (Superseded plans kept for the record) **Phase F — CI and reviewer-build gates:** CI jobs for addons-linter, package contamination/remote-resource scans, build-twice diff, version consistency, checksums, internal size threshold; `extension/BUILD.md` with the verified environment (Node 24 / npm 11, exact commands, expected output); include `BUILD.md` and `LICENSE` in `zip:source`; run `zip:source` from the clean tree and perform a reviewer-style rebuild from the archive, comparing the generated `firefox-mv3` contents byte-for-byte. Then G (docs/privacy), H (dossier).
 
