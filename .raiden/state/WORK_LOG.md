@@ -1,5 +1,32 @@
 # Work Log
 
+## 2026-10-16 — Final advisory cleanup
+
+- D-009 records the operator's authorization to fix the remaining five findings,
+  verify them, and re-archive. Based on clean `origin/main` at `22d851d`; existing
+  local RAIDEN and Serena edits are preserved.
+- WXT 0.20.27 to 0.21.4, explicit Vite 7.3.5 peer, unimport 6.5.0: removed the
+  old web-ext-run/adbkit/node-forge chain and the old fast-glob/braces path.
+- Tailwind 3.4.3 to 4.3.3 with @tailwindcss/postcss 4.3.3: removed the remaining
+  braces and postcss-selector-parser chains. Migrated CSS imports and Carbon
+  layers, retained the JS theme, renamed changed utilities, and preserved
+  default border/placeholder/cursor styling plus the system font stack.
+- sharp 0.35.4 to 0.35.5 (librsvg 2.63.2); source-map-js 1.2.1 to 1.2.2.
+  Targeted image and source-map regression checks pass. Both npm audits report
+  zero vulnerabilities; an independent read-only review found no dependency
+  errors or unexpected package sources.
+- Node 24.18.0 / npm 11.16.0: clean npm ci; TypeScript passes; lint zero errors /
+  13 existing warnings; all 717 tests across 32 unit/component files pass.
+- Both browser packages build with 14 files, version 0.2.0.1 and the historical
+  ZIP naming. Added an E2E check for Carbon/utility cascade interoperability;
+  local headless Chrome 155 verifies computed styling and real vault creation.
+- Production browser launch is unchanged. Development builds now require manual
+  browser loading, documented in the development guide; the optional runner is
+  omitted to keep its vulnerable chain out.
+- CI now audits Linux dependency resolution as well as the existing test, build,
+  package, deterministic-output and browser gates. Final remote verification and
+  archive evidence is recorded in the operator closeout.
+
 ## 2026-10-16 — One-time dependency correction
 
 - D-008 authorizes the operator-requested correction before re-archiving.

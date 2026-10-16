@@ -16,6 +16,11 @@ npm run dev            # WXT dev build for Chrome with reload
 npm run dev:firefox    # same for Firefox
 ```
 
+The final security correction uses WXT 0.21 without its optional browser runner.
+Development commands build and watch; load the extension into the browser manually
+using the instructions below. This removes the old runner's vulnerable dependency
+chain without changing production builds.
+
 ## Commands
 
 | Command | Description |

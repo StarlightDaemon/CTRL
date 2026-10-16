@@ -96,7 +96,7 @@ export const FunctionSettings: React.FC<Props> = ({
                                     <Download className="w-6 h-6 text-white" />
                                 </div>
                                 {settings.globals.badgeInfo !== 'none' && (
-                                    <div className="absolute -bottom-2 -right-2 bg-[var(--cds-support-error)] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm border border-white">
+                                    <div className="absolute -bottom-2 -right-2 bg-[var(--cds-support-error)] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-xs border border-white">
                                         {settings.globals.badgeInfo === 'count' ? '3' : '2.5M'}
                                     </div>
                                 )}

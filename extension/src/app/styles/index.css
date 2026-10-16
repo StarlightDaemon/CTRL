@@ -8,7 +8,8 @@
  * remote @font-face so the shipped package makes no third-party requests, and
  * the tokens below map Carbon's type to the user's system fonts instead.
  */
-@import '@carbon/styles/css/styles.css';
+@layer theme, base, components, utilities;
+@import '@carbon/styles/css/styles.css' layer(components);
 @import './global.css';
 
 :root {
@@ -18,6 +19,7 @@
 }
 
 body {
+  font-family: var(--cds-font-family-sans);
   background-color: var(--cds-background, #161616);
   color: var(--cds-text-primary, #f4f4f4);
 }

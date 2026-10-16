@@ -1,5 +1,9 @@
 # CTRL dependency remediation
 
+> **Final correction:** the five additional advisories recorded below have now
+> been resolved. See the [final security closure report](2026-10-16-final-security.md).
+> This document retains the earlier correction's evidence and audit snapshot.
+
 The operator requested a one-time correction for the critical shell-quote and
 medium brace-expansion findings from the [closure report](2026-10-15.md), followed
 by verification and re-archiving. CTRL remains deprecated under D-007; D-008

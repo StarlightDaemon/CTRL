@@ -5,6 +5,8 @@
 The one-time dependency correction under D-008 is documented in
 `docs/closure/2026-10-16-dependencies.md`. Additional advisory findings are
 tracked in OL-018; they are not covered by the original two-alert correction.
+The final correction under D-009 is documented in
+`docs/closure/2026-10-16-final-security.md`.
 
 Per DECISIONS.md D-007, development and maintenance loops below are retired
 without claiming their success conditions were met. Historical entries are
@@ -15,14 +17,16 @@ credential and dependency findings are recorded in the
 ## OL-018
 
 - Title: Additional advisory findings discovered during the closure correction
-- Status: Open
+- Status: Closed (2026-10-16)
 - Date: 2026-10-16
 - Severity: High
 - Scope: braces, node-forge, postcss-selector-parser, sharp and source-map-js;
   exact advisory IDs, package versions, available fixes and audit evidence live
   in `docs/closure/2026-10-16-dependencies.md`.
-- Disposition: unresolved and recorded for the operator. The one-time correction
-  requested for shell-quote and brace-expansion does not remediate these findings.
+- Closed by: D-009's dependency correction removes the vulnerable braces,
+  node-forge and postcss-selector-parser chains and upgrades sharp and source-map-js.
+  Both full and production npm audits report zero vulnerabilities. Verification
+  and exact package versions: `docs/closure/2026-10-16-final-security.md`.
 - Success condition: a separately authorized dependency pass removes these
   advisories and validates the resulting toolchain, or the operator records a
   specific risk acceptance. Archiving alone does not meet the condition.

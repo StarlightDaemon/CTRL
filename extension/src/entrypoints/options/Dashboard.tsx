@@ -83,7 +83,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const LockButton = (
         <button
             onClick={() => setActiveView('lock')}
-            className="flex items-center justify-center p-2 text-[var(--cds-text-secondary)] hover:text-[var(--cds-text-primary)] hover:bg-[var(--cds-layer-hover)] rounded-sm transition-colors"
+            className="flex items-center justify-center p-2 text-[var(--cds-text-secondary)] hover:text-[var(--cds-text-primary)] hover:bg-[var(--cds-layer-hover)] rounded-xs transition-colors"
             title={browser.i18n.getMessage('lockVault')}
             aria-label={browser.i18n.getMessage('lockVault')}
         >

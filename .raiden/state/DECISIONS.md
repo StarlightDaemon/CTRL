@@ -1,5 +1,17 @@
 # Decisions
 
+## D-009
+
+- Date: 2026-10-16
+- Status: Active
+- Decision: resolve the remaining five dependency advisories at the operator's
+  request, including necessary parent-toolchain migrations, verify the result,
+  and archive the repository again. D-007 remains in force.
+- Implementation: remove vulnerable dependency chains through WXT and Tailwind
+  upgrades; apply released sharp and source-map-js fixes. Preserve browser
+  floors, package identity and archive naming, with browser styling verification.
+- Evidence: `docs/closure/2026-10-16-final-security.md` and the dated WORK_LOG entry.
+
 ## D-008
 
 - Date: 2026-10-16

@@ -46,6 +46,9 @@ jobs:
       - run: npm ci
       - name: Type check
         run: npm run compile
+      - name: Dependency security audit
+        # Include Linux's native image-processing dependencies in the audit.
+        run: npm audit --audit-level=low
       - name: Unit and component tests
         run: npm test
 

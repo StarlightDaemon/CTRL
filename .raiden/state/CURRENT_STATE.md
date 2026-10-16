@@ -1,8 +1,8 @@
 # Current State
 
 **Lifecycle:** deprecated; development has ended per DECISIONS.md D-007.
-The one-time dependency correction is recorded under D-008 and in the
-[remediation report](../../docs/closure/2026-10-16-dependencies.md).
+Security follow-ups are recorded under D-008 and D-009. See the
+[final security closure report](../../docs/closure/2026-10-16-final-security.md).
 The [closure report](../../docs/closure/2026-10-15.md) records the final review
 and remaining security findings. The branch, CI and project history below is a
 pre-closure snapshot, not an active development plan.

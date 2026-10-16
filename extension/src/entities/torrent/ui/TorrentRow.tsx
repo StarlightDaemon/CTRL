@@ -112,7 +112,7 @@ export const TorrentRow = memo(({ index, style, onRequestRemove }: TorrentRowPro
                     type="button"
                     onClick={handlePauseResume}
                     disabled={!!pending || !serverId}
-                    className="p-1.5 hover:bg-layer-selected-hover rounded-md text-text-secondary hover:text-interactive transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-interactive disabled:opacity-50"
+                    className="p-1.5 hover:bg-layer-selected-hover rounded-md text-text-secondary hover:text-interactive transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-interactive disabled:opacity-50"
                     aria-label={isPaused ? `Resume ${torrent.name}` : `Pause ${torrent.name}`}
                     title={isPaused ? 'Resume' : 'Pause'}
                 >
@@ -126,7 +126,7 @@ export const TorrentRow = memo(({ index, style, onRequestRemove }: TorrentRowPro
                     type="button"
                     onClick={handleRemove}
                     disabled={!!pending || !serverId}
-                    className="p-1.5 hover:bg-layer-selected-hover rounded-md text-text-secondary hover:text-status-error transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-interactive disabled:opacity-50"
+                    className="p-1.5 hover:bg-layer-selected-hover rounded-md text-text-secondary hover:text-status-error transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-interactive disabled:opacity-50"
                     aria-label={`Remove ${torrent.name} from the client`}
                     title="Remove (keeps downloaded files)"
                 >

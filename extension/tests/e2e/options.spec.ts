@@ -47,6 +47,21 @@ test.describe('Options Page', () => {
         await expect(page.getByText(/^v\d+\.\d+\.\d+/)).toBeVisible({ timeout: 10000 });
     });
 
+    test('preserves Carbon controls and utility spacing after the CSS toolchain upgrade', async ({ page, extensionId }) => {
+        await gotoOptions(page, extensionId);
+
+        // Utility spacing and typography must still override Carbon's component
+        // defaults when its stylesheet and Tailwind use native cascade layers.
+        const tile = page.locator('.cds--tile').first();
+        await expect(tile).toHaveCSS('padding-left', '32px');
+        await expect(tile).toHaveCSS('padding-right', '32px');
+        await expect(page.getByRole('heading', { name: 'Secure Your Data' })).toHaveCSS('font-size', '24px');
+        await expect(page.locator('body')).toHaveCSS('font-family', /system-ui/);
+
+        await createVault(page);
+        await expect(page.getByRole('tab', { name: 'Dashboard' })).toBeVisible();
+    });
+
     test('should navigate between tabs', async ({ page, extensionId }) => {
         await gotoOptions(page, extensionId);
 

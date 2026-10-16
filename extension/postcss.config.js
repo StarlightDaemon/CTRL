@@ -1,5 +1,4 @@
-import tailwindcss from 'tailwindcss';
-import autoprefixer from 'autoprefixer';
+import tailwindcss from '@tailwindcss/postcss';
 
 /**
  * Drop every `@font-face` whose `src` points at a remote origin.
@@ -25,5 +24,5 @@ const stripRemoteFontFaces = () => ({
 stripRemoteFontFaces.postcss = true;
 
 export default {
-    plugins: [tailwindcss(), autoprefixer(), stripRemoteFontFaces()],
+    plugins: [tailwindcss(), stripRemoteFontFaces()],
 };

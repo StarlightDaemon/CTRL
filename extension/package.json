@@ -46,6 +46,7 @@
   "devDependencies": {
     "@eslint/js": "9.39.2",
     "@playwright/test": "1.57.0",
+    "@tailwindcss/postcss": "4.3.3",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.7",
@@ -56,7 +57,6 @@
     "@vitejs/plugin-react": "5.2.0",
     "@webext-core/fake-browser": "1.3.2",
     "@wxt-dev/module-react": "1.1.5",
-    "autoprefixer": "10.4.19",
     "eslint": "9.39.2",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "7.0.1",
@@ -65,13 +65,14 @@
     "postcss": "^8.5.18",
     "puppeteer-core": "25.10.0",
     "selenium-webdriver": "4.49.0",
-    "sharp": "0.35.4",
-    "tailwindcss": "3.4.3",
+    "sharp": "0.35.5",
+    "tailwindcss": "4.3.3",
     "tsx": "4.21.0",
     "typescript": "5.7.2",
     "typescript-eslint": "8.52.0",
     "vitest": "4.1.11",
-    "wxt": "0.20.27"
+    "wxt": "0.21.4",
+    "vite": "7.3.5"
   },
   "overrides": {
     "esbuild": "0.28.1",

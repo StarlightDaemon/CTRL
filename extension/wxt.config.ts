@@ -34,6 +34,9 @@ export default defineConfig({
   publicDir: 'src/public',
   outDir: 'builds',
   zip: {
+    // Keep Firefox archive names based on its manifest version and Chrome
+    // archive names based on version_name, as before the WXT 0.21 upgrade.
+    artifactTemplate: '{{name}}-{{versionName}}-{{browser}}{{modeSuffix}}.zip',
     // The reviewer source archive is produced by scripts/zip-source.ts from a
     // clean git tree. WXT's automatic "-sources.zip" would sweep in local
     // artefacts (backups, logs, reports), so it is disabled for every target.

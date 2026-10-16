@@ -112,7 +112,7 @@ reviewer source archive from a clean git tree. See `extension/BUILD.md`.
 
 | Layer | Technology |
 |---|---|
-| Framework | WXT 0.20 |
+| Framework | WXT 0.21 |
 | UI | React 18, TypeScript, IBM Carbon, Tailwind (layout) |
 | State | Zustand (UI mirror of the background snapshot) |
 | Validation | Zod |

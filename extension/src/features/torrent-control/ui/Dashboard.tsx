@@ -315,7 +315,7 @@ const LiveDashboard: React.FC<{ onLock: () => Promise<void> }> = ({ onLock }) =>
                     <div className="rounded border border-[var(--cds-border-subtle)] overflow-hidden">
                         <div className="bg-[var(--cds-layer-02)] px-3 py-1.5 text-[10px] font-bold text-[var(--cds-text-helper)] uppercase flex justify-between items-center border-b border-[var(--cds-border-subtle)]">
                             <span>Torrents</span>
-                            <span className="bg-[var(--cds-layer-03)] px-1.5 py-0.5 rounded-sm" aria-label={`${totalCount} torrents`}>{totalCount}</span>
+                            <span className="bg-[var(--cds-layer-03)] px-1.5 py-0.5 rounded-xs" aria-label={`${totalCount} torrents`}>{totalCount}</span>
                         </div>
                         <ul className="max-h-48 overflow-y-auto bg-[var(--cds-background)] list-none m-0 p-0" aria-label="Recent torrents">
                             {ids.length > 0 ? (
