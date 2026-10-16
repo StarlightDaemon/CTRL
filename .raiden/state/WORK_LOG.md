@@ -20,7 +20,11 @@
 - npm audit contains neither requested advisory and zero critical findings.
   Additional findings and exact residual audit counts are documented in
   `docs/closure/2026-10-16-dependencies.md`; see OL-018.
-- Final GitHub CI, alert and archive evidence is delivered in the operator closeout.
+- GitHub alerts 95 and 93 are `fixed` at 2026-10-16T17:17:47Z. CI run
+  `38938578322` is successful on code commit `24fd2e2`: lint, test, package and
+  e2e all pass. All 28 local browser-package files also match the pre-fix build
+  bytes. The evidence-only follow-up changes no dependency or application files.
+- Final archive and Actions settings are verified in the operator closeout.
 
 ## 2026-10-15 — Repository closure
 

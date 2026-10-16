@@ -33,6 +33,8 @@ Verification uses Node 24.18.0 and npm 11.16.0 on a clean worktree based on
 - TypeScript compilation passes. ESLint reports zero errors and 13 existing warnings.
 - Chrome and Firefox packages build successfully, each with the expected 14 files
   and manifest version `0.2.0.1`. ZIP sizes are 326,574 and 326,651 bytes.
+- All 28 files across the two browser packages are byte-identical to the existing
+  pre-fix builds in the original checkout.
 - All 717 unit and component tests pass across 32 files with two workers.
 - Current npm audit output contains neither shell-quote nor brace-expansion, and
   reports zero critical vulnerabilities. Additional findings remain below.
@@ -40,8 +42,13 @@ Verification uses Node 24.18.0 and npm 11.16.0 on a clean worktree based on
 The first sandboxed unit run could not load tests because of temporary-file
 rename restrictions. A subsequent unrestricted run passed 716 tests and timed
 out on one form test while browser builds were running. The final run with two
-workers after the builds passes all 717 tests. Remote CI evidence is recorded
-in the dated WORK_LOG entry and operator closeout.
+workers after the builds passes all 717 tests.
+
+GitHub confirms alerts 95 and 93 as `fixed` at `2026-10-16T17:17:47Z` after
+publication of commit `24fd2e2`. [CI run 38938578322](https://github.com/StarlightDaemon/CTRL/actions/runs/38938578322)
+completed successfully on that commit: lint, test, package and e2e all passed.
+The final evidence update changes documentation only; the tested dependency
+files remain unchanged.
 
 ## Additional audit findings
 
