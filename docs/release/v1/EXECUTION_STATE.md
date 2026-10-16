@@ -1,5 +1,9 @@
 # CTRL v1 Execution State
 
+> **Program ended:** the repository is deprecated. The release gates and future
+> work below are historical and no store release is planned. See the
+> [closure report](../../closure/2026-10-15.md).
+
 ## Checkpoint
 
 - **superseded 2026-09-11** — the git facts in this Checkpoint block (branch tracking `f088c5f`, 27 local commits ahead, nothing pushed) describe the 2026-09-09 pre-push state and are now historical. For current state see "Publication and Post-Merge Reconciliation" immediately below.

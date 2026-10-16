@@ -1,5 +1,8 @@
 # CTRL Roadmap
 
+> **Deprecated:** this roadmap is historical. Development and release plans have
+> ended; its unfinished items are not commitments. See the [closure report](docs/closure/2026-10-15.md).
+
 > **Strategic direction for the CTRL browser extension**
 
 Status note: This roadmap is strategic direction, not the public live-status page. Use [docs/BETA_TESTING.md](docs/BETA_TESTING.md) for the current beta-status and tester-facing state.

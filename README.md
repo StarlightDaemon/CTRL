@@ -1,3 +1,12 @@
+# Deprecated — development ended
+
+CTRL is no longer maintained or developed. This repository is retained as a
+read-only archive for reference. No new features, bug fixes, security updates,
+or releases are planned. The documentation below describes the historical project.
+
+See the [closure report](docs/closure/2026-10-15.md) for the final security review
+and outstanding findings.
+
 # CTRL
 
 > **Send magnet links to your own BitTorrent client and control its queue from the browser.**

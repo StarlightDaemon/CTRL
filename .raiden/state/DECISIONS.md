@@ -1,5 +1,16 @@
 # Decisions
 
+## D-007
+
+- Date: 2026-10-15
+- Status: Active
+- Decision: deprecate CTRL, end development and maintenance, and archive the
+  GitHub repository as read-only after publishing the closure documentation.
+- Authorization: the operator explicitly requested deprecation, read-only
+  status, a repository-wide credential scan and a closure report.
+- Disposition: unfinished development and release work is retired, not completed.
+  Unresolved security findings remain visible in `docs/closure/2026-10-15.md`.
+
 ## D-001
 
 - Date: 2026-04-10

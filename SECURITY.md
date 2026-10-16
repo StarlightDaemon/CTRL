@@ -1,39 +1,12 @@
 # Security Policy
 
-## Supported Versions
+CTRL is deprecated and no longer maintained. No version receives security
+updates, and there is no guaranteed response or remediation timeline.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+The [closure report](docs/closure/2026-10-15.md) records the final security review
+and unresolved findings. Archiving the repository does not fix vulnerabilities
+or remove credentials from historical commits.
 
-## Reporting a Vulnerability
-
-**Do not open a public issue for security vulnerabilities.**
-
-Instead, please report security issues by:
-1. Emailing the maintainers directly
-2. Using GitHub's private vulnerability reporting
-
-Include:
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
-
-## Response Timeline
-
-- **Acknowledgment:** Within 48 hours
-- **Initial Assessment:** Within 1 week
-- **Resolution:** Depends on severity
-
-## Scope
-
-Security issues in:
-- Extension code (`extension/src/`)
-- Authentication/encryption logic
-- Data handling and storage
-- Network communications
-
-Out of scope:
-- Third-party dependencies (report to their maintainers)
-- Research/documentation files
+If you discover exposed credentials, notify the repository owner privately and
+contact the credential provider to revoke or rotate them. Do not publish secret
+values in issues, pull requests, or reports.

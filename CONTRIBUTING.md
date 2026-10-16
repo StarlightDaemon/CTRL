@@ -1,5 +1,8 @@
 # Contributing to CTRL
 
+> **Deprecated:** development has ended and contributions are no longer accepted.
+> The guidelines below are historical. See the [closure report](docs/closure/2026-10-15.md).
+
 Thank you for your interest in contributing to CTRL! This document provides guidelines for contributing.
 
 ## Getting Started

@@ -1,5 +1,13 @@
 # Open Loops
 
+## Closure disposition
+
+Per DECISIONS.md D-007, development and maintenance loops below are retired
+without claiming their success conditions were met. Historical entries are
+preserved. OL-011 remains an unresolved external security follow-up. Current
+credential and dependency findings are recorded in the
+[closure report](../../docs/closure/2026-10-15.md); archiving does not remediate them.
+
 ## OL-001
 
 - Title: Phase 2 — Error Handling

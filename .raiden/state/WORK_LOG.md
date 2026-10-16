@@ -1,5 +1,19 @@
 # Work Log
 
+## 2026-10-15 — Repository closure
+
+- D-007 records the operator's deprecation and archive decision. Closure changes
+  were prepared from freshly fetched `origin/main` at `f9e4057` in a clean
+  worktree, preserving the original checkout's existing RAIDEN state and Serena
+  edits, local branches, tags and stash.
+- README, contribution, roadmap, security, release and RAIDEN state documents
+  now reflect the end of development. Writ and local overlay were not changed.
+- Credential review covered the working tree, ignored local artifacts, source
+  archives, all fetched branch/tag/PR histories and every local Git blob.
+  Findings and reproduction commands: `docs/closure/2026-10-15.md`.
+- Final remote operations and archive verification are recorded in the operator
+  closeout delivered after publication of this commit.
+
 ## 2026-07-09 — Edict v2.0.0 + state normalization
 
 - Edict v1.0.1 → v2.0.0 applied via `raiden_updater.cli` (plan → apply → re-plan "Already up to date"): `README.md`, `OPERATING_RULES.md`, `WORKSPACE_AUDIT_PROTOCOL.md`, `FORK_REVIEW_PROTOCOL.md`, `AGENTS.md` updated; `ROUTING_POLICY.md` added; `MODEL_TIERS.md` removed (expected `managed_file_removal` warn on the plan, package no longer ships it); `hooks/commit-msg` unchanged.

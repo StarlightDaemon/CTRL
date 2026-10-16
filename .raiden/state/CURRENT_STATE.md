@@ -1,5 +1,10 @@
 # Current State
 
+**Lifecycle:** deprecated; development has ended per DECISIONS.md D-007.
+The [closure report](../../docs/closure/2026-10-15.md) records the final review
+and remaining security findings. The branch, CI and project history below is a
+pre-closure snapshot, not an active development plan.
+
 **Active branch:** `main` (PR #4 merged `next/main-rebuild`; PR #5 merged `release/v1-publication-candidate` on 2026-09-11, merge commit `bdf2fb0`). The v1 release lineage (see `docs/release/v1/EXECUTION_STATE.md`) is **published as the default branch** — all 28 candidate commits are ancestors of `origin/main`. Publication here means git publication only: **no browser-store release, no GitHub release and no tag exist**, and the version remains `0.2.0-beta.1`. Sync status is deliberately not recorded here — verify it from live git evidence (`git fetch origin`, then `git rev-list --left-right --count origin/main...<branch>` and `git ls-remote origin`) before acting. This file is not authoritative for ahead/behind counts.
 **CI:** last verified passing on `origin/main` at `bdf2fb0` — GitHub CI run `34553140709` (push), with `lint`, `test`, `package` and `e2e` all green; the PR run `34551989324` for `01f57ee` was green on the same four jobs. Release **Gate H is PASS** (its success condition was the first remote run of all four jobs completing green). Gate K (operator acceptance on a real install) is still not evaluated.
 
@@ -9,8 +14,8 @@
 
 CTRL is a browser extension for managing BitTorrent clients. Built with WXT, React, and TypeScript. Supports 9 torrent clients (qBittorrent, Transmission, Deluge, Flood, ruTorrent, uTorrent, BiglyBT, Vuze, Aria2). MIT licensed.
 
-**Status:** Beta / Active Stabilization — Phase 2 Technical Excellence in progress.
-**Target:** v1.0 Chrome Web Store and Firefox Add-Ons release.
+**Status:** Deprecated; no further development or maintenance.
+**Target:** Retain the repository for historical reference; no further releases.
 
 ---
 
