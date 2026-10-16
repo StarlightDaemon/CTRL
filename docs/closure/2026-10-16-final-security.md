@@ -60,7 +60,14 @@ The correction was prepared in a clean worktree from `22d851d`, using Node
   guards the Carbon/Tailwind cascade interaction in CI.
 - GitHub CI includes an explicit dependency audit on Linux, alongside the existing
   lint, tests, deterministic package checks, Mozilla validation and browser smoke
-  tests. Its final result is recorded in the operator closeout.
+  tests. [Run 38941104573](https://github.com/StarlightDaemon/CTRL/actions/runs/38941104573)
+  passes all four jobs on security commit `2989632`: lint, test, package and e2e.
+
+GitHub reports zero open Dependabot alerts after reanalysis. The four previously
+open alerts (99, 101, 102 and 103) are confirmed `fixed` at
+`2026-10-16T17:37:27Z`; the fifth npm advisory's vulnerable package is absent from
+the dependency tree. The final evidence update changes documentation only and
+does not change the tested application, configuration or lockfile.
 
 ## Remaining limits and archive
 

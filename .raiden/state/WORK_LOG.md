@@ -24,8 +24,11 @@
   browser loading, documented in the development guide; the optional runner is
   omitted to keep its vulnerable chain out.
 - CI now audits Linux dependency resolution as well as the existing test, build,
-  package, deterministic-output and browser gates. Final remote verification and
-  archive evidence is recorded in the operator closeout.
+  package, deterministic-output and browser gates. Run `38941104573` is successful
+  on security commit `2989632`: lint, test, package and e2e all pass. GitHub reports
+  zero open Dependabot alerts; alerts 99, 101, 102 and 103 are `fixed` at
+  2026-10-16T17:37:27Z. The final evidence update changes documentation only.
+- Final archive evidence is verified in the operator closeout.
 
 ## 2026-10-16 — One-time dependency correction
 
