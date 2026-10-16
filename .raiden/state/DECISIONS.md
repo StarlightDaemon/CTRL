@@ -1,5 +1,17 @@
 # Decisions
 
+## D-008
+
+- Date: 2026-10-16
+- Status: Active
+- Decision: make the operator-requested one-time security correction for
+  shell-quote and brace-expansion, verify it, and re-archive the repository.
+  D-007 remains in force; this does not resume product development.
+- Scope: retain existing dependency major versions and update the three affected
+  lockfile entries plus the existing shell-quote override. Record newly observed
+  advisory findings separately; do not silently undertake toolchain migrations.
+- Evidence: `docs/closure/2026-10-16-dependencies.md` and the dated WORK_LOG entry.
+
 ## D-007
 
 - Date: 2026-10-15

@@ -1,5 +1,27 @@
 # Work Log
 
+## 2026-10-16 — One-time dependency correction
+
+- D-008 authorizes the operator-requested correction before re-archiving.
+  Based on clean `origin/main` at `52741ed`; original local changes are preserved.
+- Updated shell-quote override and lock entry from 1.9.0 to 1.11.0; updated
+  brace-expansion 1.1.18 to 1.1.21 and 2.1.4 to 2.1.7 within existing parent ranges.
+  Independent read-only review confirmed the three lock entries are the only
+  dependency changes.
+- Node 24.18.0 / npm 11.16.0: clean npm ci; typecheck passes; lint has zero errors
+  and 13 existing warnings; final unit suite has 32 files / 717 tests passing.
+  Initial test attempts encountered a sandbox temporary-file rename failure and
+  one concurrent-build form-test timeout; unrestricted two-worker rerun passes.
+- Targeted advisory checks pass: shell-quote rejects four line terminators after
+  a comment token; both brace-expansion instances handle the 128,000-brace input
+  inside a two-second limit and preserve normal expansion.
+- Chrome and Firefox packages build: 14 files each, manifest 0.2.0.1, ZIPs
+  326,574 / 326,651 bytes. Application source and version are unchanged.
+- npm audit contains neither requested advisory and zero critical findings.
+  Additional findings and exact residual audit counts are documented in
+  `docs/closure/2026-10-16-dependencies.md`; see OL-018.
+- Final GitHub CI, alert and archive evidence is delivered in the operator closeout.
+
 ## 2026-10-15 — Repository closure
 
 - D-007 records the operator's deprecation and archive decision. Closure changes

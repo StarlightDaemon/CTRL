@@ -2,11 +2,30 @@
 
 ## Closure disposition
 
+The one-time dependency correction under D-008 is documented in
+`docs/closure/2026-10-16-dependencies.md`. Additional advisory findings are
+tracked in OL-018; they are not covered by the original two-alert correction.
+
 Per DECISIONS.md D-007, development and maintenance loops below are retired
 without claiming their success conditions were met. Historical entries are
 preserved. OL-011 remains an unresolved external security follow-up. Current
 credential and dependency findings are recorded in the
 [closure report](../../docs/closure/2026-10-15.md); archiving does not remediate them.
+
+## OL-018
+
+- Title: Additional advisory findings discovered during the closure correction
+- Status: Open
+- Date: 2026-10-16
+- Severity: High
+- Scope: braces, node-forge, postcss-selector-parser, sharp and source-map-js;
+  exact advisory IDs, package versions, available fixes and audit evidence live
+  in `docs/closure/2026-10-16-dependencies.md`.
+- Disposition: unresolved and recorded for the operator. The one-time correction
+  requested for shell-quote and brace-expansion does not remediate these findings.
+- Success condition: a separately authorized dependency pass removes these
+  advisories and validates the resulting toolchain, or the operator records a
+  specific risk acceptance. Archiving alone does not meet the condition.
 
 ## OL-001
 
